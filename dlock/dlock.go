@@ -1,9 +1,9 @@
 package dlock
 
 import (
-	"git.qfpay.net/server/goqfpay/logger"
-	"git.qfpay.net/server/goqfpay/redispool"
 	"github.com/garyburd/redigo/redis"
+	"github.com/lanwenhong/goqfpay/logger"
+	"github.com/lanwenhong/goqfpay/redispool"
 	"github.com/satori/go.uuid"
 	"time"
 )

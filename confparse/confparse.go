@@ -3,7 +3,7 @@ package confparse
 import (
 	"errors"
 	"fmt"
-	config "github.com/server/lgobase/gconfig"
+	config "github.com/lanwenhong/lgobase/gconfig"
 	"reflect"
 	"strconv"
 	"strings"

@@ -3,7 +3,7 @@ package ghttpclient
 import (
 	"errors"
 	"fmt"
-	"github.com/lgobase/logger"
+	"github.com/lanwenhong/lgobase/logger"
 	"io"
 	"io/ioutil"
 	"net/http"

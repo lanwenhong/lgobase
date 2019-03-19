@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/garyburd/redigo/redis"
-	"github.com/lgobase/logger"
-	"github.com/lgobase/selector"
+	"github.com/lanwenhong/lgobase/logger"
+	"github.com/lanwenhong/lgobase/selector"
 	"time"
 )
 

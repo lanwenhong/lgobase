@@ -3,7 +3,7 @@ package gpool
 import (
 	"container/list"
 	"fmt"
-	"github.com/lgobase/logger"
+	"github.com/lanwenhong/lgobase/logger"
 	"sync"
 )
 

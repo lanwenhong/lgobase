@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/apache/thrift/lib/go/thrift"
-	"github.com/lgobase/logger"
+	"github.com/lanwenhong/lgobase/logger"
 	"reflect"
 	"time"
 )
