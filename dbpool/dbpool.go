@@ -1,10 +1,10 @@
 package dbpool
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/jmoiron/sqlx"
 	"github.com/lanwenhong/lgobase/dbenc"
 	"github.com/lanwenhong/lgobase/logger"
 	"strconv"
@@ -13,13 +13,13 @@ import (
 
 type Dbpool struct {
 	Tset  *dbenc.DbConf
-	Pools map[string]*sql.DB
+	Pools map[string]*sqlx.DB
 }
 
 func DbpoolNew(conf *dbenc.DbConf) *Dbpool {
 	dbpool := new(Dbpool)
 	dbpool.Tset = conf
-	dbpool.Pools = make(map[string]*sql.DB)
+	dbpool.Pools = make(map[string]*sqlx.DB)
 	return dbpool
 }
 
@@ -65,7 +65,7 @@ func (dbpool *Dbpool) Add(db string, url string) error {
 	dbc := dbpool.Tset.DbConfReadGroup(token)
 	dburl := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8", dbc["user"], dbc["pswd"], dbc["host"], dbc["port"], dbc["dtbs"])
 	logger.Debugf("db url: %s", dburl)
-	dbpool.Pools[db], err = sql.Open("mysql", dburl)
+	dbpool.Pools[db], err = sqlx.Connect("mysql", dburl)
 
 	if err == nil {
 		dbpool.Pools[db].SetMaxOpenConns(maxopen)
