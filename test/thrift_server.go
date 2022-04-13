@@ -3,8 +3,10 @@ package main
 import (
 
     "fmt"
+    "context"
     "github.com/apache/thrift/lib/go/thrift"
-    "lgobase/test/thriftExample/gen-go/echo"
+    "github.com/lanwenhong/lgobase/test/gen-go/echo"
+    "github.com/lanwenhong/lgobase/logger"
 
 )
 
@@ -12,7 +14,7 @@ import (
 type EchoServer struct {
 }
 
-func (e *EchoServer) Echo(req *echo.EchoReq) (*echo.EchoRes, error) {
+func (e *EchoServer) Echo(ctx context.Context, req *echo.EchoReq) (*echo.EchoRes, error) {
     fmt.Printf("message from client: %v\n", req.GetMsg())
 
     res := &echo.EchoRes{
@@ -23,6 +25,9 @@ func (e *EchoServer) Echo(req *echo.EchoReq) (*echo.EchoRes, error) {
 }
 
 func main() {
+    //ctx,cancel := context.WithTimeout(context.Background(),10 * time.Second)
+    //defer cancel()
+
     transport, err := thrift.NewTServerSocket(":9898")
     if err != nil {
         panic(err)
@@ -43,4 +48,9 @@ func main() {
     if err := server.Serve(); err != nil {
         panic(err)
     }
+    logger.SetConsole(true)
+    logger.SetRollingDaily("./",  "my.log", "my.log.err")
+    loglevel, _ := logger.LoggerLevelIndex("DEBUG")
+    logger.SetLevel(loglevel)
+    logger.Debugf("xxxx")
 }
