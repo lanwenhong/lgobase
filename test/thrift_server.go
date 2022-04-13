@@ -6,7 +6,8 @@ import (
     "context"
     "github.com/apache/thrift/lib/go/thrift"
     "github.com/lanwenhong/lgobase/test/gen-go/echo"
-    "github.com/lanwenhong/lgobase/logger"
+    //"github.com/lanwenhong/lgobase/logger"
+    //"github.com/lanwenhong/lgobase/test/mytest" 
 
 )
 
@@ -27,7 +28,7 @@ func (e *EchoServer) Echo(ctx context.Context, req *echo.EchoReq) (*echo.EchoRes
 func main() {
     //ctx,cancel := context.WithTimeout(context.Background(),10 * time.Second)
     //defer cancel()
-
+    //mytest.Mytest()
     transport, err := thrift.NewTServerSocket(":9898")
     if err != nil {
         panic(err)
@@ -48,9 +49,9 @@ func main() {
     if err := server.Serve(); err != nil {
         panic(err)
     }
-    logger.SetConsole(true)
+    /*logger.SetConsole(true)
     logger.SetRollingDaily("./",  "my.log", "my.log.err")
     loglevel, _ := logger.LoggerLevelIndex("DEBUG")
     logger.SetLevel(loglevel)
-    logger.Debugf("xxxx")
+    logger.Debugf("xxxx")*/
 }
