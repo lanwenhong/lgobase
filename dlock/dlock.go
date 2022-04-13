@@ -2,8 +2,8 @@ package dlock
 
 import (
 	"github.com/garyburd/redigo/redis"
-	"github.com/lanwenhong/goqfpay/logger"
-	"github.com/lanwenhong/goqfpay/redispool"
+	"github.com/lanwenhong/lgobase/logger"
+	"github.com/lanwenhong/lgobase/redispool"
 	"github.com/satori/go.uuid"
 	"time"
 )

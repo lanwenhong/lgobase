@@ -3,8 +3,8 @@ package main
 import (
 
     "fmt"
-    "git.apache.org/thrift.git/lib/go/thrift"
-    "thriftExample/gen-go/echo"
+    "github.com/apache/thrift/lib/go/thrift"
+    "lgobase/test/thriftExample/gen-go/echo"
 
 )
 
