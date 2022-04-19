@@ -1,15 +1,54 @@
 package gpool
 
 import (
+    "fmt"
     "testing"
     "time"
     "context"
     "github.com/lanwenhong/lgobase/gpool/gen-go/echo"
     "github.com/lanwenhong/lgobase/gpool"
+	"github.com/apache/thrift/lib/go/thrift"
 )
 
+type EchoServer struct {
 
-func TestClientClient(t *testing.T) {
+}
+
+func (e *EchoServer) Echo(ctx context.Context, req *echo.EchoReq) (*echo.EchoRes, error) {
+    fmt.Printf("message from client: %v\n", req.GetMsg())
+
+    res := &echo.EchoRes{
+        Msg: "success",
+    }   
+
+    return res, nil 
+}
+
+
+func TestBufferClient(t *testing.T) {
+
+	go func(){
+		transport, err := thrift.NewTServerSocket(":9898")
+		if err != nil {
+            t.Fatal(err.Error())
+	    }
+        handler := &EchoServer{}
+        processor := echo.NewEchoProcessor(handler)
+        transportFactory := thrift.NewTBufferedTransportFactory(8192)
+        protocolFactory := thrift.NewTBinaryProtocolFactoryDefault()
+        server := thrift.NewTSimpleServer4(
+            processor,
+            transport,
+            transportFactory,
+            protocolFactory,
+        )
+        if err = server.Serve(); err != nil {
+            t.Fatal(err.Error())
+        }
+
+	}()
+    time.Sleep(3 * time.Second)
+
     ctx, cancel := context.WithTimeout(context.Background(),10 * time.Second)
     defer cancel()
 
