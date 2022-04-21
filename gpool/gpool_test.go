@@ -71,12 +71,14 @@ func TestBufferClient(t *testing.T) {
 
     gp := &gpool.Gpool[echo.EchoClient]{}
     gp.GpoolInit("127.0.0.1", 9898, 3, 10, 5, gpool.CreateThriftBufferConn[echo.EchoClient], echo.NewEchoClientFactory)
-
+    
+    //var rpcerr error = nil
     gc, _ := gp.Get()
     defer gc.Close()
     req := &echo.EchoReq{Msg:"You are welcome."}
     client := gc.Gc.GetThrfitClient()
     ret, err := client.Echo(ctx, req)
+    //rpcerr = err
     if err != nil {
         t.Fatal(err.Error())
     }
@@ -112,22 +114,94 @@ func TestFramedClient(t *testing.T) {
 
     gp := &gpool.Gpool[example.ExampleClient]{}
     gp.GpoolInit("127.0.0.1", 9899, 3, 10, 5, gpool.CreateThriftFramedConn[example.ExampleClient], example.NewExampleClientFactory)
-
+    
     gc, _ := gp.Get()
     defer gc.Close()
+
     client := gc.Gc.GetThrfitClient()
     c , err := client.Add(ctx, 1, 2)
     if err != nil {
         t.Fatal(err.Error())
     }
     t.Log("rpc get c: ", c)
+
+
     if c != 3 {
         t.Fatal("value error")
     }
-    ret, err := client.Echo(ctx, "ganni")    
+    ret, err:= client.Echo(ctx, "ganni")    
     if err != nil {
         t.Fatal(err.Error())
     }
     t.Log("rcp get: ", ret.Ret)
 
+}
+
+func TestGpoolReconnect(t *testing.T) {
+    ctx, cancel := context.WithTimeout(context.Background(),10 * time.Second)
+    defer cancel()
+    
+    gp := &gpool.Gpool[example.ExampleClient]{}
+    gp.GpoolInit("127.0.0.1", 9899, 3, 10, 5, gpool.CreateThriftFramedConn[example.ExampleClient], example.NewExampleClientFactory)
+    for i:= 0; i < 15; i++ {
+        gc, err := gp.Get()
+        client := gc.Gc.GetThrfitClient()
+        ret, err:= client.Echo(ctx, "ganni")
+        gc.Close()
+        if err != nil {
+            t.Log(err.Error())
+            time.Sleep(1 * time.Second)
+            continue
+        }
+        if err == nil {
+            t.Log(ret.Ret)
+        }
+        time.Sleep(1 * time.Second)
+    }
+}
+
+
+func TestGpoolList(t *testing.T) {
+    ctx, cancel := context.WithTimeout(context.Background(),10 * time.Second)
+    defer cancel()
+    gp := &gpool.Gpool[example.ExampleClient]{}
+    gp.GpoolInit("127.0.0.1", 9899, 3, 201, 5, gpool.CreateThriftFramedConn[example.ExampleClient], example.NewExampleClientFactory)
+    
+    cs := make(chan string)
+    for i := 0; i < 200; i++ {
+        go func() {
+            for j := 0; j < 20; j++ {
+                gc, err := gp.Get()
+                if err != nil {
+                    cs <- "error"
+                    break
+                }
+                t.Log("<<<<<DEBUG>>>>>")
+                client := gc.Gc.GetThrfitClient()
+                ret, err:= client.Echo(ctx, "ganni")
+                gc.Close()
+                if err != nil {
+                    t.Log(err.Error())
+                    cs <- "ferror"
+                }
+                t.Log("+++++++++++++", ret.Ret)
+            }
+            cs <- "ok"
+        }()
+
+    }
+    
+    i := 0
+    for s := range cs {
+        t.Log(s)
+        i++
+        if i >= 200 {
+            break
+        }
+        t.Log("<<<<<<>>>>>", i)
+    }
+
+    if gp.GetFreeLen() != 5 {
+        t.Fatal("free len error")
+    }
 }

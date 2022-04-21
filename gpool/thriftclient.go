@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/apache/thrift/lib/go/thrift"
+    //"github.com/lanwenhong/lgobase/logger"
 	"time"
 )
 
@@ -22,7 +23,9 @@ type TConn[T any] struct {
 	Tft      thrift.TTransport
 	Tbt      *thrift.TBufferedTransport
 	Tbp      *thrift.TBinaryProtocolFactory
-	isClose  bool
+	//isClose  bool
+	isOpen   bool
+    
 	Nc       NewThriftClient[T]
     Client   *T
 }
@@ -55,13 +58,13 @@ func (tc *TConn[T]) Open() error {
 	if tc.Protocol == TH_PRO_FRAMED {
 		err := tc.Tft.Open()
 		if err == nil {
-			tc.isClose = false
+			tc.isOpen = tc.Tft.IsOpen()
 		}
 		return err
 	} else if tc.Protocol == TH_PRO_BUFFER {
 		err := tc.Tbt.Open()
 		if err == nil {
-			tc.isClose = false
+			tc.isOpen = tc.Tft.IsOpen()
 		}
 		return err
 	}
@@ -80,22 +83,27 @@ func (tc *TConn[T]) NewThClient(nc NewThriftClient[T]) {
 func (tc *TConn[T]) Close() error {
 	if tc.Protocol == TH_PRO_FRAMED {
 		tc.Tft.Close()
-		tc.isClose = true
+		tc.isOpen = tc.Tft.IsOpen()
 	} else if tc.Protocol == TH_PRO_BUFFER {
 		tc.Tbt.Close()
-		tc.isClose = true
+		tc.isOpen = tc.Tft.IsOpen()
 	}
 	return errors.New("not support")
 }
 
-func (tc *TConn[T]) IsClosed() bool {
-	return tc.isClose
+func (tc *TConn[T]) IsOpen() bool {
+    if tc.Protocol == TH_PRO_FRAMED {
+        tc.isOpen = tc.Tft.IsOpen()
+    } else if tc.Protocol == TH_PRO_BUFFER {
+        tc.isOpen = tc.Tbt.IsOpen()
+    }
+    return tc.isOpen
 }
 
 func NewTConn[T any](addr string, port int, timeout int, protocol int) *TConn[T] {
 	tc := &TConn[T]{}
 	tc.Protocol = protocol
-	tc.isClose = true
+	tc.isOpen = false 
 	tc.Init(addr, port, timeout)
 	return tc
 }

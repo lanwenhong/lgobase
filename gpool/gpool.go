@@ -11,7 +11,7 @@ type Conn[T any] interface {
 	Init(host string, port int, timeout int) error
 	Open() error
 	Close() error
-	IsClosed() bool
+	IsOpen() bool
     GetThrfitClient() *T
 }
 
@@ -19,7 +19,6 @@ type CreateConn[T any] func(string, int, int) (Conn[T], error)
 
 type PoolConn[T any] struct {
 	Gc Conn[T]
-    //Tc *TConn[T]
 	gp *Gpool[T]
 	e  *list.Element
 }
@@ -56,17 +55,17 @@ func (gp *Gpool[T])GpoolInit(addr string, port int, timeout int, maxconns int, m
 func (gp *Gpool[T]) getConnFromFreeList() (*PoolConn[T], error) {
 	e := gp.FreeList.Front()
 	logger.Debugf("after get flist len %d ulist len %d", gp.FreeList.Len(), gp.UseList.Len())
+    var reterr error
 	pc := e.Value.(*PoolConn[T])
-	if pc.Gc.IsClosed() {
-		err := pc.Gc.Open()
-		if err != nil {
-			logger.Warnf("open err %s", err.Error())
-			return nil, err
+	if !pc.Gc.IsOpen() {
+		reterr = pc.Gc.Open()
+		if reterr != nil {
+			logger.Warnf("open err %s", reterr.Error())
 		}
 	}
 	gp.FreeList.Remove(e)
 	e.Value.(*PoolConn[T]).e = gp.UseList.PushBack(e.Value)
-	return e.Value.(*PoolConn[T]), nil
+	return e.Value.(*PoolConn[T]), reterr
 }
 
 func (gp *Gpool[T]) getConnFromNew() (*PoolConn[T], error) {
@@ -102,12 +101,12 @@ func (gp *Gpool[T]) Get() (*PoolConn[T], error) {
 	} else {
 		logger.Debugf("pool full flist %d ulist %d", gp.FreeList.Len(), gp.UseList.Len())
 		flen := gp.FreeList.Len()
-		for i := 0; i < flen-1; i++ {
+		/*for i := 0; i < flen-1; i++ {
 			e := gp.FreeList.Front()
 			pc := e.Value.(*PoolConn[T])
 			pc.Gc.Close()
 			gp.FreeList.Remove(e)
-		}
+		}*/
 		if flen > 0 {
 			return gp.getConnFromFreeList()
 		}
@@ -133,6 +132,14 @@ func (pc *PoolConn[T]) put() error {
 	return nil
 }
 
-func (pc *PoolConn[T]) Close() error {
-	return pc.put()
+func (pc *PoolConn[T]) Close() {
+	pc.put()
+}
+
+func (gp *Gpool[T]) GetFreeLen() int {
+    return gp.FreeList.Len() 
+}
+
+func (gp *Gpool[T]) GetUseLen() int {
+    return gp.UseList.Len()
 }
