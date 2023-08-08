@@ -3,8 +3,9 @@ package gpool
 import (
 	"container/list"
 	"fmt"
-	"github.com/lanwenhong/lgobase/logger"
 	"sync"
+
+	"github.com/lanwenhong/lgobase/logger"
 )
 
 type Conn[T any] interface {
@@ -12,7 +13,7 @@ type Conn[T any] interface {
 	Open() error
 	Close() error
 	IsOpen() bool
-    GetThrfitClient() *T
+	GetThrfitClient() *T
 }
 
 type CreateConn[T any] func(string, int, int) (Conn[T], error)
@@ -38,9 +39,9 @@ type Gpool[T any] struct {
 	TimeOut int
 }
 
-func (gp *Gpool[T])GpoolInit(addr string, port int, timeout int, maxconns int, maxidleconns int, 
-    cfunc CreateConn[T], clfunc NewThriftClient[T]) {
-    gp.FreeList = list.New()
+func (gp *Gpool[T]) GpoolInit(addr string, port int, timeout int, maxconns int, maxidleconns int,
+	cfunc CreateConn[T], clfunc NewThriftClient[T]) {
+	gp.FreeList = list.New()
 	gp.UseList = list.New()
 	gp.MaxConns = maxconns
 	gp.MaxIdleConns = maxidleconns
@@ -48,14 +49,13 @@ func (gp *Gpool[T])GpoolInit(addr string, port int, timeout int, maxconns int, m
 	gp.Port = port
 	gp.TimeOut = timeout
 	gp.Cfunc = cfunc
-	gp.Nc = clfunc 
+	gp.Nc = clfunc
 }
-
 
 func (gp *Gpool[T]) getConnFromFreeList() (*PoolConn[T], error) {
 	e := gp.FreeList.Front()
 	logger.Debugf("after get flist len %d ulist len %d", gp.FreeList.Len(), gp.UseList.Len())
-    var reterr error
+	var reterr error
 	pc := e.Value.(*PoolConn[T])
 	if !pc.Gc.IsOpen() {
 		reterr = pc.Gc.Open()
@@ -72,6 +72,7 @@ func (gp *Gpool[T]) getConnFromNew() (*PoolConn[T], error) {
 	var err error
 	pc := new(PoolConn[T])
 	pc.gp = gp
+	logger.Debugf("----%v", gp.Cfunc)
 	pc.Gc, err = gp.Cfunc(gp.Addr, gp.Port, gp.TimeOut)
 	if err == nil {
 		switch pc.Gc.(type) {
@@ -94,8 +95,10 @@ func (gp *Gpool[T]) Get() (*PoolConn[T], error) {
 	defer gp.mutex.Unlock()
 	if gp.FreeList.Len()+gp.UseList.Len() < gp.MaxConns {
 		if gp.FreeList.Len() > 0 {
+			logger.Debugf("get conn from freelist")
 			return gp.getConnFromFreeList()
 		} else {
+			logger.Debugf("get conn from new")
 			return gp.getConnFromNew()
 		}
 	} else {
@@ -137,9 +140,9 @@ func (pc *PoolConn[T]) Close() {
 }
 
 func (gp *Gpool[T]) GetFreeLen() int {
-    return gp.FreeList.Len() 
+	return gp.FreeList.Len()
 }
 
 func (gp *Gpool[T]) GetUseLen() int {
-    return gp.UseList.Len()
+	return gp.UseList.Len()
 }

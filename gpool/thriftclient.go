@@ -3,12 +3,13 @@ package gpool
 import (
 	"errors"
 	"fmt"
-	"github.com/apache/thrift/lib/go/thrift"
-    //"github.com/lanwenhong/lgobase/logger"
 	"time"
+
+	"github.com/apache/thrift/lib/go/thrift"
+	"github.com/lanwenhong/lgobase/logger"
 )
 
-type NewThriftClient[T any] func(thrift.TTransport, thrift.TProtocolFactory) *T 
+type NewThriftClient[T any] func(thrift.TTransport, thrift.TProtocolFactory) *T
 
 const (
 	TH_PRO_FRAMED = iota
@@ -24,14 +25,14 @@ type TConn[T any] struct {
 	Tbt      *thrift.TBufferedTransport
 	Tbp      *thrift.TBinaryProtocolFactory
 	//isClose  bool
-	isOpen   bool
-    
-	Nc       NewThriftClient[T]
-    Client   *T
+	isOpen bool
+
+	Nc     NewThriftClient[T]
+	Client *T
 }
 
-func (tc *TConn[T])GetThrfitClient() *T {
-    return tc.Client
+func (tc *TConn[T]) GetThrfitClient() *T {
+	return tc.Client
 }
 
 func (tc *TConn[T]) Init(addr string, port int, timeout int) error {
@@ -64,7 +65,7 @@ func (tc *TConn[T]) Open() error {
 	} else if tc.Protocol == TH_PRO_BUFFER {
 		err := tc.Tbt.Open()
 		if err == nil {
-			tc.isOpen = tc.Tft.IsOpen()
+			tc.isOpen = tc.Tbt.IsOpen()
 		}
 		return err
 	}
@@ -92,18 +93,18 @@ func (tc *TConn[T]) Close() error {
 }
 
 func (tc *TConn[T]) IsOpen() bool {
-    if tc.Protocol == TH_PRO_FRAMED {
-        tc.isOpen = tc.Tft.IsOpen()
-    } else if tc.Protocol == TH_PRO_BUFFER {
-        tc.isOpen = tc.Tbt.IsOpen()
-    }
-    return tc.isOpen
+	if tc.Protocol == TH_PRO_FRAMED {
+		tc.isOpen = tc.Tft.IsOpen()
+	} else if tc.Protocol == TH_PRO_BUFFER {
+		tc.isOpen = tc.Tbt.IsOpen()
+	}
+	return tc.isOpen
 }
 
 func NewTConn[T any](addr string, port int, timeout int, protocol int) *TConn[T] {
 	tc := &TConn[T]{}
 	tc.Protocol = protocol
-	tc.isOpen = false 
+	tc.isOpen = false
 	tc.Init(addr, port, timeout)
 	return tc
 }
@@ -116,8 +117,11 @@ func CreateThriftFramedConn[T any](addr string, port int, timeout int) (c Conn[T
 }
 
 func CreateThriftBufferConn[T any](addr string, port int, timeout int) (c Conn[T], err error) {
+	logger.Debugf("in CreateThriftBufferConn")
 	conn := NewTConn[T](addr, port, timeout, TH_PRO_BUFFER)
+	logger.Debugf("conn created: %v", conn)
 	err = conn.Open()
+	logger.Debugf("conn opened")
 	c = conn
 	return c, err
 }
