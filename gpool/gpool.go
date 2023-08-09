@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/lanwenhong/lgobase/logger"
 )
 
@@ -135,7 +136,18 @@ func (pc *PoolConn[T]) put() error {
 	return nil
 }
 
-func (pc *PoolConn[T]) Close() {
+func (pc *PoolConn[T]) Close(err error) {
+	switch err.(type) {
+	case thrift.TTransportException:
+		tte := err.(thrift.TTransportException)
+		e_type_id := tte.TypeId()
+		logger.Warnf("e id: %d", e_type_id)
+	case thrift.TProtocolException:
+		tpe := err.(thrift.TProtocolException)
+		e_type_id := tpe.TypeId()
+		logger.Warnf("e id: %d", e_type_id)
+		pc.Gc.Close()
+	}
 	pc.put()
 }
 

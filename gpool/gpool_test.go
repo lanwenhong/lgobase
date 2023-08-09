@@ -75,12 +75,14 @@ func TestBufferClient(t *testing.T) {
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	defer gc.Close()
+	var rpc_err error = nil
+	defer gc.Close(rpc_err)
+
 	req := &echo.EchoReq{Msg: "You are welcome."}
 	client := gc.Gc.GetThrfitClient()
-	ret, err := client.Echo(ctx, req)
+	ret, rpc_err := client.Echo(ctx, req)
 	//rpcerr = err
-	if err != nil {
+	if rpc_err != nil {
 		t.Fatal(err.Error())
 	}
 	t.Log("rpc get: ", ret.Msg)
@@ -116,13 +118,14 @@ func TestFramedClient(t *testing.T) {
 	gp := &gpool.Gpool[example.ExampleClient]{}
 	gp.GpoolInit("127.0.0.1", 9899, 3, 10, 5, gpool.CreateThriftFramedConn[example.ExampleClient], example.NewExampleClientFactory)
 
+	var rpc_err error = nil
 	gc, _ := gp.Get()
-	defer gc.Close()
+	defer gc.Close(rpc_err)
 
 	client := gc.Gc.GetThrfitClient()
-	c, err := client.Add(ctx, 1, 2)
-	if err != nil {
-		t.Fatal(err.Error())
+	c, rpc_err := client.Add(ctx, 1, 2)
+	if rpc_err != nil {
+		t.Fatal(rpc_err.Error())
 	}
 	t.Log("rpc get c: ", c)
 
@@ -147,7 +150,7 @@ func TestGpoolReconnect(t *testing.T) {
 		gc, err := gp.Get()
 		client := gc.Gc.GetThrfitClient()
 		ret, err := client.Echo(ctx, "ganni")
-		gc.Close()
+		gc.Close(err)
 		if err != nil {
 			t.Log(err.Error())
 			time.Sleep(1 * time.Second)
@@ -178,7 +181,7 @@ func TestGpoolList(t *testing.T) {
 				t.Log("<<<<<DEBUG>>>>>")
 				client := gc.Gc.GetThrfitClient()
 				ret, err := client.Echo(ctx, "ganni")
-				gc.Close()
+				gc.Close(err)
 				if err != nil {
 					t.Log(err.Error())
 					cs <- "ferror"
