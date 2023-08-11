@@ -3,27 +3,48 @@ package dbpool
 import (
 	"errors"
 	"fmt"
+
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
-	"github.com/lanwenhong/lgobase/dbenc"
-	"github.com/lanwenhong/lgobase/logger"
+
 	"strconv"
 	"strings"
+
+	"github.com/lanwenhong/lgobase/dbenc"
+	"github.com/lanwenhong/lgobase/logger"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
+	dlog "gorm.io/gorm/logger"
+)
+
+const (
+	USE_SQLX = iota
+	USE_GORM
 )
 
 type Dbpool struct {
-	Tset  *dbenc.DbConf
-	Pools map[string]*sqlx.DB
+	Tset     *dbenc.DbConf
+	Pools    map[string]*sqlx.DB
+	OrmPools map[string]*gorm.DB
+
+	Logobj   *logger.FILE
+	GormConf *dlog.Config
 }
 
 func DbpoolNew(conf *dbenc.DbConf) *Dbpool {
 	dbpool := new(Dbpool)
 	dbpool.Tset = conf
 	dbpool.Pools = make(map[string]*sqlx.DB)
+	dbpool.OrmPools = make(map[string]*gorm.DB)
 	return dbpool
 }
 
-func (dbpool *Dbpool) Add(db string, url string) error {
+func (dbpool *Dbpool) SetormLog(logobj *logger.FILE, gormConf *dlog.Config) {
+	dbpool.Logobj = logobj
+	dbpool.GormConf = gormConf
+}
+
+func (dbpool *Dbpool) Add(db string, url string, model int) error {
 	xdata := strings.Split(url, "?")
 	logger.Debugf("xdata: %v", xdata)
 
@@ -65,11 +86,21 @@ func (dbpool *Dbpool) Add(db string, url string) error {
 	dbc := dbpool.Tset.DbConfReadGroup(token)
 	dburl := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8", dbc["user"], dbc["pswd"], dbc["host"], dbc["port"], dbc["dtbs"])
 	logger.Debugf("db url: %s", dburl)
-	dbpool.Pools[db], err = sqlx.Connect("mysql", dburl)
+	if model == USE_SQLX {
+		dbpool.Pools[db], err = sqlx.Connect("mysql", dburl)
 
-	if err == nil {
-		dbpool.Pools[db].SetMaxOpenConns(maxopen)
-		dbpool.Pools[db].SetMaxIdleConns(maxidle)
+		if err == nil {
+			dbpool.Pools[db].SetMaxOpenConns(maxopen)
+			dbpool.Pools[db].SetMaxIdleConns(maxidle)
+		}
+	} else if model == USE_GORM {
+		mylog := logger.New(dbpool.Logobj, *dbpool.GormConf)
+		dbpool.OrmPools[db], err = gorm.Open(mysql.Open(dburl), &gorm.Config{Logger: mylog})
+		if err == nil {
+			sqlDB, _ := dbpool.OrmPools[db].DB()
+			sqlDB.SetMaxOpenConns(maxopen)
+			sqlDB.SetMaxIdleConns(maxidle)
+		}
 	}
 	return err
 }
