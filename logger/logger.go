@@ -26,7 +26,7 @@ const (
 )
 
 const (
-	ROTATE_FILE_DAYLY = iota + 100
+	ROTATE_FILE_DAILY = iota + 100
 	ROTATE_FILE_NUM
 )
 
@@ -38,7 +38,8 @@ var maxFileCount int32
 var dailyRolling bool = true
 var consoleAppender bool = true
 var RollingFile bool = false
-var LogObj *FILE = nil
+
+//var LogObj *FILE = nil
 
 const DATEFORMAT = "2006-01-02"
 
@@ -130,14 +131,14 @@ func (glog *Glog) fileMonitor() {
 }
 
 func (glog *Glog) fileCheck() {
-	defer func() {
+	/*defer func() {
 		if err := recover(); err != nil {
 			log.Println(err)
 		}
-	}()
+	}()*/
 	if glog.LogObj != nil && glog.isMustRename() {
-		LogObj.mu.Lock()
-		defer LogObj.mu.Unlock()
+		glog.LogObj.mu.Lock()
+		defer glog.LogObj.mu.Unlock()
 		glog.rename()
 	}
 }
@@ -165,7 +166,7 @@ func (glog *Glog) SetRollingFile(fileDir, fileName string, stdout bool) error {
 	if !glog.isMustRename() {
 		if !stdout {
 			glog.LogObj.logfile, _ = os.OpenFile(fileDir+"/"+fileName, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
-			glog.LogObj.lg = log.New(LogObj.logfile, "", log.Ldate|log.Lmicroseconds|log.Lshortfile)
+			glog.LogObj.lg = log.New(glog.LogObj.logfile, "", log.Ldate|log.Lmicroseconds|log.Lshortfile)
 		} else {
 			glog.LogObj.lg = log.New(os.Stdout, "", log.Ldate|log.Lmicroseconds|log.Lshortfile)
 		}
@@ -250,7 +251,7 @@ func Debug(fmtstr string, v ...interface{}) {
 		//if dailyRolling {
 		Gfilelog.fileCheck()
 		//}
-		defer catchError()
+		//defer catchError()
 		if Gfilelog.LogObj != nil {
 			Gfilelog.LogObj.mu.RLock()
 			defer Gfilelog.LogObj.mu.RUnlock()
@@ -269,7 +270,7 @@ func Info(fmtstr string, v ...interface{}) {
 	//if dailyRolling {
 	Gfilelog.fileCheck()
 	//}
-	defer catchError()
+	//defer catchError()
 	if Gfilelog.LogObj != nil {
 		Gfilelog.LogObj.mu.RLock()
 		defer Gfilelog.LogObj.mu.RUnlock()
@@ -289,7 +290,7 @@ func Warn(fmtstr string, v ...interface{}) {
 	//if dailyRolling {
 	Gfilelog.fileCheck()
 	//}
-	defer catchError()
+	//defer catchError()
 	if Gfilelog.LogObj != nil {
 		Gfilelog.LogObj.mu.RLock()
 		defer Gfilelog.LogObj.mu.RUnlock()
@@ -308,7 +309,7 @@ func Warnf(fmtstr string, v ...interface{}) {
 
 func Error(fmtstr string, v ...interface{}) {
 	Gfilelog.fileCheck()
-	defer catchError()
+	//defer catchError()
 	if Gfilelog.LogObj != nil {
 		Gfilelog.LogObj.mu.RLock()
 		defer Gfilelog.LogObj.mu.RUnlock()
@@ -327,8 +328,9 @@ func Errorf(fmtstr string, v ...interface{}) {
 }
 
 func (glog *Glog) isMustRename() bool {
-	if glog.Logconf.RotateMethod == ROTATE_FILE_DAYLY {
+	if glog.Logconf.RotateMethod == ROTATE_FILE_DAILY {
 		t, _ := time.Parse(DATEFORMAT, time.Now().Format(DATEFORMAT))
+		fmt.Println("====debug")
 		if t.After(*(glog.LogObj.Ldate)) {
 			return true
 		}
@@ -344,7 +346,7 @@ func (glog *Glog) isMustRename() bool {
 
 func (glog *Glog) rename() {
 	f := glog.LogObj
-	if glog.Logconf.RotateMethod == ROTATE_FILE_DAYLY {
+	if glog.Logconf.RotateMethod == ROTATE_FILE_DAILY {
 		fn := f.dir + "/" + f.filename + "." + f.Ldate.Format(DATEFORMAT)
 		fn_err := f.dir + "/" + f.filename_err + "." + f.Ldate.Format(DATEFORMAT)
 
@@ -362,12 +364,12 @@ func (glog *Glog) rename() {
 			f.Ldate = &t
 
 			f.logfile, _ = os.Create(f.dir + "/" + f.filename)
-			f.lg = log.New(LogObj.logfile, "", log.Ldate|log.Lmicroseconds|log.Lshortfile)
+			f.lg = log.New(glog.LogObj.logfile, "", log.Ldate|log.Lmicroseconds|log.Lshortfile)
 			f.logfile_err, _ = os.Create(f.dir + "/" + f.filename_err)
-			f.lg_err = log.New(LogObj.logfile_err, "", log.Ldate|log.Lmicroseconds|log.Lshortfile)
+			f.lg_err = log.New(glog.LogObj.logfile_err, "", log.Ldate|log.Lmicroseconds|log.Lshortfile)
 		}
 	} else {
-		f.coverNextOne()
+		glog.coverNextOne()
 	}
 }
 
@@ -375,7 +377,8 @@ func (f *FILE) nextSuffix() int {
 	return int(f._suffix%int(maxFileCount) + 1)
 }
 
-func (f *FILE) coverNextOne() {
+func (glog *Glog) coverNextOne() {
+	f := glog.LogObj
 	f._suffix = f.nextSuffix()
 	if f.logfile != nil {
 		f.logfile.Close()
@@ -385,7 +388,7 @@ func (f *FILE) coverNextOne() {
 	}
 	os.Rename(f.dir+"/"+f.filename, f.dir+"/"+f.filename+"."+strconv.Itoa(int(f._suffix)))
 	f.logfile, _ = os.Create(f.dir + "/" + f.filename)
-	f.lg = log.New(LogObj.logfile, "", log.Ldate|log.Lmicroseconds|log.Lshortfile)
+	f.lg = log.New(f.logfile, "", log.Ldate|log.Lmicroseconds|log.Lshortfile)
 }
 
 func (glog *Glog) fileSize(file string) int64 {

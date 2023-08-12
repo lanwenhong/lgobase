@@ -103,7 +103,7 @@ func TestDBTraceWarnLog(t *testing.T) {
 
 func TestLogfile(t *testing.T) {
 	myconf := &logger.Glogconf{
-		RotateMethod: logger.ROTATE_FILE_DAYLY,
+		RotateMethod: logger.ROTATE_FILE_DAILY,
 		Stdout:       false,
 		Loglevel:     logger.DEBUG,
 	}
@@ -117,19 +117,19 @@ func TestLogfile(t *testing.T) {
 
 func TestLogRatate(t *testing.T) {
 	myconf := &logger.Glogconf{
-		RotateMethod: logger.ROTATE_FILE_DAYLY,
+		RotateMethod: logger.ROTATE_FILE_DAILY,
 		Stdout:       false,
 		Loglevel:     logger.DEBUG,
 	}
 	logger.Newglog("./", "test.log", "test.log.err", myconf)
 
 	logger.Info("test")
-	logger.Info("test")
-	logger.Info("test")
-	logger.Warn("test")
+	//logger.Info("test")
+	//logger.Info("test")
+	//logger.Warn("test")
 
 	time.Sleep(2 * time.Second)
-	stringTime := "2023-08-13 16:40:41"
+	stringTime := "2023-08-11 16:40:41"
 	loc, _ := time.LoadLocation("Local")
 	rotate, _ := time.ParseInLocation("2006-01-02 15:04:05", stringTime, loc)
 	logger.Gfilelog.LogObj.Ldate = &rotate
