@@ -23,9 +23,9 @@ type User struct {
 	Age       sql.NullInt64 `gorm:"column:age"`
 	Mobile    string        `gorm:"type:varchar(16);column:name;index:idx_mobile,unique"`
 	Sex       string        `gorm:"type:varchar(2);column:sex"`
-	CreatedAt time.Time     `gorm:"column:crateat"`
-	UpdatedAt time.Time     `gorm:"column:updateat"`
-	DeletedAt time.Time     `gorm:"column:deleteat"`
+	CreatedAt time.Time     `gorm:"column:createat;type:datetime(0)"`
+	UpdatedAt time.Time     `gorm:"column:updateat;type:datetime(0)"`
+	DeletedAt time.Time     `gorm:"column:deleteat;type:datetime(0)"`
 }
 
 func TestLoadDbconf(t *testing.T) {
@@ -65,10 +65,26 @@ func TestQuery(t *testing.T) {
 }
 
 func TestCreate(t *testing.T) {
+
+	logger.SetConsole(true)
+	logger.SetRollingDaily("./", "test.log", "test.log.err")
+	loglevel, _ := logger.LoggerLevelIndex("DEBUG")
+	logger.SetLevel(loglevel)
+
+	dconfig := &dlog.Config{
+		SlowThreshold:             time.Second, // 慢 SQL 阈值
+		LogLevel:                  dlog.Info,   // 日志级别
+		IgnoreRecordNotFoundError: true,        // 忽略ErrRecordNotFound（记录未找到）错误
+		Colorful:                  false,       // 禁用彩色打印
+	}
+
 	db_conf := dbenc.DbConfNew("db.ini")
 	dbs := dbpool.DbpoolNew(db_conf)
+	dbs.SetormLog(dconfig)
+
 	tk := "qfconf://test1?maxopen=1000&maxidle=30"
 	err := dbs.Add("test1", tk, dbpool.USE_GORM)
+
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,7 +103,6 @@ func TestCreate(t *testing.T) {
 }
 
 func TestCreateMulti(t *testing.T) {
-
 	logger.SetConsole(true)
 	logger.SetRollingDaily("./", "test.log", "test.log.err")
 	loglevel, _ := logger.LoggerLevelIndex("DEBUG")
@@ -102,8 +117,7 @@ func TestCreateMulti(t *testing.T) {
 
 	db_conf := dbenc.DbConfNew("db.ini")
 	dbs := dbpool.DbpoolNew(db_conf)
-	dbs.SetormLog(logger.LogObj, dconfig)
-	//dbs.SetormLog(nil, dconfig)
+	dbs.SetormLog(dconfig)
 	tk := "qfconf://test1?maxopen=1000&maxidle=30"
 	err := dbs.Add("test1", tk, dbpool.USE_GORM)
 	if err != nil {
@@ -143,4 +157,34 @@ func TestCreateMulti(t *testing.T) {
 		},
 	}
 	tdb.Create(&users)
+}
+
+func TestQuery1(t *testing.T) {
+	user := User{}
+	logger.SetConsole(true)
+	logger.SetRollingDaily("./", "test.log", "test.log.err")
+	loglevel, _ := logger.LoggerLevelIndex("DEBUG")
+	logger.SetLevel(loglevel)
+
+	dconfig := &dlog.Config{
+		SlowThreshold:             time.Second, // 慢 SQL 阈值
+		LogLevel:                  dlog.Info,   // 日志级别
+		IgnoreRecordNotFoundError: true,        // 忽略ErrRecordNotFound（记录未找到）错误
+		Colorful:                  false,       // 禁用彩色打印
+	}
+
+	db_conf := dbenc.DbConfNew("db.ini")
+	dbs := dbpool.DbpoolNew(db_conf)
+	dbs.SetormLog(dconfig)
+	tk := "qfconf://test1?maxopen=1000&maxidle=30"
+	err := dbs.Add("test1", tk, dbpool.USE_GORM)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tdb := dbs.OrmPools["test1"]
+	tdb.Where("name = ?", "wowow").First(&user)
+
+	t.Log(user)
+	c_tm := user.CreatedAt.Format("2006-01-02 15:04:05")
+	t.Log(c_tm)
 }

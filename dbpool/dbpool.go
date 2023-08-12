@@ -39,8 +39,9 @@ func DbpoolNew(conf *dbenc.DbConf) *Dbpool {
 	return dbpool
 }
 
-func (dbpool *Dbpool) SetormLog(logobj *logger.FILE, gormConf *dlog.Config) {
-	dbpool.Logobj = logobj
+// func (dbpool *Dbpool) SetormLog(logobj *logger.FILE, gormConf *dlog.Config) {
+func (dbpool *Dbpool) SetormLog(gormConf *dlog.Config) {
+	dbpool.Logobj = logger.LogObj
 	dbpool.GormConf = gormConf
 }
 
@@ -84,7 +85,7 @@ func (dbpool *Dbpool) Add(db string, url string, model int) error {
 	token := tdata[1]
 	logger.Debugf("token: %s", token)
 	dbc := dbpool.Tset.DbConfReadGroup(token)
-	dburl := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8", dbc["user"], dbc["pswd"], dbc["host"], dbc["port"], dbc["dtbs"])
+	dburl := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8&parseTime=true", dbc["user"], dbc["pswd"], dbc["host"], dbc["port"], dbc["dtbs"])
 	logger.Debugf("db url: %s", dburl)
 	if model == USE_SQLX {
 		dbpool.Pools[db], err = sqlx.Connect("mysql", dburl)
