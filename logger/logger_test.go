@@ -104,21 +104,23 @@ func TestDBTraceWarnLog(t *testing.T) {
 func TestLogfile(t *testing.T) {
 	myconf := &logger.Glogconf{
 		RotateMethod: logger.ROTATE_FILE_DAILY,
-		Stdout:       false,
-		Loglevel:     logger.DEBUG,
+		Stdout:       true,
+		ColorFull:    true,
+		Loglevel:     logger.ERROR,
 	}
 	logger.Newglog("./", "test.log", "test.log.err", myconf)
 	logger.Debug("it is a test")
 	logger.Info("it is a test")
 	logger.Warn("it is a test")
-	logger.Warnf("it is a test")
+	//logger.Warnf("it is a test")
 	logger.Error("it is a error")
+	logger.Error("d=%d", 1)
 }
 
 func TestLogRatate(t *testing.T) {
 	myconf := &logger.Glogconf{
 		RotateMethod: logger.ROTATE_FILE_DAILY,
-		Stdout:       false,
+		Stdout:       true,
 		Loglevel:     logger.DEBUG,
 	}
 	logger.Newglog("./", "test.log", "test.log.err", myconf)

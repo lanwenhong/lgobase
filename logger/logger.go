@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"runtime"
 	"strconv"
 	"sync"
 	"time"
@@ -144,10 +143,6 @@ func (glog *Glog) fileCheck() {
 }
 
 func (glog *Glog) SetRollingFile(fileDir, fileName string, stdout bool) error {
-	//maxFileCount = glog.MaxNumber
-	//maxFileSize = maxSize * int64(_unit)
-	//RollingFile = true
-	//dailyRolling = false
 	glog.LogObj = &FILE{
 		dir:      fileDir,
 		filename: fileName,
@@ -195,11 +190,13 @@ func (glog *Glog) SetRollingDaily(fileDir, fileName, fileName_err string, stdout
 
 	if !glog.isMustRename() {
 		if !stdout {
+			fmt.Println("==0000000000000===")
 			glog.LogObj.logfile, _ = os.OpenFile(fileDir+"/"+fileName, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
-			glog.LogObj.lg = log.New(glog.LogObj.logfile, "", log.Ldate|log.Lmicroseconds|log.Lshortfile)
+			//glog.LogObj.lg = log.New(glog.LogObj.logfile, "", log.Ldate|log.Lmicroseconds|log.Lshortfile|log.Llongfile|log.LstdFlags)
+			glog.LogObj.lg = log.New(glog.LogObj.logfile, "", log.Ldate|log.Lmicroseconds|log.LstdFlags)
 
 			glog.LogObj.logfile_err, _ = os.OpenFile(fileDir+"/"+fileName_err, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
-			glog.LogObj.lg_err = log.New(glog.LogObj.logfile_err, "", log.Ldate|log.Lmicroseconds|log.Lshortfile)
+			glog.LogObj.lg_err = log.New(glog.LogObj.logfile_err, "", log.Ldate|log.Lmicroseconds|log.Lshortfile|log.Llongfile|log.LstdFlags)
 		} else {
 			glog.LogObj.lg = log.New(os.Stdout, "", log.Ldate|log.Lmicroseconds|log.Lshortfile)
 		}
@@ -209,37 +206,6 @@ func (glog *Glog) SetRollingDaily(fileDir, fileName, fileName_err string, stdout
 
 }
 
-func console(s ...interface{}) {
-	if consoleAppender {
-		_, file, line, _ := runtime.Caller(2)
-		short := file
-		for i := len(file) - 1; i > 0; i-- {
-			if file[i] == '/' {
-				short = file[i+1:]
-				break
-			}
-		}
-		file = short
-		log.Println(file, strconv.Itoa(line), s)
-	}
-}
-
-func console_new(v string) {
-	if consoleAppender {
-		_, file, line, _ := runtime.Caller(2)
-		short := file
-		for i := len(file) - 1; i > 0; i-- {
-			if file[i] == '/' {
-				short = file[i+1:]
-				break
-			}
-		}
-		file = short
-		var pv = file + " " + strconv.Itoa(line) + " " + v
-		log.Println(pv)
-	}
-}
-
 func catchError() {
 	if err := recover(); err != nil {
 		log.Println("err", err)
@@ -247,16 +213,15 @@ func catchError() {
 }
 
 func Debug(fmtstr string, v ...interface{}) {
-	if Gfilelog != nil {
-		//if dailyRolling {
+	if Gfilelog != nil && Gfilelog.LogObj != nil {
 		Gfilelog.fileCheck()
-		//}
-		//defer catchError()
 		if Gfilelog.LogObj != nil {
 			Gfilelog.LogObj.mu.RLock()
 			defer Gfilelog.LogObj.mu.RUnlock()
 		}
-		if Gfilelog.Logconf.Loglevel <= DEBUG {
+		if Gfilelog.Logconf.Stdout && Gfilelog.Logconf.ColorFull && Gfilelog.Logconf.Loglevel <= DEBUG {
+			Gfilelog.LogObj.lg.Printf(Green+"[DEBUG] "+fmtstr+Reset, v...)
+		} else if Gfilelog.Logconf.Loglevel <= DEBUG {
 			Gfilelog.LogObj.lg.Printf("[DEBUG] "+fmtstr, v...)
 		}
 	}
@@ -267,16 +232,13 @@ func Debugf(fmtstr string, v ...interface{}) {
 }
 
 func Info(fmtstr string, v ...interface{}) {
-	//if dailyRolling {
-	Gfilelog.fileCheck()
-	//}
-	//defer catchError()
-	if Gfilelog.LogObj != nil {
+	if Gfilelog != nil && Gfilelog.LogObj != nil {
+		Gfilelog.fileCheck()
 		Gfilelog.LogObj.mu.RLock()
 		defer Gfilelog.LogObj.mu.RUnlock()
-	}
-	if Gfilelog.Logconf.Loglevel <= INFO {
-		if Gfilelog.LogObj != nil {
+		if Gfilelog.Logconf.Stdout && Gfilelog.Logconf.ColorFull && Gfilelog.Logconf.Loglevel <= INFO {
+			Gfilelog.LogObj.lg.Printf(Green+"[INFO] "+fmtstr+Reset, v...)
+		} else if Gfilelog.Logconf.Loglevel <= INFO {
 			Gfilelog.LogObj.lg.Printf("[INFO] "+fmtstr, v...)
 		}
 	}
@@ -287,17 +249,16 @@ func Infof(fmtstr string, v ...interface{}) {
 }
 
 func Warn(fmtstr string, v ...interface{}) {
-	//if dailyRolling {
-	Gfilelog.fileCheck()
-	//}
-	//defer catchError()
-	if Gfilelog.LogObj != nil {
+	if Gfilelog != nil && Gfilelog.LogObj != nil {
+		Gfilelog.fileCheck()
 		Gfilelog.LogObj.mu.RLock()
 		defer Gfilelog.LogObj.mu.RUnlock()
-	}
 
-	if Gfilelog.Logconf.Loglevel <= WARN {
-		if Gfilelog.LogObj != nil {
+		if Gfilelog.Logconf.Stdout && Gfilelog.Logconf.ColorFull && Gfilelog.Logconf.Loglevel <= WARN {
+			Gfilelog.LogObj.lg.Printf(Yellow+"[WARN] "+fmtstr+Reset, v...)
+		} else if Gfilelog.Logconf.Stdout && Gfilelog.Logconf.Loglevel <= WARN {
+			Gfilelog.LogObj.lg.Printf("[WARN] "+fmtstr, v...)
+		} else if Gfilelog.Logconf.Loglevel <= WARN {
 			Gfilelog.LogObj.lg.Printf("[WARN] "+fmtstr, v...)
 			Gfilelog.LogObj.lg_err.Printf("[WARN] "+fmtstr, v...)
 		}
@@ -308,14 +269,16 @@ func Warnf(fmtstr string, v ...interface{}) {
 }
 
 func Error(fmtstr string, v ...interface{}) {
-	Gfilelog.fileCheck()
-	//defer catchError()
-	if Gfilelog.LogObj != nil {
+	if Gfilelog != nil && Gfilelog.LogObj != nil {
+		Gfilelog.fileCheck()
 		Gfilelog.LogObj.mu.RLock()
 		defer Gfilelog.LogObj.mu.RUnlock()
-	}
-	if Gfilelog.Logconf.Loglevel <= ERROR {
-		if Gfilelog.LogObj != nil {
+		if Gfilelog.Logconf.Stdout && Gfilelog.Logconf.ColorFull && Gfilelog.Logconf.Loglevel <= ERROR {
+			Gfilelog.LogObj.lg.Printf(Red+"[ERROR] "+fmtstr+Reset, v...)
+
+		} else if Gfilelog.Logconf.Stdout && Gfilelog.Logconf.Loglevel <= ERROR {
+			Gfilelog.LogObj.lg.Printf("[ERROR] "+fmtstr, v...)
+		} else if Gfilelog.Logconf.Loglevel <= ERROR {
 			Gfilelog.LogObj.lg.Printf("[ERROR] "+fmtstr, v...)
 			Gfilelog.LogObj.lg_err.Printf("[ERROR] "+fmtstr, v...)
 
@@ -328,9 +291,11 @@ func Errorf(fmtstr string, v ...interface{}) {
 }
 
 func (glog *Glog) isMustRename() bool {
+	/*if glog.Logconf.Stdout {
+		return false
+	}*/
 	if glog.Logconf.RotateMethod == ROTATE_FILE_DAILY {
 		t, _ := time.Parse(DATEFORMAT, time.Now().Format(DATEFORMAT))
-		fmt.Println("====debug")
 		if t.After(*(glog.LogObj.Ldate)) {
 			return true
 		}
