@@ -135,10 +135,13 @@ func (l MyDBlogger) Error(ctx context.Context, msg string, data ...interface{}) 
 }
 
 func (l MyDBlogger) Trace(ctx context.Context, begin time.Time, fc func() (string, int64), err error) {
-	l.glog.fileCheck()
-	if l.glog.LogObj != nil {
-		l.glog.LogObj.mu.RLock()
-		defer l.glog.LogObj.mu.RUnlock()
+
+	if l.glog != nil && l.glog.LogObj != nil {
+		l.glog.fileCheck()
+		if l.glog.LogObj != nil {
+			l.glog.LogObj.mu.RLock()
+			defer l.glog.LogObj.mu.RUnlock()
+		}
 	}
 	if l.LogLevel <= dlog.Silent {
 		return
