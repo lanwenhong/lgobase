@@ -63,7 +63,7 @@ func New(glog *Glog, config dlog.Config) dlog.Interface {
 		//traceErrStr = dlog.RedBold + "%s " + dlog.MagentaBold + "%s\n" + dlog.Reset + dlog.Yellow + "[%.3fms] " + dlog.BlueBold + "[rows:%v]" + dlog.Reset + " %s"
 		traceErrStr = dlog.RedBold + "%s" + " [error] " + "%s" + "|" + "time=%.3fms" + "|" + "rows=%v" + "|" + "%s" + dlog.Reset
 	}
-	if glog.LogObj != nil {
+	if glog != nil && glog.LogObj != nil {
 		return &MyDBlogger{
 			glog:         glog,
 			Writer:       glog.LogObj.lg,
@@ -97,13 +97,17 @@ func (l *MyDBlogger) LogMode(level dlog.LogLevel) dlog.Interface {
 }
 
 func (l MyDBlogger) Info(ctx context.Context, msg string, data ...interface{}) {
-	l.glog.fileCheck()
-	if l.glog.LogObj != nil {
-		l.glog.LogObj.mu.RLock()
-		defer l.glog.LogObj.mu.RUnlock()
+	if l.glog != nil && l.glog.LogObj != nil {
+		l.glog.fileCheck()
+		if l.glog.LogObj != nil {
+			l.glog.LogObj.mu.RLock()
+			defer l.glog.LogObj.mu.RUnlock()
+		}
 	}
 	if l.LogLevel >= dlog.Info {
-		l.Printf(l.infoStr+msg, append([]interface{}{utils.FileWithLineNum()}, data...)...)
+		fmt.Println(msg)
+		fmt.Println(l.infoStr)
+		l.Printf(l.infoStr+dlog.Green+msg+dlog.Reset, append([]interface{}{utils.FileWithLineNum()}, data...)...)
 	}
 }
 

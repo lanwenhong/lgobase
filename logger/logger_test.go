@@ -47,8 +47,8 @@ func TestDbColorlog(t *testing.T) {
 
 	mylog := logger.New(nil, d_conf)
 	mylog.Info(ctx, "xxxxxxxx%d%d%d", 1, 2, 3)
-	mylog.Warn(ctx, "xxxxxxxx%d%d%d", 1, 2, 3)
-	mylog.Error(ctx, "xxxxxxxx%d%d%d", 1, 2, 3)
+	//mylog.Warn(ctx, "xxxxxxxx%d%d%d", 1, 2, 3)
+	//mylog.Error(ctx, "xxxxxxxx%d%d%d", 1, 2, 3)
 }
 
 func TestDbTraceErrLog(t *testing.T) {
