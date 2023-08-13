@@ -117,6 +117,9 @@ func GetGoid() uint64 {
 }
 
 func GetstrGoid() string {
+	if Gfilelog != nil && Gfilelog.Logconf != nil && !Gfilelog.Logconf.Goid {
+		return ""
+	}
 	var (
 		buf [64]byte
 		n   = runtime.Stack(buf[:], false)

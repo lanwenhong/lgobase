@@ -101,6 +101,12 @@ func (l *MyDBlogger) LogMode(level dlog.LogLevel) dlog.Interface {
 }
 
 func (l MyDBlogger) Info(ctx context.Context, msg string, data ...interface{}) {
+
+	cmd := []interface{}{
+		GetstrGoid(),
+	}
+	cmd = append(cmd, utils.FileWithLineNum())
+	cmd = append(cmd, data...)
 	if l.glog != nil && l.glog.LogObj != nil {
 		l.glog.fileCheck()
 		if l.glog.LogObj != nil {
@@ -109,11 +115,6 @@ func (l MyDBlogger) Info(ctx context.Context, msg string, data ...interface{}) {
 		}
 	}
 
-	cmd := []interface{}{
-		GetstrGoid(),
-	}
-	cmd = append(cmd, utils.FileWithLineNum())
-	cmd = append(cmd, data...)
 	if l.LogLevel >= dlog.Info {
 		fmt.Println(msg)
 		fmt.Println(l.infoStr)
@@ -128,6 +129,12 @@ func (l MyDBlogger) Info(ctx context.Context, msg string, data ...interface{}) {
 }
 
 func (l MyDBlogger) Warn(ctx context.Context, msg string, data ...interface{}) {
+	cmd := []interface{}{
+		GetstrGoid(),
+	}
+	cmd = append(cmd, utils.FileWithLineNum())
+	cmd = append(cmd, data...)
+
 	if l.glog != nil && l.glog.LogObj != nil {
 		l.glog.fileCheck()
 		if l.glog.LogObj != nil {
@@ -135,11 +142,6 @@ func (l MyDBlogger) Warn(ctx context.Context, msg string, data ...interface{}) {
 			defer l.glog.LogObj.mu.RUnlock()
 		}
 	}
-	cmd := []interface{}{
-		GetstrGoid(),
-	}
-	cmd = append(cmd, utils.FileWithLineNum())
-	cmd = append(cmd, data...)
 	if l.LogLevel >= dlog.Warn {
 		if l.Config.Colorful {
 			//l.Printf(l.warnStr+dlog.Yellow+msg+dlog.Reset, append([]interface{}{utils.FileWithLineNum()}, data...)...)
@@ -152,6 +154,12 @@ func (l MyDBlogger) Warn(ctx context.Context, msg string, data ...interface{}) {
 }
 
 func (l MyDBlogger) Error(ctx context.Context, msg string, data ...interface{}) {
+	cmd := []interface{}{
+		GetstrGoid(),
+	}
+	cmd = append(cmd, utils.FileWithLineNum())
+	cmd = append(cmd, data...)
+
 	if l.glog != nil && l.glog.LogObj != nil {
 		l.glog.fileCheck()
 		if l.glog.LogObj != nil {
@@ -159,12 +167,6 @@ func (l MyDBlogger) Error(ctx context.Context, msg string, data ...interface{}) 
 			defer l.glog.LogObj.mu.RUnlock()
 		}
 	}
-	cmd := []interface{}{
-		GetstrGoid(),
-	}
-	cmd = append(cmd, utils.FileWithLineNum())
-	cmd = append(cmd, data...)
-
 	if l.LogLevel >= dlog.Error {
 		if l.Config.Colorful {
 			//l.Printf(l.errStr+dlog.Red+msg+dlog.Reset, append([]interface{}{utils.FileWithLineNum()}, data...)...)

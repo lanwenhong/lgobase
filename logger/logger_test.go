@@ -91,6 +91,32 @@ func TestDBTraceWarnLog(t *testing.T) {
 	mylog.Trace(ctx, time.Now(), testdb, nil)
 }
 
+func TestDbWithfilelog(t *testing.T) {
+	myconf := &logger.Glogconf{
+		RotateMethod: logger.ROTATE_FILE_DAILY,
+		Stdout:       true,
+		ColorFull:    true,
+		Loglevel:     logger.DEBUG,
+		Goid:         true,
+	}
+	logger.Newglog("./", "test.log", "test.log.err", myconf)
+
+	d_conf := dlog.Config{
+		SlowThreshold:             time.Second,
+		LogLevel:                  dlog.Info,
+		IgnoreRecordNotFoundError: true,
+		Colorful:                  true,
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	mylog := logger.New(logger.Gfilelog, d_conf)
+	mylog.Info(ctx, "xxxxxxxx%d%d%d", 1, 2, 3)
+	mylog.Warn(ctx, "xxxxxxxx%d%d%d", 1, 2, 3)
+	mylog.Error(ctx, "xxxxxxxx%d%d%d", 1, 2, 3)
+
+}
+
 /*func TestLog(t *testing.T) {
 	logger.SetConsole(true)
 	logger.SetRollingDaily("./", "test.log", "test.log.err")
