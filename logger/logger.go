@@ -192,11 +192,10 @@ func (glog *Glog) SetRollingDaily(fileDir, fileName, fileName_err string, stdout
 		if !stdout {
 			fmt.Println("==0000000000000===")
 			glog.LogObj.logfile, _ = os.OpenFile(fileDir+"/"+fileName, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
-			glog.LogObj.lg = log.New(glog.LogObj.logfile, "", log.Ldate|log.Lmicroseconds|log.Lshortfile|log.Llongfile|log.LstdFlags)
-			//glog.LogObj.lg = log.New(glog.LogObj.logfile, "", log.Ldate|log.Lmicroseconds|log.LstdFlags)
+			glog.LogObj.lg = log.New(glog.LogObj.logfile, "", log.Ldate|log.Lmicroseconds|log.Lshortfile|log.LstdFlags)
 
 			glog.LogObj.logfile_err, _ = os.OpenFile(fileDir+"/"+fileName_err, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
-			glog.LogObj.lg_err = log.New(glog.LogObj.logfile_err, "", log.Ldate|log.Lmicroseconds|log.Lshortfile|log.Llongfile|log.LstdFlags)
+			glog.LogObj.lg_err = log.New(glog.LogObj.logfile_err, "", log.Ldate|log.Lmicroseconds|log.Lshortfile|log.LstdFlags)
 		} else {
 			glog.LogObj.lg = log.New(os.Stdout, "", log.Ldate|log.Lmicroseconds|log.Lshortfile)
 		}
@@ -212,7 +211,7 @@ func catchError() {
 	}
 }
 
-func Debug(fmtstr string, v ...interface{}) {
+func pDebug(depth int, fmtstr string, v ...interface{}) {
 	if Gfilelog != nil && Gfilelog.LogObj != nil {
 		Gfilelog.fileCheck()
 		if Gfilelog.LogObj != nil {
@@ -221,37 +220,45 @@ func Debug(fmtstr string, v ...interface{}) {
 		}
 		if Gfilelog.Logconf.Stdout && Gfilelog.Logconf.ColorFull && Gfilelog.Logconf.Loglevel <= DEBUG {
 			//Gfilelog.LogObj.lg.Printf(Green+"[DEBUG] "+fmtstr+Reset, v...)
-			Gfilelog.LogObj.lg.Output(2, fmt.Sprintf(Green+"[DEBUG] "+fmtstr+Reset, v...))
+			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf(Green+"[DEBUG] "+fmtstr+Reset, v...))
 		} else if Gfilelog.Logconf.Loglevel <= DEBUG {
-			Gfilelog.LogObj.lg.Output(2, fmt.Sprintf("[DEBUG] "+fmtstr, v...))
+			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf("[DEBUG] "+fmtstr, v...))
 		}
 	}
 }
 
-func Debugf(fmtstr string, v ...interface{}) {
-	Debug(fmtstr, v...)
+func Debug(fmtstr string, v ...interface{}) {
+	pDebug(3, fmtstr, v...)
 }
 
-func Info(fmtstr string, v ...interface{}) {
+func Debugf(fmtstr string, v ...interface{}) {
+	pDebug(3, fmtstr, v...)
+}
+
+func pInfo(depth int, fmtstr string, v ...interface{}) {
 	if Gfilelog != nil && Gfilelog.LogObj != nil {
 		Gfilelog.fileCheck()
 		Gfilelog.LogObj.mu.RLock()
 		defer Gfilelog.LogObj.mu.RUnlock()
 		if Gfilelog.Logconf.Stdout && Gfilelog.Logconf.ColorFull && Gfilelog.Logconf.Loglevel <= INFO {
 			//Gfilelog.LogObj.lg.Printf(Green+"[INFO] "+fmtstr+Reset, v...)
-			Gfilelog.LogObj.lg.Output(2, fmt.Sprintf(Green+"[INFO] "+fmtstr+Reset, v...))
+			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf(Green+"[INFO] "+fmtstr+Reset, v...))
 		} else if Gfilelog.Logconf.Loglevel <= INFO {
 			//Gfilelog.LogObj.lg.Printf("[INFO] "+fmtstr, v...)
-			Gfilelog.LogObj.lg.Output(2, fmt.Sprintf("[INFO] "+fmtstr, v...))
+			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf("[INFO] "+fmtstr, v...))
 		}
 	}
 }
 
-func Infof(fmtstr string, v ...interface{}) {
-	Info(fmtstr, v...)
+func Info(fmtstr string, v ...interface{}) {
+	pInfo(3, fmtstr, v...)
 }
 
-func Warn(fmtstr string, v ...interface{}) {
+func Infof(fmtstr string, v ...interface{}) {
+	pInfo(3, fmtstr, v...)
+}
+
+func pWarn(depth int, fmtstr string, v ...interface{}) {
 	if Gfilelog != nil && Gfilelog.LogObj != nil {
 		Gfilelog.fileCheck()
 		Gfilelog.LogObj.mu.RLock()
@@ -259,46 +266,54 @@ func Warn(fmtstr string, v ...interface{}) {
 
 		if Gfilelog.Logconf.Stdout && Gfilelog.Logconf.ColorFull && Gfilelog.Logconf.Loglevel <= WARN {
 			//Gfilelog.LogObj.lg.Printf(Yellow+"[WARN] "+fmtstr+Reset, v...)
-			Gfilelog.LogObj.lg.Output(2, fmt.Sprintf(Yellow+"[WARN] "+fmtstr+Reset, v...))
+			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf(Yellow+"[WARN] "+fmtstr+Reset, v...))
 		} else if Gfilelog.Logconf.Stdout && Gfilelog.Logconf.Loglevel <= WARN {
 			//Gfilelog.LogObj.lg.Printf("[WARN] "+fmtstr, v...)
-			Gfilelog.LogObj.lg.Output(2, fmt.Sprintf("[WARN] "+fmtstr, v...))
+			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf("[WARN] "+fmtstr, v...))
 		} else if Gfilelog.Logconf.Loglevel <= WARN {
 			//Gfilelog.LogObj.lg.Printf("[WARN] "+fmtstr, v...)
-			Gfilelog.LogObj.lg.Output(2, fmt.Sprintf("[WARN] "+fmtstr, v...))
+			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf("[WARN] "+fmtstr, v...))
 			//Gfilelog.LogObj.lg_err.Printf("[WARN] "+fmtstr, v...)
-			Gfilelog.LogObj.lg_err.Output(2, fmt.Sprintf("[WARN] "+fmtstr, v...))
+			Gfilelog.LogObj.lg_err.Output(depth, fmt.Sprintf("[WARN] "+fmtstr, v...))
 		}
 	}
 }
-func Warnf(fmtstr string, v ...interface{}) {
-	Warn(fmtstr, v...)
+
+func Warn(fmtstr string, v ...interface{}) {
+	pWarn(3, fmtstr, v...)
 }
 
-func Error(fmtstr string, v ...interface{}) {
+func Warnf(fmtstr string, v ...interface{}) {
+	pWarn(3, fmtstr, v...)
+}
+
+func pError(depth int, fmtstr string, v ...interface{}) {
 	if Gfilelog != nil && Gfilelog.LogObj != nil {
 		Gfilelog.fileCheck()
 		Gfilelog.LogObj.mu.RLock()
 		defer Gfilelog.LogObj.mu.RUnlock()
 		if Gfilelog.Logconf.Stdout && Gfilelog.Logconf.ColorFull && Gfilelog.Logconf.Loglevel <= ERROR {
 			//Gfilelog.LogObj.lg.Printf(Red+"[ERROR] "+fmtstr+Reset, v...)
-			Gfilelog.LogObj.lg.Output(2, fmt.Sprintf(Red+"[ERROR] "+fmtstr+Reset, v...))
+			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf(Red+"[ERROR] "+fmtstr+Reset, v...))
 
 		} else if Gfilelog.Logconf.Stdout && Gfilelog.Logconf.Loglevel <= ERROR {
 			//Gfilelog.LogObj.lg.Printf("[ERROR] "+fmtstr, v...)
-			Gfilelog.LogObj.lg.Output(2, fmt.Sprintf("[ERROR] "+fmtstr, v...))
+			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf("[ERROR] "+fmtstr, v...))
 		} else if Gfilelog.Logconf.Loglevel <= ERROR {
 			//Gfilelog.LogObj.lg.Printf("[ERROR] "+fmtstr, v...)
-			Gfilelog.LogObj.lg.Output(2, fmt.Sprintf("[ERROR] "+fmtstr, v...))
+			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf("[ERROR] "+fmtstr, v...))
 			//Gfilelog.LogObj.lg_err.Printf("[ERROR] "+fmtstr, v...)
-			Gfilelog.LogObj.lg_err.Output(2, fmt.Sprintf("[ERROR] "+fmtstr, v...))
+			Gfilelog.LogObj.lg_err.Output(depth, fmt.Sprintf("[ERROR] "+fmtstr, v...))
 
 		}
 	}
 }
 
+func Error(fmtstr string, v ...interface{}) {
+	pError(3, fmtstr, v...)
+}
 func Errorf(fmtstr string, v ...interface{}) {
-	Error(fmtstr, v...)
+	pError(3, fmtstr, v...)
 }
 
 func (glog *Glog) isMustRename() bool {

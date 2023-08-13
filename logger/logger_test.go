@@ -11,7 +11,7 @@ import (
 )
 
 func testdb() (string, int64) {
-	return "ssssssss", 1
+	return "ssssssss", -1
 }
 
 func TestDblog(t *testing.T) {
@@ -47,8 +47,8 @@ func TestDbColorlog(t *testing.T) {
 
 	mylog := logger.New(nil, d_conf)
 	mylog.Info(ctx, "xxxxxxxx%d%d%d", 1, 2, 3)
-	//mylog.Warn(ctx, "xxxxxxxx%d%d%d", 1, 2, 3)
-	//mylog.Error(ctx, "xxxxxxxx%d%d%d", 1, 2, 3)
+	mylog.Warn(ctx, "xxxxxxxx%d%d%d", 1, 2, 3)
+	mylog.Error(ctx, "xxxxxxxx%d%d%d", 1, 2, 3)
 }
 
 func TestDbTraceErrLog(t *testing.T) {
@@ -106,15 +106,17 @@ func TestLogfile(t *testing.T) {
 		RotateMethod: logger.ROTATE_FILE_DAILY,
 		Stdout:       true,
 		ColorFull:    true,
-		Loglevel:     logger.ERROR,
+		Loglevel:     logger.DEBUG,
 	}
 	logger.Newglog("./", "test.log", "test.log.err", myconf)
 	logger.Debug("it is a test")
+	logger.Debugf("it is a test")
 	logger.Info("it is a test")
+	logger.Infof("it is a test")
 	logger.Warn("it is a test")
-	//logger.Warnf("it is a test")
+	logger.Warnf("it is a test")
 	logger.Error("it is a error")
-	logger.Error("d=%d", 1)
+	logger.Errorf("d=%d", 1)
 }
 
 func TestLogRatate(t *testing.T) {
