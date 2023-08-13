@@ -118,7 +118,7 @@ func GetGoid() uint64 {
 
 func GetstrGoid() string {
 	if Gfilelog != nil && Gfilelog.Logconf != nil && !Gfilelog.Logconf.Goid {
-		return ""
+		return "?"
 	}
 	var (
 		buf [64]byte
@@ -262,7 +262,7 @@ func pDebugWithGid(depth int, fmtstr string, v ...interface{}) {
 
 }
 
-func pDebug(depth int, fmtstr string, v ...interface{}) {
+/*func pDebug(depth int, fmtstr string, v ...interface{}) {
 	if Gfilelog != nil && Gfilelog.LogObj != nil {
 		Gfilelog.fileCheck()
 		if Gfilelog.LogObj != nil {
@@ -276,29 +276,31 @@ func pDebug(depth int, fmtstr string, v ...interface{}) {
 			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf("[DEBUG] "+fmtstr, v...))
 		}
 	}
-}
+}*/
 
 func Debug(fmtstr string, v ...interface{}) {
 	//pDebug(3, fmtstr, v...)
-	if Gfilelog != nil && Gfilelog.LogObj != nil && Gfilelog.Logconf != nil {
+	/*if Gfilelog != nil && Gfilelog.LogObj != nil && Gfilelog.Logconf != nil {
 		if Gfilelog.Logconf.Goid {
 			pDebugWithGid(3, fmtstr, v...)
 		} else {
 			pDebug(3, fmtstr, v...)
 		}
-	}
+	}*/
+	pDebugWithGid(3, fmtstr, v...)
 
 }
 
 func Debugf(fmtstr string, v ...interface{}) {
 	//pDebug(3, fmtstr, v...)
-	if Gfilelog != nil && Gfilelog.LogObj != nil && Gfilelog.Logconf != nil {
+	/*if Gfilelog != nil && Gfilelog.LogObj != nil && Gfilelog.Logconf != nil {
 		if Gfilelog.Logconf.Goid {
 			pDebugWithGid(3, fmtstr, v...)
 		} else {
 			pDebug(3, fmtstr, v...)
 		}
-	}
+	}*/
+	pDebugWithGid(3, fmtstr, v...)
 }
 
 func pInfoWithGid(depth int, fmtstr string, v ...interface{}) {
@@ -319,7 +321,7 @@ func pInfoWithGid(depth int, fmtstr string, v ...interface{}) {
 	}
 }
 
-func pInfo(depth int, fmtstr string, v ...interface{}) {
+/*func pInfo(depth int, fmtstr string, v ...interface{}) {
 	if Gfilelog != nil && Gfilelog.LogObj != nil {
 		Gfilelog.fileCheck()
 		Gfilelog.LogObj.mu.RLock()
@@ -334,27 +336,29 @@ func pInfo(depth int, fmtstr string, v ...interface{}) {
 			//Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf("gorouting-%s [INFO] "+fmtstr, append([]interface{}{GetstrGoid()}, v...)...))
 		}
 	}
-}
+}*/
 
 func Info(fmtstr string, v ...interface{}) {
-	if Gfilelog != nil && Gfilelog.LogObj != nil && Gfilelog.Logconf != nil {
+	/*if Gfilelog != nil && Gfilelog.LogObj != nil && Gfilelog.Logconf != nil {
 		if Gfilelog.Logconf.Goid {
 			pInfoWithGid(3, fmtstr, v...)
 		} else {
 			pInfo(3, fmtstr, v...)
 		}
-	}
+	}*/
+	pInfoWithGid(3, fmtstr, v...)
 }
 
 func Infof(fmtstr string, v ...interface{}) {
 	//pInfo(3, fmtstr, v...)
-	if Gfilelog != nil && Gfilelog.LogObj != nil && Gfilelog.Logconf != nil {
+	/*if Gfilelog != nil && Gfilelog.LogObj != nil && Gfilelog.Logconf != nil {
 		if Gfilelog.Logconf.Goid {
 			pInfoWithGid(3, fmtstr, v...)
 		} else {
 			pInfo(3, fmtstr, v...)
 		}
-	}
+	}*/
+	pInfoWithGid(3, fmtstr, v...)
 
 }
 
@@ -379,7 +383,7 @@ func pWarnWithGid(depth int, fmtstr string, v ...interface{}) {
 	}
 }
 
-func pWarn(depth int, fmtstr string, v ...interface{}) {
+/*func pWarn(depth int, fmtstr string, v ...interface{}) {
 	if Gfilelog != nil && Gfilelog.LogObj != nil {
 		Gfilelog.fileCheck()
 		Gfilelog.LogObj.mu.RLock()
@@ -398,29 +402,31 @@ func pWarn(depth int, fmtstr string, v ...interface{}) {
 			Gfilelog.LogObj.lg_err.Output(depth, fmt.Sprintf("[WARN] "+fmtstr, v...))
 		}
 	}
-}
+}*/
 
 func Warn(fmtstr string, v ...interface{}) {
 	//pWarn(3, fmtstr, v...)
 
-	if Gfilelog != nil && Gfilelog.LogObj != nil && Gfilelog.Logconf != nil {
+	/*if Gfilelog != nil && Gfilelog.LogObj != nil && Gfilelog.Logconf != nil {
 		if Gfilelog.Logconf.Goid {
 			pWarnWithGid(3, fmtstr, v...)
 		} else {
 			pWarn(3, fmtstr, v...)
 		}
-	}
+	}*/
+	pWarnWithGid(3, fmtstr, v...)
 }
 
 func Warnf(fmtstr string, v ...interface{}) {
 	//pWarn(3, fmtstr, v...)
-	if Gfilelog != nil && Gfilelog.LogObj != nil && Gfilelog.Logconf != nil {
+	/*if Gfilelog != nil && Gfilelog.LogObj != nil && Gfilelog.Logconf != nil {
 		if Gfilelog.Logconf.Goid {
 			pWarnWithGid(3, fmtstr, v...)
 		} else {
 			pWarn(3, fmtstr, v...)
 		}
-	}
+	}*/
+	pWarnWithGid(3, fmtstr, v...)
 
 }
 func pErrorWithGid(depth int, fmtstr string, v ...interface{}) {
@@ -444,7 +450,7 @@ func pErrorWithGid(depth int, fmtstr string, v ...interface{}) {
 	}
 }
 
-func pError(depth int, fmtstr string, v ...interface{}) {
+/*func pError(depth int, fmtstr string, v ...interface{}) {
 	if Gfilelog != nil && Gfilelog.LogObj != nil {
 		Gfilelog.fileCheck()
 		Gfilelog.LogObj.mu.RLock()
@@ -463,30 +469,31 @@ func pError(depth int, fmtstr string, v ...interface{}) {
 
 		}
 	}
-}
+}*/
 
 func Error(fmtstr string, v ...interface{}) {
 
-	if Gfilelog != nil && Gfilelog.LogObj != nil && Gfilelog.Logconf != nil {
+	/*if Gfilelog != nil && Gfilelog.LogObj != nil && Gfilelog.Logconf != nil {
 		if Gfilelog.Logconf.Goid {
 			pErrorWithGid(3, fmtstr, v...)
 		} else {
 			pError(3, fmtstr, v...)
 		}
-	}
+	}*/
+	pErrorWithGid(3, fmtstr, v...)
 
 	//pError(3, fmtstr, v...)
 }
 func Errorf(fmtstr string, v ...interface{}) {
 	//pError(3, fmtstr, v...)
-	if Gfilelog != nil && Gfilelog.LogObj != nil && Gfilelog.Logconf != nil {
+	/*if Gfilelog != nil && Gfilelog.LogObj != nil && Gfilelog.Logconf != nil {
 		if Gfilelog.Logconf.Goid {
 			pErrorWithGid(3, fmtstr, v...)
 		} else {
 			pError(3, fmtstr, v...)
 		}
-	}
-
+	}*/
+	pErrorWithGid(3, fmtstr, v...)
 }
 
 func (glog *Glog) isMustRename() bool {
