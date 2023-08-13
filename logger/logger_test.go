@@ -20,7 +20,7 @@ func TestDblog(t *testing.T) {
 		SlowThreshold:             time.Second,
 		LogLevel:                  dlog.Info,
 		IgnoreRecordNotFoundError: true,
-		Colorful:                  false,
+		Colorful:                  true,
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
