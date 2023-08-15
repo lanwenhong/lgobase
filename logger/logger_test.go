@@ -133,7 +133,7 @@ func TestLogfile(t *testing.T) {
 		Stdout:       true,
 		ColorFull:    true,
 		Loglevel:     logger.DEBUG,
-		Goid:         false,
+		Goid:         true,
 	}
 	logger.Newglog("./", "test.log", "test.log.err", myconf)
 	logger.Debug("it is a test")
