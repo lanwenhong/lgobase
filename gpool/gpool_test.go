@@ -41,7 +41,7 @@ func (e *ExampleServer) Echo(ctx context.Context, req string) (ret *example.Myre
 }
 
 func TestBufferClient(t *testing.T) {
-	go func() {
+	/*go func() {
 		transport, err := thrift.NewTServerSocket(":9898")
 		if err != nil {
 			t.Fatal(err.Error())
@@ -61,7 +61,7 @@ func TestBufferClient(t *testing.T) {
 		}
 
 	}()
-	time.Sleep(3 * time.Second)
+	time.Sleep(3 * time.Second)*/
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
