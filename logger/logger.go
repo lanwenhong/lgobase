@@ -264,7 +264,7 @@ func pDebugWithGid(ctx context.Context, depth int, fmtstr string, v ...interface
 			trace_id = value
 		}
 	}
-	fmt.Printf("trace_id: %s", trace_id)
+	//fmt.Printf("trace_id: %s", trace_id)
 	if Gfilelog != nil && Gfilelog.LogObj != nil {
 		Gfilelog.fileCheck()
 		Gfilelog.LogObj.mu.RLock()
@@ -299,7 +299,7 @@ func pInfoWithGid(ctx context.Context, depth int, fmtstr string, v ...interface{
 			trace_id = value
 		}
 	}
-	fmt.Printf("trace_id: %s", trace_id)
+	//fmt.Printf("trace_id: %s", trace_id)
 	if Gfilelog != nil && Gfilelog.LogObj != nil {
 		Gfilelog.fileCheck()
 		Gfilelog.LogObj.mu.RLock()
@@ -330,7 +330,7 @@ func pWarnWithGid(ctx context.Context, depth int, fmtstr string, v ...interface{
 			trace_id = value
 		}
 	}
-	fmt.Printf("trace_id: %s", trace_id)
+	//fmt.Printf("trace_id: %s", trace_id)
 	if Gfilelog != nil && Gfilelog.LogObj != nil {
 		Gfilelog.fileCheck()
 		Gfilelog.LogObj.mu.RLock()

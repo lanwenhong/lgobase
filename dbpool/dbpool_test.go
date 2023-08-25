@@ -204,16 +204,16 @@ func TestQuery1(t *testing.T) {
 	//loglevel, _ := logger.LoggerLevelIndex("DEBUG")
 	//logger.SetLevel(loglevel)
 
-	/*dconfig := &dlog.Config{
+	dconfig := &dlog.Config{
 		SlowThreshold:             time.Second, // 慢 SQL 阈值
 		LogLevel:                  dlog.Info,   // 日志级别
 		IgnoreRecordNotFoundError: true,        // 忽略ErrRecordNotFound（记录未找到）错误
-		Colorful:                  false,       // 禁用彩色打印
-	}*/
+		Colorful:                  true,        // 禁用彩色打印
+	}
 
 	db_conf := dbenc.DbConfNew(ctx, "db.ini")
 	dbs := dbpool.DbpoolNew(db_conf)
-	//dbs.SetormLog(dconfig)
+	dbs.SetormLog(ctx, dconfig)
 	tk := "qfconf://test1?maxopen=1000&maxidle=30"
 	err := dbs.Add(ctx, "test1", tk, dbpool.USE_GORM)
 	if err != nil {
