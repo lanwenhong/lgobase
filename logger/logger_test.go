@@ -141,7 +141,7 @@ func TestLogfile(t *testing.T) {
 		Stdout:       true,
 		ColorFull:    true,
 		Loglevel:     logger.DEBUG,
-		Goid:         true,
+		//Goid:         true,
 	}
 	//ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	//defer cancel()

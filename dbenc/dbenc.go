@@ -1,17 +1,19 @@
 package dbenc
 
 import (
+	"context"
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
-	config "github.com/lanwenhong/lgobase/gconfig"
-	"github.com/lanwenhong/lgobase/logger"
-	"github.com/lanwenhong/lgobase/util"
 	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	config "github.com/lanwenhong/lgobase/gconfig"
+	"github.com/lanwenhong/lgobase/logger"
+	"github.com/lanwenhong/lgobase/util"
 )
 
 type DbConf struct {
@@ -28,18 +30,18 @@ func GenAesIv() (string, error) {
 	return hex.EncodeToString(md5_cipher), nil
 }
 
-func DbConfNew(filename string) *DbConf {
+func DbConfNew(ctx context.Context, filename string) *DbConf {
 	dbc := new(DbConf)
 	dbc.DbConfFile = filename
 	fi, err := os.Open(filename)
 	if err != nil {
-		logger.Warnf("open filename %s err: %s", filename, err.Error())
+		logger.Warnf(ctx, "open filename %s err: %s", filename, err.Error())
 		return nil
 	}
 	defer fi.Close()
 	fbuf, err := ioutil.ReadAll(fi)
 	if err != nil {
-		logger.Warnf("read filename %s err: %s", filename, err.Error())
+		logger.Warnf(ctx, "read filename %s err: %s", filename, err.Error())
 		return nil
 	}
 	flag := string(fbuf[:8])
@@ -48,7 +50,7 @@ func DbConfNew(filename string) *DbConf {
 		cfg := config.NewGconf(filename)
 		err := cfg.GconfParse()
 		if err != nil {
-			logger.Warnf("db conf err: %s", err.Error())
+			logger.Warnf(ctx, "db conf err: %s", err.Error())
 			return nil
 		}
 		dbc.Dbconf = cfg
@@ -56,45 +58,45 @@ func DbConfNew(filename string) *DbConf {
 		sbuf := string(fbuf)
 		slist := strings.Split(sbuf, "\n")
 		for i := 0; i < len(slist); i++ {
-			logger.Debugf("get line: %s", slist[i])
+			logger.Debugf(ctx, "get line: %s", slist[i])
 			dbc.DbConfFileBuf += slist[i]
 		}
 		skeylen := dbc.DbConfFileBuf[8:16]
 		keylen, err := strconv.ParseInt(skeylen, 16, 64)
 		if err != nil {
-			logger.Warnf("get keylen %s err %s", skeylen, err.Error())
+			logger.Warnf(ctx, "get keylen %s err %s", skeylen, err.Error())
 			return nil
 		}
-		logger.Debugf("get key len: %d", keylen)
+		logger.Debugf(ctx, "get key len: %d", keylen)
 		enckey := dbc.DbConfFileBuf[16 : 16+keylen]
-		logger.Debugf("get enckey: %s len: %d", enckey, len(enckey))
+		logger.Debugf(ctx, "get enckey: %s len: %d", enckey, len(enckey))
 		iv, _ := GenAesIv()
 		ivc := hex.EncodeToString([]byte(iv[:16]))
-		logger.Debugf("iv: %s", ivc)
-		key, err := util.AesCbcDec(iv, enckey, ivc)
+		logger.Debugf(ctx, "iv: %s", ivc)
+		key, err := util.AesCbcDec(ctx, iv, enckey, ivc)
 		if err != nil {
 			return nil
 		}
-		logger.Debugf("get key: %s len: %d", key, len(key))
+		logger.Debugf(ctx, "get key: %s len: %d", key, len(key))
 		padlen := int(key[len(key)-1])
-		logger.Debugf("key padlen: %d", padlen)
+		logger.Debugf(ctx, "key padlen: %d", padlen)
 
 		encdata := dbc.DbConfFileBuf[16+keylen:]
-		realdata, err := util.AesCbcDec(string(key[:len(key)-padlen]), encdata, ivc)
+		realdata, err := util.AesCbcDec(ctx, string(key[:len(key)-padlen]), encdata, ivc)
 		if err != nil {
 			return nil
 		}
 		padlen = int(realdata[len(realdata)-1])
-		logger.Debugf("datalen: %d data padlen: %d", len(realdata), padlen)
+		logger.Debugf(ctx, "datalen: %d data padlen: %d", len(realdata), padlen)
 		realdata = realdata[:len(realdata)-padlen]
-		logger.Debugf("get data: %s", realdata)
+		logger.Debugf(ctx, "get data: %s", realdata)
 
 		gen := time.Now().UnixNano()
 		filename := fmt.Sprintf("/tmp/db_%d.conf", gen)
 		fd, err := os.Create(filename)
 		defer fd.Close()
 		if err != nil {
-			logger.Warnf("create file %s %s", filename, err.Error())
+			logger.Warnf(ctx, "create file %s %s", filename, err.Error())
 			return nil
 		}
 		fd.WriteString(string(realdata))
@@ -102,7 +104,7 @@ func DbConfNew(filename string) *DbConf {
 		cfg := config.NewGconf(filename)
 		err = cfg.GconfParse()
 		if err != nil {
-			logger.Warnf("db conf err: %s", err.Error())
+			logger.Warnf(ctx, "db conf err: %s", err.Error())
 			return nil
 		}
 		dbc.Dbconf = cfg

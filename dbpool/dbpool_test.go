@@ -1,10 +1,13 @@
 package dbpool
 
 import (
+	"context"
 	"database/sql"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/lanwenhong/lgobase/dbenc"
 	"github.com/lanwenhong/lgobase/dbpool"
 	"github.com/lanwenhong/lgobase/logger"
@@ -28,31 +31,38 @@ type User struct {
 	DeletedAt time.Time     `gorm:"column:deleteat;type:datetime(0)"`
 }
 
+func NewRequestID() string {
+	return strings.Replace(uuid.New().String(), "-", "", -1)
+}
+
 func TestLoadDbconf(t *testing.T) {
-	db_conf := dbenc.DbConfNew("db.ini")
+	ctx := context.WithValue(context.Background(), "trace_id", NewRequestID())
+	db_conf := dbenc.DbConfNew(ctx, "db.ini")
 	dbs := dbpool.DbpoolNew(db_conf)
 	tk := "qfconf://test1?maxopen=1000&maxidle=30"
-	err := dbs.Add("qf_push", tk, dbpool.USE_SQLX)
+	err := dbs.Add(ctx, "qf_push", tk, dbpool.USE_SQLX)
 	if err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestLoadOrmConfig(t *testing.T) {
-	db_conf := dbenc.DbConfNew("db.ini")
+	ctx := context.WithValue(context.Background(), "trace_id", NewRequestID())
+	db_conf := dbenc.DbConfNew(ctx, "db.ini")
 	dbs := dbpool.DbpoolNew(db_conf)
 	tk := "qfconf://test1?maxopen=1000&maxidle=30"
-	err := dbs.Add("test1", tk, dbpool.USE_GORM)
+	err := dbs.Add(ctx, "test1", tk, dbpool.USE_GORM)
 	if err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestQuery(t *testing.T) {
-	db_conf := dbenc.DbConfNew("db.ini")
+	ctx := context.WithValue(context.Background(), "trace_id", NewRequestID())
+	db_conf := dbenc.DbConfNew(ctx, "db.ini")
 	dbs := dbpool.DbpoolNew(db_conf)
 	tk := "qfconf://test1?maxopen=1000&maxidle=30"
-	err := dbs.Add("test1", tk, dbpool.USE_GORM)
+	err := dbs.Add(ctx, "test1", tk, dbpool.USE_GORM)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,11 +75,19 @@ func TestQuery(t *testing.T) {
 }
 
 func TestCreate(t *testing.T) {
-
-	logger.SetConsole(true)
-	logger.SetRollingDaily("./", "test.log", "test.log.err")
-	loglevel, _ := logger.LoggerLevelIndex("DEBUG")
-	logger.SetLevel(loglevel)
+	ctx := context.WithValue(context.Background(), "trace_id", NewRequestID())
+	myconf := &logger.Glogconf{
+		RotateMethod: logger.ROTATE_FILE_DAILY,
+		Stdout:       true,
+		ColorFull:    true,
+		Loglevel:     logger.DEBUG,
+		//Goid:         true,
+	}
+	logger.Newglog("./", "test.log", "test.log.err", myconf)
+	//logger.SetConsole(true)
+	//logger.SetRollingDaily("./", "test.log", "test.log.err")
+	//loglevel, _ := logger.LoggerLevelIndex("DEBUG")
+	//logger.SetLevel(loglevel)
 
 	dconfig := &dlog.Config{
 		SlowThreshold:             time.Second, // 慢 SQL 阈值
@@ -78,12 +96,12 @@ func TestCreate(t *testing.T) {
 		Colorful:                  false,       // 禁用彩色打印
 	}
 
-	db_conf := dbenc.DbConfNew("db.ini")
+	db_conf := dbenc.DbConfNew(ctx, "db.ini")
 	dbs := dbpool.DbpoolNew(db_conf)
-	dbs.SetormLog(dconfig)
+	dbs.SetormLog(ctx, dconfig)
 
 	tk := "qfconf://test1?maxopen=1000&maxidle=30"
-	err := dbs.Add("test1", tk, dbpool.USE_GORM)
+	err := dbs.Add(ctx, "test1", tk, dbpool.USE_GORM)
 
 	if err != nil {
 		t.Fatal(err)
@@ -103,11 +121,20 @@ func TestCreate(t *testing.T) {
 }
 
 func TestCreateMulti(t *testing.T) {
-	logger.SetConsole(true)
-	logger.SetRollingDaily("./", "test.log", "test.log.err")
-	loglevel, _ := logger.LoggerLevelIndex("DEBUG")
-	logger.SetLevel(loglevel)
+	ctx := context.WithValue(context.Background(), "trace_id", NewRequestID())
+	//logger.SetConsole(true)
+	//logger.SetRollingDaily("./", "test.log", "test.log.err")
+	//loglevel, _ := logger.LoggerLevelIndex("DEBUG")
+	//logger.SetLevel(loglevel)
 
+	myconf := &logger.Glogconf{
+		RotateMethod: logger.ROTATE_FILE_DAILY,
+		Stdout:       true,
+		ColorFull:    true,
+		Loglevel:     logger.DEBUG,
+		//Goid:         true,
+	}
+	logger.Newglog("./", "test.log", "test.log.err", myconf)
 	dconfig := &dlog.Config{
 		SlowThreshold:             time.Second, // 慢 SQL 阈值
 		LogLevel:                  dlog.Info,   // 日志级别
@@ -115,11 +142,11 @@ func TestCreateMulti(t *testing.T) {
 		Colorful:                  false,       // 禁用彩色打印
 	}
 
-	db_conf := dbenc.DbConfNew("db.ini")
+	db_conf := dbenc.DbConfNew(ctx, "db.ini")
 	dbs := dbpool.DbpoolNew(db_conf)
-	dbs.SetormLog(dconfig)
+	dbs.SetormLog(ctx, dconfig)
 	tk := "qfconf://test1?maxopen=1000&maxidle=30"
-	err := dbs.Add("test1", tk, dbpool.USE_GORM)
+	err := dbs.Add(ctx, "test1", tk, dbpool.USE_GORM)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,29 +187,40 @@ func TestCreateMulti(t *testing.T) {
 }
 
 func TestQuery1(t *testing.T) {
-	user := User{}
-	logger.SetConsole(true)
-	logger.SetRollingDaily("./", "test.log", "test.log.err")
-	loglevel, _ := logger.LoggerLevelIndex("DEBUG")
-	logger.SetLevel(loglevel)
+	ctx := context.WithValue(context.Background(), "trace_id", NewRequestID())
 
-	dconfig := &dlog.Config{
+	myconf := &logger.Glogconf{
+		RotateMethod: logger.ROTATE_FILE_DAILY,
+		Stdout:       true,
+		ColorFull:    true,
+		Loglevel:     logger.DEBUG,
+		//Goid:         true,
+	}
+
+	user := User{}
+	logger.Newglog("./", "test.log", "test.log.err", myconf)
+	//logger.SetConsole(true)
+	//logger.SetRollingDaily("./", "test.log", "test.log.err")
+	//loglevel, _ := logger.LoggerLevelIndex("DEBUG")
+	//logger.SetLevel(loglevel)
+
+	/*dconfig := &dlog.Config{
 		SlowThreshold:             time.Second, // 慢 SQL 阈值
 		LogLevel:                  dlog.Info,   // 日志级别
 		IgnoreRecordNotFoundError: true,        // 忽略ErrRecordNotFound（记录未找到）错误
 		Colorful:                  false,       // 禁用彩色打印
-	}
+	}*/
 
-	db_conf := dbenc.DbConfNew("db.ini")
+	db_conf := dbenc.DbConfNew(ctx, "db.ini")
 	dbs := dbpool.DbpoolNew(db_conf)
-	dbs.SetormLog(dconfig)
+	//dbs.SetormLog(dconfig)
 	tk := "qfconf://test1?maxopen=1000&maxidle=30"
-	err := dbs.Add("test1", tk, dbpool.USE_GORM)
+	err := dbs.Add(ctx, "test1", tk, dbpool.USE_GORM)
 	if err != nil {
 		t.Fatal(err)
 	}
 	tdb := dbs.OrmPools["test1"]
-	tdb.Where("name = ?", "wowow").First(&user)
+	tdb.WithContext(ctx).Where("name = ?", "wowow").First(&user)
 
 	t.Log(user)
 	c_tm := user.CreatedAt.Format("2006-01-02 15:04:05")

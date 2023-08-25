@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	dlog "gorm.io/gorm/logger"
 )
 
 const (
@@ -96,8 +98,9 @@ type Glogconf struct {
 }
 
 type Glog struct {
-	LogObj  *FILE
-	Logconf *Glogconf
+	LogObj     *FILE
+	Logconf    *Glogconf
+	LogormConf *dlog.Config
 }
 
 var Gfilelog *Glog = nil
@@ -132,8 +135,16 @@ func GetstrGoid() string {
 }
 
 func Newglog(fileDir string, fileName string, fileNameErr string, glog_conf *Glogconf) *Glog {
+	dconfig := &dlog.Config{
+		SlowThreshold:             time.Second, // 慢 SQL 阈值
+		LogLevel:                  dlog.Info,   // 日志级别
+		IgnoreRecordNotFoundError: true,        // 忽略ErrRecordNotFound（记录未找到）错误
+		Colorful:                  true,        // 禁用彩色打印
+	}
+
 	glog := &Glog{
-		Logconf: glog_conf,
+		Logconf:    glog_conf,
+		LogormConf: dconfig,
 	}
 	if glog_conf.RotateMethod == ROTATE_FILE_NUM {
 		glog.SetRollingFile(fileDir, fileName, glog_conf.Stdout)
