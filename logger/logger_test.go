@@ -2,13 +2,19 @@ package logger
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/lanwenhong/lgobase/logger"
 	"gorm.io/gorm"
 	dlog "gorm.io/gorm/logger"
 )
+
+func NewRequestID() string {
+	return strings.Replace(uuid.New().String(), "-", "", -1)
+}
 
 func testdb() (string, int64) {
 	return "ssssssss", -1
@@ -23,8 +29,9 @@ func TestDblog(t *testing.T) {
 		Colorful:                  true,
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+	//ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	//defer cancel()
+	ctx := context.WithValue(context.Background(), "trace_id", NewRequestID())
 
 	mylog := logger.New(nil, d_conf)
 	mylog.Info(ctx, "xxxxxxxx%d%d%d", 1, 2, 3)
@@ -59,8 +66,9 @@ func TestDbTraceErrLog(t *testing.T) {
 		Colorful:                  true,
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+	//ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	//defer cancel()
+	ctx := context.WithValue(context.Background(), "trace_id", NewRequestID())
 
 	mylog := logger.New(nil, d_conf)
 	stringTime := "2017-08-30 16:40:41"
@@ -135,15 +143,25 @@ func TestLogfile(t *testing.T) {
 		Loglevel:     logger.DEBUG,
 		Goid:         true,
 	}
+	//ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	//defer cancel()
+	ctx := context.WithValue(context.Background(), "trace_id", NewRequestID())
+
 	logger.Newglog("./", "test.log", "test.log.err", myconf)
-	logger.Debug("it is a test")
-	logger.Debugf("it is a test")
-	logger.Info("it is a test")
-	logger.Infof("it is a test")
-	logger.Warn("it is a test")
-	logger.Warnf("it is a test")
-	logger.Error("it is a error")
-	logger.Errorf("d=%d", 1)
+	logger.Debug(ctx, "it is a test")
+	logger.Debugf(ctx, "it is a test")
+	logger.Info(ctx, "it is a test")
+	logger.Infof(ctx, "it is a test")
+
+	go func() {
+		ctxx := context.WithValue(ctx, "trace_id", NewRequestID())
+		logger.Debug(ctxx, "child log")
+	}()
+	time.Sleep(2 * time.Second)
+	logger.Warn(ctx, "it is a test")
+	logger.Warnf(ctx, "it is a test")
+	logger.Error(ctx, "it is a error")
+	logger.Errorf(ctx, "d=%d", 1)
 }
 
 func TestLogRatate(t *testing.T) {
@@ -153,8 +171,10 @@ func TestLogRatate(t *testing.T) {
 		Loglevel:     logger.DEBUG,
 	}
 	logger.Newglog("./", "test.log", "test.log.err", myconf)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	logger.Info("test")
+	logger.Info(ctx, "test")
 	//logger.Info("test")
 	//logger.Info("test")
 	//logger.Warn("test")
@@ -165,6 +185,6 @@ func TestLogRatate(t *testing.T) {
 	rotate, _ := time.ParseInLocation("2006-01-02 15:04:05", stringTime, loc)
 	logger.Gfilelog.LogObj.Ldate = &rotate
 
-	logger.Info("rotate")
-	logger.Warn("rotate")
+	logger.Info(ctx, "rotate")
+	//logger.Warn(ctx, "rotate")
 }

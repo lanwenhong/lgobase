@@ -31,41 +31,41 @@ func New(glog *Glog, config dlog.Config) dlog.Interface {
 
 	var (
 		//infoStr = "%s\n[info] "
-		infoStr = "gorouting-%s [INFO] call_at=%s|"
+		infoStr = "trace_id-%s [INFO] call_at=%s|"
 		//warnStr = "%s\n[warn] "
-		warnStr = "gorouting-%s [WARN] call_at=%s|"
+		warnStr = "trace_id-%s [WARN] call_at=%s|"
 		//errStr  = "%s\n[error] "
-		errStr = "gorouting-%s [ERROR] call_at=%s|"
+		errStr = "trace_id-%s [ERROR] call_at=%s|"
 		//traceStr     = "%s\n[%.3fms] [rows:%v] %s"
-		traceStr = "gorouting-%s [INFO] call_at=%s|time=%.3fms|rows=%v|%s"
+		traceStr = "trace_id-%s [INFO] call_at=%s|time=%.3fms|rows=%v|%s"
 		//traceWarnStr = "%s %s\n[%.3fms] [rows:%v] %s"
 		//traceWarnStr = "%s %s\n[%.3fms] [rows:%v] %s"
-		traceWarnStr = "gorouting-%s [WARN] call_at=%s|%s|time=%.3fms|rows=%v|%s"
+		traceWarnStr = "trace_id-%s [WARN] call_at=%s|%s|time=%.3fms|rows=%v|%s"
 		//traceErrStr  = "%s %s\n[%.3fms] [rows:%v] %s"
-		traceErrStr = "gorouting-%s [ERROR] call_at=%s|%s|time=%.3fms|rows=%v|%s"
+		traceErrStr = "trace_id-%s [ERROR] call_at=%s|%s|time=%.3fms|rows=%v|%s"
 	)
 
 	if config.Colorful {
 		//infoStr = dlog.Green + "%s\n" + dlog.Reset + dlog.Green + "[info] " + dlog.Reset
-		infoStr = dlog.Green + "gorouting-%s [INFO] " + "call_at=%s" + "|" + dlog.Reset
+		infoStr = dlog.Green + "trace_id-%s [INFO] " + "call_at=%s" + "|" + dlog.Reset
 
 		//warnStr = dlog.BlueBold + "%s\n" + dlog.Reset + dlog.Magenta + "[warn] " + dlog.Reset
 		//warnStr = dlog.BlueBold + "%s" + dlog.Reset + dlog.Magenta + " [warn] " + dlog.Reset
-		warnStr = dlog.Yellow + "gorouting-%s [WARN] " + "call_at=%s" + "|" + dlog.Reset
+		warnStr = dlog.Yellow + "trace_id-%s [WARN] " + "call_at=%s" + "|" + dlog.Reset
 
 		//errStr = dlog.Magenta + "%s\n" + dlog.Reset + dlog.Red + "[error] " + dlog.Reset
-		errStr = dlog.Red + "gorouting-%s [ERROR] " + "call_at=%s" + "|" + dlog.Reset
+		errStr = dlog.Red + "trace_id-%s [ERROR] " + "call_at=%s" + "|" + dlog.Reset
 
 		//traceStr = dlog.Green + "%s\n" + dlog.Reset + dlog.Yellow + "[%.3fms] " + dlog.BlueBold + "[rows:%v]" + dlog.Reset + " %s"
 		//traceStr = dlog.Green + "call_at=%s" + " [info] " + "time=%.3fms" + "|" + "rows=%v" + "|%s" + dlog.Reset
-		traceStr = dlog.Green + "gorouting-%s [INFO] " + "call_at=%s" + "|" + "time=%.3fms" + "|" + "rows=%v" + "|%s" + dlog.Reset
+		traceStr = dlog.Green + "trace_id-%s [INFO] " + "call_at=%s" + "|" + "time=%.3fms" + "|" + "rows=%v" + "|%s" + dlog.Reset
 
 		//traceWarnStr = dlog.Yellow + "call_at=%s" + " [warn] " + "%s" + "|" + "time=%.3fms" + "|" + "rows=%v" + "|" + "%s" + dlog.Reset
-		traceWarnStr = dlog.Yellow + "gorouting-%s [WARN] " + "call_at=%s" + "|" + "%s" + "|" + "time=%.3fms" + "|" + "rows=%v" + "|" + "%s" + dlog.Reset
+		traceWarnStr = dlog.Yellow + "trace_id-%s [WARN] " + "call_at=%s" + "|" + "%s" + "|" + "time=%.3fms" + "|" + "rows=%v" + "|" + "%s" + dlog.Reset
 
 		//traceErrStr = dlog.RedBold + "%s " + dlog.MagentaBold + "%s\n" + dlog.Reset + dlog.Yellow + "[%.3fms] " + dlog.BlueBold + "[rows:%v]" + dlog.Reset + " %s"
 		//traceErrStr = dlog.RedBold + "call_at=%s" + " [error] " + "%s" + "|" + "time=%.3fms" + "|" + "rows=%v" + "|" + "%s" + dlog.Reset
-		traceErrStr = dlog.RedBold + "gorouting-%s [ERROR] " + "call_at=%s" + "|" + "%s" + "|" + "time=%.3fms" + "|" + "rows=%v" + "|" + "%s" + dlog.Reset
+		traceErrStr = dlog.RedBold + "trace_id-%s [ERROR] " + "call_at=%s" + "|" + "%s" + "|" + "time=%.3fms" + "|" + "rows=%v" + "|" + "%s" + dlog.Reset
 	}
 	if glog != nil && glog.LogObj != nil {
 		return &MyDBlogger{
@@ -101,9 +101,15 @@ func (l *MyDBlogger) LogMode(level dlog.LogLevel) dlog.Interface {
 }
 
 func (l MyDBlogger) Info(ctx context.Context, msg string, data ...interface{}) {
-
+	trace_id := ""
+	if m := ctx.Value("trace_id"); m != nil {
+		if value, ok := m.(string); ok {
+			trace_id = value
+		}
+	}
 	cmd := []interface{}{
-		GetstrGoid(),
+		//GetstrGoid(),
+		trace_id,
 	}
 	cmd = append(cmd, utils.FileWithLineNum())
 	cmd = append(cmd, data...)
@@ -116,8 +122,8 @@ func (l MyDBlogger) Info(ctx context.Context, msg string, data ...interface{}) {
 	}
 
 	if l.LogLevel >= dlog.Info {
-		fmt.Println(msg)
-		fmt.Println(l.infoStr)
+		//fmt.Println(msg)
+		//fmt.Println(l.infoStr)
 		if l.Config.Colorful {
 			//l.Printf(l.infoStr+dlog.Green+msg+dlog.Reset, append([]interface{}{utils.FileWithLineNum()}, data...)...)
 			l.Printf(l.infoStr+dlog.Green+msg+dlog.Reset, cmd...)
@@ -129,8 +135,16 @@ func (l MyDBlogger) Info(ctx context.Context, msg string, data ...interface{}) {
 }
 
 func (l MyDBlogger) Warn(ctx context.Context, msg string, data ...interface{}) {
+
+	trace_id := ""
+	if m := ctx.Value("trace_id"); m != nil {
+		if value, ok := m.(string); ok {
+			trace_id = value
+		}
+	}
 	cmd := []interface{}{
-		GetstrGoid(),
+		//GetstrGoid(),
+		trace_id,
 	}
 	cmd = append(cmd, utils.FileWithLineNum())
 	cmd = append(cmd, data...)
@@ -154,8 +168,16 @@ func (l MyDBlogger) Warn(ctx context.Context, msg string, data ...interface{}) {
 }
 
 func (l MyDBlogger) Error(ctx context.Context, msg string, data ...interface{}) {
+
+	trace_id := ""
+	if m := ctx.Value("trace_id"); m != nil {
+		if value, ok := m.(string); ok {
+			trace_id = value
+		}
+	}
 	cmd := []interface{}{
-		GetstrGoid(),
+		//GetstrGoid(),
+		trace_id,
 	}
 	cmd = append(cmd, utils.FileWithLineNum())
 	cmd = append(cmd, data...)
@@ -179,6 +201,13 @@ func (l MyDBlogger) Error(ctx context.Context, msg string, data ...interface{}) 
 }
 
 func (l MyDBlogger) Trace(ctx context.Context, begin time.Time, fc func() (string, int64), err error) {
+
+	trace_id := ""
+	if m := ctx.Value("trace_id"); m != nil {
+		if value, ok := m.(string); ok {
+			trace_id = value
+		}
+	}
 	if l.glog != nil && l.glog.LogObj != nil {
 		l.glog.fileCheck()
 		if l.glog.LogObj != nil {
@@ -195,24 +224,24 @@ func (l MyDBlogger) Trace(ctx context.Context, begin time.Time, fc func() (strin
 	case err != nil && l.LogLevel >= dlog.Error && (!errors.Is(err, dlog.ErrRecordNotFound) || !l.IgnoreRecordNotFoundError):
 		sql, rows := fc()
 		if rows == -1 {
-			l.Printf(l.traceErrStr, GetstrGoid(), utils.FileWithLineNum(), err, float64(elapsed.Nanoseconds())/1e6, "-", sql)
+			l.Printf(l.traceErrStr, trace_id, utils.FileWithLineNum(), err, float64(elapsed.Nanoseconds())/1e6, "-", sql)
 		} else {
-			l.Printf(l.traceErrStr, GetstrGoid(), utils.FileWithLineNum(), err, float64(elapsed.Nanoseconds())/1e6, rows, sql)
+			l.Printf(l.traceErrStr, trace_id, utils.FileWithLineNum(), err, float64(elapsed.Nanoseconds())/1e6, rows, sql)
 		}
 	case elapsed > l.SlowThreshold && l.SlowThreshold != 0 && l.LogLevel >= dlog.Warn:
 		sql, rows := fc()
 		slowLog := fmt.Sprintf("SLOW SQL >= %v", l.SlowThreshold)
 		if rows == -1 {
-			l.Printf(l.traceWarnStr, GetstrGoid(), utils.FileWithLineNum(), slowLog, float64(elapsed.Nanoseconds())/1e6, "-", sql)
+			l.Printf(l.traceWarnStr, trace_id, utils.FileWithLineNum(), slowLog, float64(elapsed.Nanoseconds())/1e6, "-", sql)
 		} else {
-			l.Printf(l.traceWarnStr, GetstrGoid(), utils.FileWithLineNum(), slowLog, float64(elapsed.Nanoseconds())/1e6, rows, sql)
+			l.Printf(l.traceWarnStr, trace_id, utils.FileWithLineNum(), slowLog, float64(elapsed.Nanoseconds())/1e6, rows, sql)
 		}
 	case l.LogLevel == dlog.Info:
 		sql, rows := fc()
 		if rows == -1 {
-			l.Printf(l.traceStr, GetstrGoid(), utils.FileWithLineNum(), float64(elapsed.Nanoseconds())/1e6, "-", sql)
+			l.Printf(l.traceStr, trace_id, utils.FileWithLineNum(), float64(elapsed.Nanoseconds())/1e6, "-", sql)
 		} else {
-			l.Printf(l.traceStr, GetstrGoid(), utils.FileWithLineNum(), float64(elapsed.Nanoseconds())/1e6, rows, sql)
+			l.Printf(l.traceStr, trace_id, utils.FileWithLineNum(), float64(elapsed.Nanoseconds())/1e6, rows, sql)
 		}
 	}
 }
