@@ -135,7 +135,7 @@ func ThriftCall[T any](ctx context.Context, pc *PoolConn[T], method string, argu
 	tconn := pc.Gc.(*TConn[T])
 	c := reflect.ValueOf(tconn.Client)
 	starttime := time.Now().UnixNano()
-	defer pc.Close(ctx, err)
+	//defer pc.Close(ctx, err)
 	defer func() {
 		endTime := time.Now().UnixNano()
 		errStr := ""
@@ -173,15 +173,6 @@ func ThriftCall[T any](ctx context.Context, pc *PoolConn[T], method string, argu
 	} else if rets[1] != nil {
 		err = rets[1].(error)
 	}
-	/*if err != nil {
-		logger.Warnf(ctx, "call %s %s", method, err.Error())
-		switch err.(type) {
-		case thrift.TTransportException:
-		case thrift.TProtocolException:
-			pc.Gc.Close()
-			//pc.Close(ctx, err)
-		}
-	}*/
 	if retlen == 1 {
 		return nil, err
 	} else {
@@ -195,7 +186,7 @@ func ThriftCall2[T any](ctx context.Context, pc *PoolConn[T], fn interface{}, pa
 
 	tconn := pc.Gc.(*TConn[T])
 	starttime := time.Now().UnixNano()
-	defer pc.Close(ctx, err)
+	//defer pc.Close(ctx, err)
 	defer func() {
 		endTime := time.Now().UnixNano()
 		errStr := ""
@@ -233,15 +224,6 @@ func ThriftCall2[T any](ctx context.Context, pc *PoolConn[T], fn interface{}, pa
 	} else if rets[1] != nil {
 		err = rets[1].(error)
 	}
-	/*if err != nil {
-		logger.Warnf(ctx, "call %v %s", fn, err.Error())
-		switch err.(type) {
-		case thrift.TTransportException:
-		case thrift.TProtocolException:
-			pc.Gc.Close()
-			//pc.Close(ctx, err)
-		}
-	}*/
 	if retlen == 1 {
 		return nil, err
 	} else {

@@ -1,12 +1,14 @@
 package redispool
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/garyburd/redigo/redis"
 	"github.com/lanwenhong/lgobase/logger"
 	"github.com/lanwenhong/lgobase/selector"
-	"time"
 )
 
 type RedisPool struct {
@@ -92,20 +94,20 @@ func NewPool(db int, passwd string, maxidle_conn int, maxactive_conn int, sl *se
 	return rp
 }
 
-func (pr *RedisPool) RedisPoolRoundRobin() *redis.Pool {
+func (pr *RedisPool) RedisPoolRoundRobin(ctx context.Context) *redis.Pool {
 	addr := pr.Sl.RoundRobin()
-	logger.Debugf("get addr: %s index:%d", addr.GetAddr(), pr.Sl.Pos)
+	logger.Debugf(ctx, "get addr: %s index:%d", addr.GetAddr(), pr.Sl.Pos)
 	getpool := pr.Plist[pr.Sl.Pos]
 	return getpool
 }
 
-func (pr *RedisPool) Do(commandName string, args ...interface{}) (reply interface{}, err error) {
+func (pr *RedisPool) Do(ctx context.Context, commandName string, args ...interface{}) (reply interface{}, err error) {
 	snow := time.Now()
 	smicros := snow.UnixNano() / 1000
 	addr := pr.Sl.RoundRobin()
 	if addr == nil {
 		if pr.PrintLog {
-			logger.Infof("server=redis|addr=%s:%d|cmd=%s|args=%s|time=%d", addr.GetAddr(), addr.GetPort(), commandName, args, time.Now().UnixNano()/1000-smicros)
+			logger.Infof(ctx, "server=redis|addr=%s:%d|cmd=%s|args=%s|time=%d", addr.GetAddr(), addr.GetPort(), commandName, args, time.Now().UnixNano()/1000-smicros)
 		}
 		return nil, errors.New("not valid server")
 	}
@@ -115,7 +117,7 @@ func (pr *RedisPool) Do(commandName string, args ...interface{}) (reply interfac
 	defer c.Close()
 	reply, err = c.Do(commandName, args...)
 	if pr.PrintLog {
-		logger.Infof("server=redis|addr=%s:%d|cmd=%s|args=%v|time=%d", addr.GetAddr(), addr.GetPort(), commandName, args, time.Now().UnixNano()/1000-smicros)
+		logger.Infof(ctx, "server=redis|addr=%s:%d|cmd=%s|args=%v|time=%d", addr.GetAddr(), addr.GetPort(), commandName, args, time.Now().UnixNano()/1000-smicros)
 	}
 	return reply, err
 }
