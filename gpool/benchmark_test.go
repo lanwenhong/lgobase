@@ -2,12 +2,18 @@ package gpool
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/lanwenhong/lgobase/gpool"
 	"github.com/lanwenhong/lgobase/gpool/gen-go/echo"
 )
+
+func NewRequestID() string {
+	return strings.Replace(uuid.New().String(), "-", "", -1)
+}
 
 type EchoServer struct {
 }
@@ -53,7 +59,7 @@ func BenchmarkBufferClient(b *testing.B) {
 	gp.GpoolInit("127.0.0.1", 9898, 3, 10, 5, gpool.CreateThriftBufferConn[echo.EchoClient], echo.NewEchoClientFactory)
 
 	for n := 0; n < b.N; n++ {
-		gc, err := gp.Get()
+		gc, err := gp.Get(ctx)
 		if err != nil {
 			b.Fatal(err.Error())
 		}
@@ -61,7 +67,7 @@ func BenchmarkBufferClient(b *testing.B) {
 		req := &echo.EchoReq{Msg: "You are welcome."}
 		client := gc.Gc.GetThrfitClient()
 		ret, err := client.Echo(ctx, req)
-		gc.Close(err)
+		gc.Close(ctx, err)
 		//rpcerr = err
 		if err != nil {
 			b.Fatal(err.Error())
@@ -79,7 +85,7 @@ func BenchmarkBufferClient2(b *testing.B) {
 
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			gc, err := gp.Get()
+			gc, err := gp.Get(ctx)
 			if err != nil {
 				b.Fatal(err.Error())
 			}
@@ -87,12 +93,28 @@ func BenchmarkBufferClient2(b *testing.B) {
 			req := &echo.EchoReq{Msg: "You are welcome."}
 			client := gc.Gc.GetThrfitClient()
 			ret, err := client.Echo(ctx, req)
-			gc.Close(err)
+			gc.Close(ctx, err)
 			//rpcerr = err
 			if err != nil {
 				b.Fatal(err.Error())
 			}
-			b.Log("rpc get: ", ret.Msg)
+			b.Log("rpc get: ", ret)
 		}
 	})
+}
+
+func Benchmark3BufferClient(b *testing.B) {
+	ctx := context.WithValue(context.Background(), "trace_id", NewRequestID())
+
+	gp := &gpool.Gpool[echo.EchoClient]{}
+	gp.GpoolInit("127.0.0.1", 9898, 3, 100, 50, gpool.CreateThriftBufferConn[echo.EchoClient], echo.NewEchoClientFactory)
+
+	for n := 0; n < b.N; n++ {
+		req := &echo.EchoReq{Msg: "You are welcome."}
+		ret, err := gp.ThriftCall(ctx, "Echo", req)
+		if err != nil {
+			b.Fatal(err.Error())
+		}
+		b.Log("rpc get: ", ret.(*echo.EchoRes).Msg)
+	}
 }

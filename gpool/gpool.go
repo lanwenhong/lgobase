@@ -2,8 +2,12 @@ package gpool
 
 import (
 	"container/list"
+	"context"
+	"errors"
 	"fmt"
+	"reflect"
 	"sync"
+	"time"
 
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/lanwenhong/lgobase/logger"
@@ -17,7 +21,7 @@ type Conn[T any] interface {
 	GetThrfitClient() *T
 }
 
-type CreateConn[T any] func(string, int, int) (Conn[T], error)
+type CreateConn[T any] func(context.Context, string, int, int) (Conn[T], error)
 
 type PoolConn[T any] struct {
 	Gc Conn[T]
@@ -53,15 +57,15 @@ func (gp *Gpool[T]) GpoolInit(addr string, port int, timeout int, maxconns int, 
 	gp.Nc = clfunc
 }
 
-func (gp *Gpool[T]) getConnFromFreeList() (*PoolConn[T], error) {
+func (gp *Gpool[T]) getConnFromFreeList(ctx context.Context) (*PoolConn[T], error) {
 	e := gp.FreeList.Front()
-	logger.Debugf("after get flist len %d ulist len %d", gp.FreeList.Len(), gp.UseList.Len())
+	logger.Debugf(ctx, "after get flist len %d ulist len %d", gp.FreeList.Len(), gp.UseList.Len())
 	var reterr error
 	pc := e.Value.(*PoolConn[T])
 	if !pc.Gc.IsOpen() {
 		reterr = pc.Gc.Open()
 		if reterr != nil {
-			logger.Warnf("open err %s", reterr.Error())
+			logger.Warnf(ctx, "open err %s", reterr.Error())
 		}
 	}
 	gp.FreeList.Remove(e)
@@ -69,12 +73,12 @@ func (gp *Gpool[T]) getConnFromFreeList() (*PoolConn[T], error) {
 	return e.Value.(*PoolConn[T]), reterr
 }
 
-func (gp *Gpool[T]) getConnFromNew() (*PoolConn[T], error) {
+func (gp *Gpool[T]) getConnFromNew(ctx context.Context) (*PoolConn[T], error) {
 	var err error
 	pc := new(PoolConn[T])
 	pc.gp = gp
-	logger.Debugf("----%v", gp.Cfunc)
-	pc.Gc, err = gp.Cfunc(gp.Addr, gp.Port, gp.TimeOut)
+	logger.Debugf(ctx, "----%v", gp.Cfunc)
+	pc.Gc, err = gp.Cfunc(ctx, gp.Addr, gp.Port, gp.TimeOut)
 	if err == nil {
 		switch pc.Gc.(type) {
 		case *TConn[T]:
@@ -84,26 +88,26 @@ func (gp *Gpool[T]) getConnFromNew() (*PoolConn[T], error) {
 		}
 		pc.e = gp.UseList.PushBack(pc)
 	} else {
-		logger.Warnf("new conn %s", err.Error())
+		logger.Warnf(ctx, "new conn %s", err.Error())
 		pc = nil
 	}
-	logger.Debugf("after get flist len %d ulist len %d", gp.FreeList.Len(), gp.UseList.Len())
+	logger.Debugf(ctx, "after get flist len %d ulist len %d", gp.FreeList.Len(), gp.UseList.Len())
 	return pc, err
 }
 
-func (gp *Gpool[T]) Get() (*PoolConn[T], error) {
+func (gp *Gpool[T]) Get(ctx context.Context) (*PoolConn[T], error) {
 	gp.mutex.Lock()
 	defer gp.mutex.Unlock()
 	if gp.FreeList.Len()+gp.UseList.Len() < gp.MaxConns {
 		if gp.FreeList.Len() > 0 {
-			logger.Debugf("get conn from freelist")
-			return gp.getConnFromFreeList()
+			logger.Debugf(ctx, "get conn from freelist")
+			return gp.getConnFromFreeList(ctx)
 		} else {
-			logger.Debugf("get conn from new")
-			return gp.getConnFromNew()
+			logger.Debugf(ctx, "get conn from new")
+			return gp.getConnFromNew(ctx)
 		}
 	} else {
-		logger.Debugf("pool full flist %d ulist %d", gp.FreeList.Len(), gp.UseList.Len())
+		logger.Debugf(ctx, "pool full flist %d ulist %d", gp.FreeList.Len(), gp.UseList.Len())
 		flen := gp.FreeList.Len()
 		/*for i := 0; i < flen-1; i++ {
 			e := gp.FreeList.Front()
@@ -112,13 +116,13 @@ func (gp *Gpool[T]) Get() (*PoolConn[T], error) {
 			gp.FreeList.Remove(e)
 		}*/
 		if flen > 0 {
-			return gp.getConnFromFreeList()
+			return gp.getConnFromFreeList(ctx)
 		}
 	}
 	return nil, fmt.Errorf("pool is full flist len %d ulist len %d", gp.FreeList.Len(), gp.UseList.Len())
 }
 
-func (pc *PoolConn[T]) put() error {
+func (pc *PoolConn[T]) put(ctx context.Context) error {
 	pc.gp.mutex.Lock()
 	defer pc.gp.mutex.Unlock()
 	pc.gp.UseList.Remove(pc.e)
@@ -132,23 +136,24 @@ func (pc *PoolConn[T]) put() error {
 			pc.gp.FreeList.Remove(e)
 		}
 	}
-	logger.Debugf("after put flist len %d ulist len %d", pc.gp.FreeList.Len(), pc.gp.UseList.Len())
+	logger.Debugf(ctx, "after put flist len %d ulist len %d", pc.gp.FreeList.Len(), pc.gp.UseList.Len())
 	return nil
 }
 
-func (pc *PoolConn[T]) Close(err error) {
+func (pc *PoolConn[T]) Close(ctx context.Context, err error) {
 	switch err.(type) {
 	case thrift.TTransportException:
 		tte := err.(thrift.TTransportException)
 		e_type_id := tte.TypeId()
-		logger.Warnf("e id: %d", e_type_id)
+		logger.Warnf(ctx, "e id: %d", e_type_id)
+		pc.Gc.Close()
 	case thrift.TProtocolException:
 		tpe := err.(thrift.TProtocolException)
 		e_type_id := tpe.TypeId()
-		logger.Warnf("e id: %d", e_type_id)
+		logger.Warnf(ctx, "e id: %d", e_type_id)
 		pc.Gc.Close()
 	}
-	pc.put()
+	pc.put(ctx)
 }
 
 func (gp *Gpool[T]) GetFreeLen() int {
@@ -157,4 +162,65 @@ func (gp *Gpool[T]) GetFreeLen() int {
 
 func (gp *Gpool[T]) GetUseLen() int {
 	return gp.UseList.Len()
+}
+
+func (gp *Gpool[T]) ThriftCall(ctx context.Context, method string, arguments ...interface{}) (interface{}, error) {
+	var rpc_err error = nil
+	pc, err := gp.Get(ctx)
+	defer pc.Close(ctx, rpc_err)
+	tconn := pc.Gc.(*TConn[T])
+
+	c := reflect.ValueOf(tconn.Client)
+	starttime := time.Now().UnixNano()
+	defer func() {
+		endTime := time.Now().UnixNano()
+		errStr := ""
+		if err != nil {
+			errStr = err.Error()
+		}
+		address := fmt.Sprintf("%s:%d", tconn.Addr, tconn.Port)
+		logger.Infof(ctx, "func=ThriftCallFramed|module=%s|method=%s|addr=%s:%d|time=%d|err=%s",
+			c.Elem().Type().Name(), method, address, time.Duration(tconn.TimeOut)*1000, (endTime-starttime)/1000, errStr)
+	}()
+
+	function := c.MethodByName(method)
+	if !function.IsValid() || function.IsNil() {
+		return nil, errors.New("method not found")
+	}
+
+	if need := function.Type().NumIn(); need != len(arguments)+1 {
+		return nil, errors.New(fmt.Sprintf("arguments number not match, need %d but got %d", need, len(arguments)))
+	}
+
+	//callArgs := make([]reflect.Value, len(arguments))
+	callArgs := make([]reflect.Value, 0)
+	callArgs = append(callArgs, reflect.ValueOf(ctx))
+	for _, arg := range arguments {
+		//callArgs[i] = reflect.ValueOf(arg)
+		callArgs = append(callArgs, reflect.ValueOf(arg))
+	}
+
+	var rets []interface{}
+	for _, arg := range function.Call(callArgs) {
+		rets = append(rets, arg.Interface())
+	}
+	retlen := len(rets)
+	if retlen == 1 && rets[0] != nil {
+		rpc_err = rets[0].(error)
+	} else if rets[1] != nil {
+		rpc_err = rets[1].(error)
+	}
+	if rpc_err != nil {
+		logger.Warnf(ctx, "call %s %s", method, rpc_err.Error())
+		switch rpc_err.(type) {
+		case thrift.TTransportException:
+		case thrift.TProtocolException:
+			pc.Gc.Close()
+		}
+	}
+	if retlen == 1 {
+		return nil, rpc_err
+	} else {
+		return rets[0], rpc_err
+	}
 }

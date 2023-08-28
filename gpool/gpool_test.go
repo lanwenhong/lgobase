@@ -3,14 +3,21 @@ package gpool
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/apache/thrift/lib/go/thrift"
+	"github.com/google/uuid"
 	"github.com/lanwenhong/lgobase/gpool"
 	"github.com/lanwenhong/lgobase/gpool/gen-go/echo"
 	"github.com/lanwenhong/lgobase/gpool/gen-go/example"
+	"github.com/lanwenhong/lgobase/logger"
 )
+
+func NewRequestID() string {
+	return strings.Replace(uuid.New().String(), "-", "", -1)
+}
 
 type EchoServer struct {
 }
@@ -41,55 +48,74 @@ func (e *ExampleServer) Echo(ctx context.Context, req string) (ret *example.Myre
 }
 
 func TestBufferClient(t *testing.T) {
-	/*go func() {
-		transport, err := thrift.NewTServerSocket(":9898")
-		if err != nil {
-			t.Fatal(err.Error())
-		}
-		handler := &EchoServer{}
-		processor := echo.NewEchoProcessor(handler)
-		transportFactory := thrift.NewTBufferedTransportFactory(8192)
-		protocolFactory := thrift.NewTBinaryProtocolFactoryDefault()
-		server := thrift.NewTSimpleServer4(
-			processor,
-			transport,
-			transportFactory,
-			protocolFactory,
-		)
-		if err = server.Serve(); err != nil {
-			t.Fatal(err.Error())
-		}
 
-	}()
-	time.Sleep(3 * time.Second)*/
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+	myconf := &logger.Glogconf{
+		RotateMethod: logger.ROTATE_FILE_DAILY,
+		Stdout:       true,
+		ColorFull:    true,
+		Loglevel:     logger.DEBUG,
+	}
+	logger.Newglog("./", "test.log", "test.log.err", myconf)
+	ctx := context.WithValue(context.Background(), "trace_id", NewRequestID())
 
 	gp := &gpool.Gpool[echo.EchoClient]{}
 	gp.GpoolInit("127.0.0.1", 9898, 3, 10, 5, gpool.CreateThriftBufferConn[echo.EchoClient], echo.NewEchoClientFactory)
 
-	//var rpcerr error = nil
-	t.Log(gp)
-	gc, err := gp.Get()
+	/*gc, err := gp.Get(ctx)
+	if err != nil {
+		t.Fatal(err.Error())
+	}*/
+	req := &echo.EchoReq{Msg: "You are welcome."}
+	//ret, err := gpool.ThriftCall[echo.EchoClient](ctx, gc, "Echo", req)
+	ret, err := gp.ThriftCall(ctx, "Echo", req)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	var rpc_err error = nil
-	defer gc.Close(rpc_err)
+	t.Log("rpc get: ", ret.(*echo.EchoRes).Msg)
+}
 
+func Test1BufferClient(t *testing.T) {
+	myconf := &logger.Glogconf{
+		RotateMethod: logger.ROTATE_FILE_DAILY,
+		Stdout:       true,
+		ColorFull:    true,
+		Loglevel:     logger.DEBUG,
+	}
+	logger.Newglog("./", "test.log", "test.log.err", myconf)
+	ctx := context.WithValue(context.Background(), "trace_id", NewRequestID())
+
+	gp := &gpool.Gpool[echo.EchoClient]{}
+	gp.GpoolInit("127.0.0.1", 9898, 3, 10, 5, gpool.CreateThriftBufferConn[echo.EchoClient], echo.NewEchoClientFactory)
+
+	/*gc, err := gp.Get(ctx)
+	if err != nil {
+		t.Fatal(err.Error())
+	}*/
 	req := &echo.EchoReq{Msg: "You are welcome."}
-	client := gc.Gc.GetThrfitClient()
-	ret, rpc_err := client.Echo(ctx, req)
-	//rpcerr = err
-	if rpc_err != nil {
+	//ret, err := gpool.ThriftCall[echo.EchoClient](ctx, gc, "Echo", req)
+	ret, err := gp.ThriftCall(ctx, "Echo", req)
+	if err != nil {
 		t.Fatal(err.Error())
 	}
-	t.Log("rpc get: ", ret.Msg)
+	t.Log("rpc get: ", ret.(*echo.EchoRes).Msg)
+
+	time.Sleep(5 * time.Second)
+
+	/*gc, err = gp.Get(ctx)
+	if err != nil {
+		t.Fatal(err.Error())
+	}*/
+	req = &echo.EchoReq{Msg: "You are welcome."}
+	ret, err = gp.ThriftCall(ctx, "Echo", req)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	t.Log("rpc2 get: ", ret.(*echo.EchoRes).Msg)
 
 }
 
 func TestFramedClient(t *testing.T) {
+	ctx := context.WithValue(context.Background(), "trace_id", NewRequestID())
 	go func() {
 		transport, err := thrift.NewTServerSocket(":9899")
 		if err != nil {
@@ -112,15 +138,15 @@ func TestFramedClient(t *testing.T) {
 	}()
 	time.Sleep(3 * time.Second)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+	//ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	//defer cancel()
 
 	gp := &gpool.Gpool[example.ExampleClient]{}
 	gp.GpoolInit("127.0.0.1", 9899, 3, 10, 5, gpool.CreateThriftFramedConn[example.ExampleClient], example.NewExampleClientFactory)
 
 	var rpc_err error = nil
-	gc, _ := gp.Get()
-	defer gc.Close(rpc_err)
+	gc, _ := gp.Get(ctx)
+	defer gc.Close(ctx, rpc_err)
 
 	client := gc.Gc.GetThrfitClient()
 	c, rpc_err := client.Add(ctx, 1, 2)
@@ -141,16 +167,17 @@ func TestFramedClient(t *testing.T) {
 }
 
 func TestGpoolReconnect(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+	//ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	//defer cancel()
+	ctx := context.WithValue(context.Background(), "trace_id", NewRequestID())
 
 	gp := &gpool.Gpool[example.ExampleClient]{}
 	gp.GpoolInit("127.0.0.1", 9899, 3, 10, 5, gpool.CreateThriftFramedConn[example.ExampleClient], example.NewExampleClientFactory)
 	for i := 0; i < 15; i++ {
-		gc, err := gp.Get()
+		gc, err := gp.Get(ctx)
 		client := gc.Gc.GetThrfitClient()
 		ret, err := client.Echo(ctx, "ganni")
-		gc.Close(err)
+		gc.Close(ctx, err)
 		if err != nil {
 			t.Log(err.Error())
 			time.Sleep(1 * time.Second)
@@ -164,8 +191,9 @@ func TestGpoolReconnect(t *testing.T) {
 }
 
 func TestGpoolList(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+	//ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	//defer cancel()
+	ctx := context.WithValue(context.Background(), "trace_id", NewRequestID())
 	gp := &gpool.Gpool[example.ExampleClient]{}
 	gp.GpoolInit("127.0.0.1", 9899, 3, 201, 5, gpool.CreateThriftFramedConn[example.ExampleClient], example.NewExampleClientFactory)
 
@@ -173,7 +201,7 @@ func TestGpoolList(t *testing.T) {
 	for i := 0; i < 200; i++ {
 		go func() {
 			for j := 0; j < 20; j++ {
-				gc, err := gp.Get()
+				gc, err := gp.Get(ctx)
 				if err != nil {
 					cs <- "error"
 					break
@@ -181,7 +209,7 @@ func TestGpoolList(t *testing.T) {
 				t.Log("<<<<<DEBUG>>>>>")
 				client := gc.Gc.GetThrfitClient()
 				ret, err := client.Echo(ctx, "ganni")
-				gc.Close(err)
+				gc.Close(ctx, err)
 				if err != nil {
 					t.Log(err.Error())
 					cs <- "ferror"
