@@ -7,6 +7,21 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+type RedisMethod interface {
+	*redis.ClusterClient | *redis.Client
+	redis.Cmdable
+}
+
+type RedisOP[T RedisMethod] struct {
+	Rdb T
+}
+
+func NewRedisOP[T RedisMethod](client T) *RedisOP[T] {
+	return &RedisOP[T]{
+		Rdb: client,
+	}
+}
+
 func NewClusterPool(ctx context.Context, username string, passwd string, addrs []string, PoolSize int, MinIdleConns int,
 	DialTimeout time.Duration,
 	ReadTimeout time.Duration,

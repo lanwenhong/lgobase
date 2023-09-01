@@ -237,3 +237,44 @@ func TestClusterSetNX(t *testing.T) {
 	t.Log(ret)
 
 }
+
+func TestRedisOP(t *testing.T) {
+	addrs := []string{
+		":9001",
+		":9002",
+		":9003",
+		":9004",
+		":9005",
+		":9006",
+	}
+	ctx := context.WithValue(context.Background(), "trace_id", util.NewRequestID())
+	rdb := redispool.NewClusterPool(ctx, "dc", "Abc12345%", addrs, 100, 30,
+		10*time.Second,
+		30*time.Second,
+		30*time.Second,
+	)
+
+	op := redispool.NewRedisOP[*redis.ClusterClient](rdb)
+	pong, err := op.Rdb.Ping(ctx).Result()
+	t.Log(pong)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func Test1RedisOP(t *testing.T) {
+	addr := ":6379"
+	ctx := context.WithValue(context.Background(), "trace_id", util.NewRequestID())
+	rdb := redispool.NewGrPool(ctx, "", "", 0, addr, 100, 30,
+		10*time.Second,
+		30*time.Second,
+		30*time.Second,
+	)
+
+	op := redispool.NewRedisOP[*redis.Client](rdb)
+	pong, err := op.Rdb.Ping(ctx).Result()
+	t.Log(pong)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
