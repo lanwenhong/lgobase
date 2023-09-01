@@ -8,31 +8,28 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-const (
-	KEY_EX_TIME   int64 = 300
-	KEY_WAIT_TIME int32 = 100
-	KEY_CHECK_NUM int   = 3
-)
-
-type Dlock struct {
-	Key   string
-	Ltime int64
-	Rdb   *redis.ClusterClient
+type RedisClients interface {
+	*redis.ClusterClient | *redis.Client
+	redis.Cmdable
 }
 
-func DlockNew(rdb *redis.ClusterClient, lkey string) *Dlock {
-	return &Dlock{
+type NDlock[T RedisClients] struct {
+	Key   string
+	Ltime int64
+	Rdb   T
+}
+
+func NDlockNew[T RedisClients](ctx context.Context, rdb T, lkey string) *NDlock[T] {
+	return &NDlock[T]{
 		Key: lkey,
 		Rdb: rdb,
 	}
 }
 
-func (dl *Dlock) Lock(ctx context.Context) error {
+func (dl *NDlock[T]) NLock(ctx context.Context) error {
 	for {
 		t := time.Now().UnixNano()
-		//st := fmt.Sprintf("%d", t)
 		logger.Debugf(ctx, "try lock")
-		//ret, err := dl.Rrp.Do("set", dl.Key, t, "nx", "px", KEY_EX_TIME)
 		ret, err := dl.Rdb.SetNX(ctx, dl.Key, t, time.Duration(KEY_EX_TIME)*time.Millisecond).Result()
 		if err != nil {
 			logger.Warn(ctx, err.Error())
@@ -52,13 +49,14 @@ func (dl *Dlock) Lock(ctx context.Context) error {
 	return nil
 }
 
-func (dl *Dlock) Unlock(ctx context.Context) error {
-	ret, err := dl.Rdb.Get(ctx, dl.Key).Int64()
+func (dl *NDlock[T]) NUnlock(ctx context.Context) error {
+	var ret int64
+	var err error
+	ret, err = dl.Rdb.Get(ctx, dl.Key).Int64()
 	if err != nil && err != redis.Nil {
 		logger.Debug(ctx, err.Error())
 		return err
 	}
-
 	if err == redis.Nil {
 		logger.Debug(ctx, "timeout")
 		return nil

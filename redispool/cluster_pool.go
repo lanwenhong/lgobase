@@ -7,7 +7,7 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-func NewClusterPool(ctx context.Context, addrs []string, PoolSize int, MinIdleConns int,
+func NewClusterPool(ctx context.Context, username string, passwd string, addrs []string, PoolSize int, MinIdleConns int,
 	DialTimeout time.Duration,
 	ReadTimeout time.Duration,
 	WriteTimeout time.Duration,
@@ -18,6 +18,29 @@ func NewClusterPool(ctx context.Context, addrs []string, PoolSize int, MinIdleCo
 		DialTimeout:  DialTimeout,
 		ReadTimeout:  ReadTimeout,
 		WriteTimeout: WriteTimeout,
+		Username:     username,
+		Password:     passwd,
+	})
+	return rdb
+}
+
+func NewGrPool(ctx context.Context, username string, passwd string, db int,
+	addr string,
+	PoolSize int,
+	MinIdleConns int,
+	DialTimeout time.Duration,
+	ReadTimeout time.Duration,
+	WriteTimeout time.Duration,
+) *redis.Client {
+	rdb := redis.NewClient(&redis.Options{
+		Addr:         addr,
+		PoolSize:     PoolSize,
+		DialTimeout:  DialTimeout,
+		ReadTimeout:  ReadTimeout,
+		WriteTimeout: WriteTimeout,
+		Username:     username,
+		Password:     passwd,
+		DB:           db,
 	})
 	return rdb
 }

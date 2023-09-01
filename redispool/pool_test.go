@@ -20,7 +20,7 @@ func TestClusterConfig(t *testing.T) {
 		":9006",
 	}
 	ctx := context.WithValue(context.Background(), "trace_id", util.NewRequestID())
-	rdb := redispool.NewClusterPool(ctx, addrs, 100, 30,
+	rdb := redispool.NewClusterPool(ctx, "", "", addrs, 100, 30,
 		10*time.Second,
 		30*time.Second,
 		30*time.Second,
@@ -42,7 +42,7 @@ func TestClusterLPush(t *testing.T) {
 		":9006",
 	}
 	ctx := context.WithValue(context.Background(), "trace_id", util.NewRequestID())
-	rdb := redispool.NewClusterPool(ctx, addrs, 100, 30,
+	rdb := redispool.NewClusterPool(ctx, "", "", addrs, 100, 30,
 		10*time.Second,
 		30*time.Second,
 		30*time.Second,
@@ -75,7 +75,7 @@ func TestClusterLRange(t *testing.T) {
 		":9006",
 	}
 	ctx := context.WithValue(context.Background(), "trace_id", util.NewRequestID())
-	rdb := redispool.NewClusterPool(ctx, addrs, 100, 30,
+	rdb := redispool.NewClusterPool(ctx, "", "", addrs, 100, 30,
 		10*time.Second,
 		30*time.Second,
 		30*time.Second,
@@ -97,7 +97,7 @@ func TestClusterZAdd(t *testing.T) {
 		":9006",
 	}
 	ctx := context.WithValue(context.Background(), "trace_id", util.NewRequestID())
-	rdb := redispool.NewClusterPool(ctx, addrs, 100, 30,
+	rdb := redispool.NewClusterPool(ctx, "", "", addrs, 100, 30,
 		10*time.Second,
 		30*time.Second,
 		30*time.Second,
@@ -157,7 +157,7 @@ func TestClusterZRangeByScore(t *testing.T) {
 		":9006",
 	}
 	ctx := context.WithValue(context.Background(), "trace_id", util.NewRequestID())
-	rdb := redispool.NewClusterPool(ctx, addrs, 100, 30,
+	rdb := redispool.NewClusterPool(ctx, "", "", addrs, 100, 30,
 		10*time.Second,
 		30*time.Second,
 		30*time.Second,
@@ -186,7 +186,7 @@ func TestClusterSet(t *testing.T) {
 		":9006",
 	}
 	ctx := context.WithValue(context.Background(), "trace_id", util.NewRequestID())
-	rdb := redispool.NewClusterPool(ctx, addrs, 100, 30,
+	rdb := redispool.NewClusterPool(ctx, "", "", addrs, 100, 30,
 		10*time.Second,
 		30*time.Second,
 		30*time.Second,
@@ -218,7 +218,7 @@ func TestClusterSetNX(t *testing.T) {
 		":9006",
 	}
 	ctx := context.WithValue(context.Background(), "trace_id", util.NewRequestID())
-	rdb := redispool.NewClusterPool(ctx, addrs, 100, 30,
+	rdb := redispool.NewClusterPool(ctx, "", "", addrs, 100, 30,
 		10*time.Second,
 		30*time.Second,
 		30*time.Second,
