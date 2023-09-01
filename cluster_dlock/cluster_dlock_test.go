@@ -34,12 +34,14 @@ func TestDlock(t *testing.T) {
 		30*time.Second,
 		30*time.Second,
 	)
-	dl := cdl.DlockNew(rdb, "lvhanikezi", true)
+	//dl := cdl.DlockNew(rdb, "lvhanikezi", true)
+	dl := cdl.DlockNew[*redis.ClusterClient](ctx, rdb, "ganjujingyi")
 
 	dl.Lock(ctx)
 	go func() {
 		cctx := context.WithValue(ctx, "trace_id", util.NewRequestID())
-		dl := cdl.DlockNew(rdb, "lvhanikezi", true)
+		//dl := cdl.DlockNew(rdb, "lvhanikezi", true)
+		dl := cdl.DlockNew[*redis.ClusterClient](ctx, rdb, "ganjujingyi")
 		dl.Lock(cctx)
 		dl.Unlock(cctx)
 	}()
@@ -69,17 +71,17 @@ func TestNDlock(t *testing.T) {
 		30*time.Second,
 		30*time.Second,
 	)
-	dl := cdl.NDlockNew[*redis.ClusterClient](ctx, rdb, "ganjujingyi")
+	dl := cdl.DlockNew[*redis.ClusterClient](ctx, rdb, "ganjujingyi")
 	//cdl.NDlockNew[*redis.ClusterClient](ctx, rdb, "lvhanikezi")
 
-	dl.NLock(ctx)
+	dl.Lock(ctx)
 	go func() {
 		cctx := context.WithValue(ctx, "trace_id", util.NewRequestID())
-		dl := cdl.NDlockNew[*redis.ClusterClient](ctx, rdb, "ganjujingyi")
-		dl.NLock(cctx)
-		dl.NUnlock(cctx)
+		dl := cdl.DlockNew[*redis.ClusterClient](ctx, rdb, "ganjujingyi")
+		dl.Lock(cctx)
+		dl.Unlock(cctx)
 	}()
-	dl.NUnlock(ctx)
+	dl.Unlock(ctx)
 	time.Sleep(1 * time.Second)
 
 }

@@ -8,25 +8,31 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+const (
+	KEY_EX_TIME   int64 = 300
+	KEY_WAIT_TIME int32 = 100
+	KEY_CHECK_NUM int   = 3
+)
+
 type RedisClients interface {
 	*redis.ClusterClient | *redis.Client
 	redis.Cmdable
 }
 
-type NDlock[T RedisClients] struct {
+type Dlock[T RedisClients] struct {
 	Key   string
 	Ltime int64
 	Rdb   T
 }
 
-func NDlockNew[T RedisClients](ctx context.Context, rdb T, lkey string) *NDlock[T] {
-	return &NDlock[T]{
+func DlockNew[T RedisClients](ctx context.Context, rdb T, lkey string) *Dlock[T] {
+	return &Dlock[T]{
 		Key: lkey,
 		Rdb: rdb,
 	}
 }
 
-func (dl *NDlock[T]) NLock(ctx context.Context) error {
+func (dl *Dlock[T]) Lock(ctx context.Context) error {
 	for {
 		t := time.Now().UnixNano()
 		logger.Debugf(ctx, "try lock")
@@ -49,7 +55,7 @@ func (dl *NDlock[T]) NLock(ctx context.Context) error {
 	return nil
 }
 
-func (dl *NDlock[T]) NUnlock(ctx context.Context) error {
+func (dl *Dlock[T]) Unlock(ctx context.Context) error {
 	var ret int64
 	var err error
 	ret, err = dl.Rdb.Get(ctx, dl.Key).Int64()
