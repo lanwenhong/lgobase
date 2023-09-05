@@ -138,7 +138,7 @@ func TestDbWithfilelog(t *testing.T) {
 func TestLogfile(t *testing.T) {
 	myconf := &logger.Glogconf{
 		RotateMethod: logger.ROTATE_FILE_DAILY,
-		Stdout:       true,
+		Stdout:       false,
 		ColorFull:    true,
 		Loglevel:     logger.DEBUG,
 		//Goid:         true,

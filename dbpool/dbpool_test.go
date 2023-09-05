@@ -226,3 +226,48 @@ func TestQuery1(t *testing.T) {
 	c_tm := user.CreatedAt.Format("2006-01-02 15:04:05")
 	t.Log(c_tm)
 }
+
+func TestQuery2(t *testing.T) {
+	ctx := context.WithValue(context.Background(), "trace_id", NewRequestID())
+
+	myconf := &logger.Glogconf{
+		RotateMethod: logger.ROTATE_FILE_DAILY,
+		Stdout:       true,
+		ColorFull:    true,
+		Loglevel:     logger.DEBUG,
+		//Goid:         true,
+	}
+
+	users := []User{}
+	logger.Newglog("./", "test.log", "test.log.err", myconf)
+	//logger.SetConsole(true)
+	//logger.SetRollingDaily("./", "test.log", "test.log.err")
+	//loglevel, _ := logger.LoggerLevelIndex("DEBUG")
+	//logger.SetLevel(loglevel)
+
+	dconfig := &dlog.Config{
+		SlowThreshold:             time.Second, // 慢 SQL 阈值
+		LogLevel:                  dlog.Info,   // 日志级别
+		IgnoreRecordNotFoundError: true,        // 忽略ErrRecordNotFound（记录未找到）错误
+		Colorful:                  true,        // 禁用彩色打印
+	}
+
+	db_conf := dbenc.DbConfNew(ctx, "db.ini")
+	dbs := dbpool.DbpoolNew(db_conf)
+	dbs.SetormLog(ctx, dconfig)
+	tk := "qfconf://test1?maxopen=1000&maxidle=30"
+	err := dbs.Add(ctx, "test1", tk, dbpool.USE_GORM)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tdb := dbs.OrmPools["test1"]
+	//tdb.WithContext(ctx).Where("name = ?", "wowow").First(&user)
+	start := time.Date(2023, 1, 1, 0, 0, 0, 0, time.Local)
+	end := time.Date(2023, 8, 12, 4, 12, 31, 0, time.Local)
+	logger.Debug(ctx, "start: %s end: %s", start, end)
+	tdb.WithContext(ctx).Where("createat between ? and ?", start, end).Find(&users)
+
+	t.Log(users)
+	//c_tm := user.CreatedAt.Format("2006-01-02 15:04:05")
+	//t.Log(c_tm)
+}

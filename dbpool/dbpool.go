@@ -94,7 +94,7 @@ func (dbpool *Dbpool) Add(ctx context.Context, db string, url string, model int)
 	token := tdata[1]
 	logger.Debugf(ctx, "token: %s", token)
 	dbc := dbpool.Tset.DbConfReadGroup(token)
-	dburl := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8&parseTime=true", dbc["user"], dbc["pswd"], dbc["host"], dbc["port"], dbc["dtbs"])
+	dburl := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8&parseTime=true&loc=Local", dbc["user"], dbc["pswd"], dbc["host"], dbc["port"], dbc["dtbs"])
 	logger.Debugf(ctx, "db url: %s", dburl)
 	if model == USE_SQLX {
 		dbpool.Pools[db], err = sqlx.Connect("mysql", dburl)

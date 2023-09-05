@@ -150,6 +150,7 @@ func Newglog(fileDir string, fileName string, fileNameErr string, glog_conf *Glo
 		glog.SetRollingFile(fileDir, fileName, glog_conf.Stdout)
 	} else {
 		glog.SetRollingDaily(fileDir, fileName, fileNameErr, glog_conf.Stdout)
+		//glog.SetRollingDaily(fileName, fileNameErr, glog_conf.Stdout)
 	}
 	Gfilelog = glog
 	return glog
@@ -217,7 +218,8 @@ func (glog *Glog) SetRollingFile(fileDir, fileName string, stdout bool) error {
 	return nil
 }
 
-func (glog *Glog) SetRollingDaily(fileDir, fileName, fileName_err string, stdout bool) {
+func (glog *Glog) SetRollingDaily(fileDir, fileName, fileName_err string, stdout bool) error {
+	var err error = nil
 	t, _ := time.Parse(DATEFORMAT, time.Now().Format(DATEFORMAT))
 
 	glog.LogObj = &FILE{
@@ -235,10 +237,10 @@ func (glog *Glog) SetRollingDaily(fileDir, fileName, fileName_err string, stdout
 	if !glog.isMustRename() {
 		if !stdout {
 			fmt.Println("==0000000000000===")
-			glog.LogObj.logfile, _ = os.OpenFile(fileDir+"/"+fileName, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
+			glog.LogObj.logfile, err = os.OpenFile(fileDir+"/"+fileName, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
 			glog.LogObj.lg = log.New(glog.LogObj.logfile, "", log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile|log.LstdFlags)
 
-			glog.LogObj.logfile_err, _ = os.OpenFile(fileDir+"/"+fileName_err, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
+			glog.LogObj.logfile_err, err = os.OpenFile(fileDir+"/"+fileName_err, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
 			glog.LogObj.lg_err = log.New(glog.LogObj.logfile_err, "", log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile|log.LstdFlags)
 		} else {
 			glog.LogObj.lg = log.New(os.Stdout, "", log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile)
@@ -246,7 +248,7 @@ func (glog *Glog) SetRollingDaily(fileDir, fileName, fileName_err string, stdout
 	} else {
 		glog.rename()
 	}
-
+	return err
 }
 
 func catchError() {
@@ -256,27 +258,19 @@ func catchError() {
 }
 
 func pDebugWithGid(ctx context.Context, depth int, fmtstr string, v ...interface{}) {
-
 	trace_id := ""
-	//trace_v := ctx.Value("trace_id")
 	if m := ctx.Value("trace_id"); m != nil {
 		if value, ok := m.(string); ok {
 			trace_id = value
 		}
 	}
-	//fmt.Printf("trace_id: %s", trace_id)
 	if Gfilelog != nil && Gfilelog.LogObj != nil {
 		Gfilelog.fileCheck()
 		Gfilelog.LogObj.mu.RLock()
 		defer Gfilelog.LogObj.mu.RUnlock()
 		if Gfilelog.Logconf.Stdout && Gfilelog.Logconf.ColorFull && Gfilelog.Logconf.Loglevel <= INFO {
-			//Gfilelog.LogObj.lg.Printf(Green+"[INFO] "+fmtstr+Reset, v...)
-			//Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf(Green+"[INFO] "+fmtstr+Reset, v...))
 			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf(Green+"trace_id-%s [DEBUG] "+fmtstr+Reset, append([]interface{}{trace_id}, v...)...))
 		} else if Gfilelog.Logconf.Loglevel <= DEBUG {
-			//Gfilelog.LogObj.lg.Printf("[INFO] "+fmtstr, v...)
-			//Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf("[INFO] "+fmtstr, v...))
-			//append([]interface{}{utils.FileWithLineNum()}, data...)
 			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf("trace_id-%s [DEBUG] "+fmtstr, append([]interface{}{trace_id}, v...)...))
 		}
 	}
@@ -299,16 +293,13 @@ func pInfoWithGid(ctx context.Context, depth int, fmtstr string, v ...interface{
 			trace_id = value
 		}
 	}
-	//fmt.Printf("trace_id: %s", trace_id)
 	if Gfilelog != nil && Gfilelog.LogObj != nil {
 		Gfilelog.fileCheck()
 		Gfilelog.LogObj.mu.RLock()
 		defer Gfilelog.LogObj.mu.RUnlock()
 		if Gfilelog.Logconf.Stdout && Gfilelog.Logconf.ColorFull && Gfilelog.Logconf.Loglevel <= INFO {
-			//Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf(Green+"gorouting-%s [INFO] "+fmtstr+Reset, append([]interface{}{GetstrGoid()}, v...)...))
 			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf(Green+"trace_id-%s [INFO] "+fmtstr+Reset, append([]interface{}{trace_id}, v...)...))
 		} else if Gfilelog.Logconf.Loglevel <= INFO {
-			//Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf("gorouting-%s [INFO] "+fmtstr, append([]interface{}{GetstrGoid()}, v...)...))
 			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf("trace_id-%s [INFO] "+fmtstr, append([]interface{}{trace_id}, v...)...))
 		}
 	}
