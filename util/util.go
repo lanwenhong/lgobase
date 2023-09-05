@@ -2,18 +2,20 @@ package util
 
 import (
 	"bytes"
+	"context"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/md5"
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/lanwenhong/lgobase/logger"
 	"sort"
 	"strings"
+
+	"github.com/lanwenhong/lgobase/logger"
 )
 
-func SvrSign(data map[string]string, key string) string {
+func SvrSign(ctx context.Context, data map[string]string, key string) string {
 	sorted_keys := make([]string, 0)
 	dlist := make([]string, 0)
 	for k, _ := range data {
@@ -26,17 +28,17 @@ func SvrSign(data map[string]string, key string) string {
 	}
 	sdata := strings.Join(dlist, "&") + key
 
-	logger.Debugf("===server sign data: %s", sdata)
+	logger.Debugf(ctx, "===server sign data: %s", sdata)
 	md5Ctx := md5.New()
 	md5Ctx.Write([]byte(sdata))
 	cipherStr := md5Ctx.Sum(nil)
 
 	sign := hex.EncodeToString(cipherStr)
-	logger.Debugf("===server sign: %s", sign)
+	logger.Debugf(ctx, "===server sign: %s", sign)
 	return sign
 }
 
-func SvrVerify(data map[string]string, key string) error {
+func SvrVerify(ctx context.Context, data map[string]string, key string) error {
 	c_sign := data["sign"]
 
 	sorted_keys := make([]string, 0)
@@ -53,38 +55,38 @@ func SvrVerify(data map[string]string, key string) error {
 	}
 	sdata := strings.Join(dlist, "&") + key
 
-	logger.Debugf("===server check sign data: %s", sdata)
+	logger.Debugf(ctx, "===server check sign data: %s", sdata)
 
 	md5Ctx := md5.New()
 	md5Ctx.Write([]byte(sdata))
 	cipherStr := md5Ctx.Sum(nil)
 
 	s_sign := hex.EncodeToString(cipherStr)
-	logger.Debugf("s_sign: %s c_sign: %s", s_sign, c_sign)
+	logger.Debugf(ctx, "s_sign: %s c_sign: %s", s_sign, c_sign)
 	if c_sign != s_sign {
 		return errors.New("sever verify error")
 	}
 	return nil
 }
 
-func AesCbcDec(key string, enc string, iv string) ([]byte, error) {
+func AesCbcDec(ctx context.Context, key string, enc string, iv string) ([]byte, error) {
 	bkey := []byte(key)
 	benc, _ := hex.DecodeString(iv + enc)
 
-	logger.Debugf("bkey: %s len: %d", bkey, len(bkey))
+	logger.Debugf(ctx, "bkey: %s len: %d", bkey, len(bkey))
 	block, err := aes.NewCipher(bkey)
 	if err != nil {
-		logger.Warnf("aes key %s init: %s", key, err.Error())
+		logger.Warnf(ctx, "aes key %s init: %s", key, err.Error())
 		return []byte(""), err
 	}
 	if len(benc) < aes.BlockSize {
-		logger.Warnf("ciphertext too short")
+		logger.Warnf(ctx, "ciphertext too short")
 		return []byte(""), errors.New("ciphertext too short")
 	}
 	ivc := benc[:aes.BlockSize]
 	benc = benc[aes.BlockSize:]
 	if len(benc)%aes.BlockSize != 0 {
-		logger.Warnf("ciphertext is not a multiple of the block size")
+		logger.Warnf(ctx, "ciphertext is not a multiple of the block size")
 		return []byte(""), errors.New("ciphertext is not a multiple of the block size")
 	}
 	mode := cipher.NewCBCDecrypter(block, ivc)
@@ -145,11 +147,11 @@ func (x *ecbDecrypter) CryptBlocks(dst, src []byte) {
 	}
 }
 
-//aes ecb support key len 128bit, 192bit, 256bit
-func AesEcbDecrypt(crypted, key []byte) ([]byte, error) {
+// aes ecb support key len 128bit, 192bit, 256bit
+func AesEcbDecrypt(ctx context.Context, crypted, key []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		logger.Warnf("err is:", err)
+		logger.Warnf(ctx, "err is:", err)
 		return nil, err
 	}
 	blockMode := NewECBDecrypter(block)
@@ -160,7 +162,7 @@ func AesEcbDecrypt(crypted, key []byte) ([]byte, error) {
 	return origData, nil
 }
 
-func AesEcbEncrypt(src, key []byte) ([]byte, error) {
+func AesEcbEncrypt(ctx context.Context, src, key []byte) ([]byte, error) {
 	block, err := aes.NewCipher([]byte(key))
 	if err != nil {
 		return nil, err
@@ -169,7 +171,7 @@ func AesEcbEncrypt(src, key []byte) ([]byte, error) {
 	ecb := NewECBEncrypter(block)
 	content := []byte(src)
 	content = PKCS5Padding(content, block.BlockSize())
-	logger.Debugf("content: %x\n", content)
+	logger.Debugf(ctx, "content: %x\n", content)
 	crypted := make([]byte, len(content))
 	ecb.CryptBlocks(crypted, content)
 	return crypted, nil

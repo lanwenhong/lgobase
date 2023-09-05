@@ -2,8 +2,11 @@ package util
 
 import (
 	"fmt"
-	"github.com/jmoiron/sqlx"
+	"strings"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/jmoiron/sqlx"
 )
 
 type UuidShort struct {
@@ -33,4 +36,8 @@ func Genid(conn *sqlx.DB) (int64, error) {
 	seq := u.Id % 65535
 	gid := msec<<22 + id.Id<<16 + seq
 	return int64(gid), nil
+}
+
+func NewRequestID() string {
+	return strings.Replace(uuid.New().String(), "-", "", -1)
 }

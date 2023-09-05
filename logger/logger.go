@@ -1,17 +1,37 @@
 package logger
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
+
+	dlog "gorm.io/gorm/logger"
 )
 
 const (
-	_VER string = "1.0.2"
+	Reset       = "\033[0m"
+	Red         = "\033[31m"
+	Green       = "\033[32m"
+	Yellow      = "\033[33m"
+	Blue        = "\033[34m"
+	Magenta     = "\033[35m"
+	Cyan        = "\033[36m"
+	White       = "\033[37m"
+	BlueBold    = "\033[34;1m"
+	MagentaBold = "\033[35;1m"
+	RedBold     = "\033[31;1m"
+	YellowBold  = "\033[33;1m"
+)
+
+const (
+	ROTATE_FILE_DAILY = iota + 100
+	ROTATE_FILE_NUM
 )
 
 type LEVEL int
@@ -22,7 +42,8 @@ var maxFileCount int32
 var dailyRolling bool = true
 var consoleAppender bool = true
 var RollingFile bool = false
-var logObj *_FILE
+
+//var LogObj *FILE = nil
 
 const DATEFORMAT = "2006-01-02"
 
@@ -35,7 +56,6 @@ const (
 	GB
 	TB
 )
-
 const (
 	//ALL LEVEL = iota
 	ALL = iota
@@ -47,19 +67,93 @@ const (
 	OFF
 )
 
-type _FILE struct {
+type FILE struct {
 	dir          string
 	filename     string
 	filename_err string
 	_suffix      int
 	isCover      bool
-	_date        *time.Time
+	Ldate        *time.Time
 	mu           *sync.RWMutex
 	logfile      *os.File
 	lg           *log.Logger
 
 	logfile_err *os.File
 	lg_err      *log.Logger
+}
+
+type Glogconf struct {
+	//maxFileSize     int64
+	MaxFileSize int64
+	//maxFileCount    int32
+	MaxFileCount int32
+	//dailyRolling    bool
+	RotateMethod int
+	//consoleAppender bool
+	RollingFile bool
+	Stdout      bool
+	ColorFull   bool
+	Goid        bool
+	Loglevel    int
+}
+
+type Glog struct {
+	LogObj     *FILE
+	Logconf    *Glogconf
+	LogormConf *dlog.Config
+}
+
+var Gfilelog *Glog = nil
+
+func GetGoid() uint64 {
+	var (
+		buf [64]byte
+		n   = runtime.Stack(buf[:], false)
+		stk = strings.TrimPrefix(string(buf[:n]), "goroutine")
+	)
+
+	idField := strings.Fields(stk)[0]
+	id, err := strconv.ParseUint(idField, 10, 64)
+	if err != nil {
+		panic(fmt.Errorf("can not get goroutine id: %v", err))
+	}
+	return id
+}
+
+func GetstrGoid() string {
+	if Gfilelog != nil && Gfilelog.Logconf != nil && !Gfilelog.Logconf.Goid {
+		return "?"
+	}
+	var (
+		buf [64]byte
+		n   = runtime.Stack(buf[:], false)
+		stk = strings.TrimPrefix(string(buf[:n]), "goroutine")
+	)
+
+	idField := strings.Fields(stk)[0]
+	return idField
+}
+
+func Newglog(fileDir string, fileName string, fileNameErr string, glog_conf *Glogconf) *Glog {
+	dconfig := &dlog.Config{
+		SlowThreshold:             time.Second, // 慢 SQL 阈值
+		LogLevel:                  dlog.Info,   // 日志级别
+		IgnoreRecordNotFoundError: true,        // 忽略ErrRecordNotFound（记录未找到）错误
+		Colorful:                  true,        // 禁用彩色打印
+	}
+
+	glog := &Glog{
+		Logconf:    glog_conf,
+		LogormConf: dconfig,
+	}
+	if glog_conf.RotateMethod == ROTATE_FILE_NUM {
+		glog.SetRollingFile(fileDir, fileName, glog_conf.Stdout)
+	} else {
+		glog.SetRollingDaily(fileDir, fileName, fileNameErr, glog_conf.Stdout)
+		//glog.SetRollingDaily(fileName, fileNameErr, glog_conf.Stdout)
+	}
+	Gfilelog = glog
+	return glog
 }
 
 func SetConsole(isConsole bool) {
@@ -70,79 +164,91 @@ func SetLevel(_level LEVEL) {
 	logLevel = _level
 }
 
-func SetRollingFile(fileDir, fileName string, maxNumber int32, maxSize int64, _unit UNIT) {
-	maxFileCount = maxNumber
-	maxFileSize = maxSize * int64(_unit)
-	RollingFile = true
-	dailyRolling = false
-	logObj = &_FILE{dir: fileDir, filename: fileName, isCover: false, mu: new(sync.RWMutex)}
-	logObj.mu.Lock()
-	defer logObj.mu.Unlock()
-	for i := 1; i <= int(maxNumber); i++ {
+func (glog *Glog) fileMonitor() {
+	timer := time.NewTicker(1 * time.Second)
+	for {
+		select {
+		case <-timer.C:
+			glog.fileCheck()
+		}
+	}
+}
+
+func (glog *Glog) fileCheck() {
+	/*defer func() {
+		if err := recover(); err != nil {
+			log.Println(err)
+		}
+	}()*/
+	if glog.LogObj != nil && glog.isMustRename() {
+		glog.LogObj.mu.Lock()
+		defer glog.LogObj.mu.Unlock()
+		glog.rename()
+	}
+}
+
+func (glog *Glog) SetRollingFile(fileDir, fileName string, stdout bool) error {
+	glog.LogObj = &FILE{
+		dir:      fileDir,
+		filename: fileName,
+		isCover:  false,
+		mu:       new(sync.RWMutex),
+	}
+	glog.LogObj.mu.Lock()
+	defer glog.LogObj.mu.Unlock()
+	for i := 1; i <= int(glog.Logconf.MaxFileCount); i++ {
 		if isExist(fileDir + "/" + fileName + "." + strconv.Itoa(i)) {
-			logObj._suffix = i
+			glog.LogObj._suffix = i
 		} else {
 			break
 		}
 	}
-	if !logObj.isMustRename() {
-		logObj.logfile, _ = os.OpenFile(fileDir+"/"+fileName, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
-		logObj.lg = log.New(logObj.logfile, "", log.Ldate|log.Lmicroseconds|log.Lshortfile)
+	if !glog.isMustRename() {
+		if !stdout {
+			glog.LogObj.logfile, _ = os.OpenFile(fileDir+"/"+fileName, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
+			glog.LogObj.lg = log.New(glog.LogObj.logfile, "", log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile)
+		} else {
+			glog.LogObj.lg = log.New(os.Stdout, "", log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile)
+		}
 	} else {
-		logObj.rename()
+		glog.rename()
 	}
-	go fileMonitor()
+	go glog.fileMonitor()
+
+	return nil
 }
 
-func SetRollingDaily(fileDir, fileName string, fileName_err string) {
-	RollingFile = false
-	dailyRolling = true
+func (glog *Glog) SetRollingDaily(fileDir, fileName, fileName_err string, stdout bool) error {
+	var err error = nil
 	t, _ := time.Parse(DATEFORMAT, time.Now().Format(DATEFORMAT))
 
-	logObj = &_FILE{dir: fileDir, filename: fileName, filename_err: fileName_err, _date: &t, isCover: false, mu: new(sync.RWMutex)}
-	logObj.mu.Lock()
-	defer logObj.mu.Unlock()
+	glog.LogObj = &FILE{
+		dir:          fileDir,
+		filename:     fileName,
+		filename_err: fileName_err,
+		Ldate:        &t,
+		isCover:      false,
+		mu:           new(sync.RWMutex),
+	}
 
-	if !logObj.isMustRename() {
-		logObj.logfile, _ = os.OpenFile(fileDir+"/"+fileName, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
-		logObj.lg = log.New(logObj.logfile, "", log.Ldate|log.Lmicroseconds|log.Lshortfile)
+	glog.LogObj.mu.Lock()
+	defer glog.LogObj.mu.Unlock()
 
-		logObj.logfile_err, _ = os.OpenFile(fileDir+"/"+fileName_err, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
-		logObj.lg_err = log.New(logObj.logfile_err, "", log.Ldate|log.Lmicroseconds|log.Lshortfile)
+	if !glog.isMustRename() {
+		if !stdout {
+			fmt.Println("==0000000000000===")
+			glog.LogObj.logfile, err = os.OpenFile(fileDir+"/"+fileName, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
+			glog.LogObj.lg = log.New(glog.LogObj.logfile, "", log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile|log.LstdFlags)
+
+			glog.LogObj.logfile_err, err = os.OpenFile(fileDir+"/"+fileName_err, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
+			glog.LogObj.lg_err = log.New(glog.LogObj.logfile_err, "", log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile|log.LstdFlags)
+		} else {
+			glog.LogObj.lg = log.New(os.Stdout, "", log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile)
+		}
 	} else {
-		logObj.rename()
+		glog.rename()
 	}
-}
-
-func console(s ...interface{}) {
-	if consoleAppender {
-		_, file, line, _ := runtime.Caller(2)
-		short := file
-		for i := len(file) - 1; i > 0; i-- {
-			if file[i] == '/' {
-				short = file[i+1:]
-				break
-			}
-		}
-		file = short
-		log.Println(file, strconv.Itoa(line), s)
-	}
-}
-
-func console_new(v string) {
-	if consoleAppender {
-		_, file, line, _ := runtime.Caller(2)
-		short := file
-		for i := len(file) - 1; i > 0; i-- {
-			if file[i] == '/' {
-				short = file[i+1:]
-				break
-			}
-		}
-		file = short
-		var pv = file + " " + strconv.Itoa(line) + " " + v
-		log.Println(pv)
-	}
+	return err
 }
 
 func catchError() {
@@ -151,225 +257,136 @@ func catchError() {
 	}
 }
 
-func Debug(v ...interface{}) {
-	if dailyRolling {
-		fileCheck()
+func pDebugWithGid(ctx context.Context, depth int, fmtstr string, v ...interface{}) {
+	trace_id := ""
+	if m := ctx.Value("trace_id"); m != nil {
+		if value, ok := m.(string); ok {
+			trace_id = value
+		}
 	}
-	defer catchError()
-	if logObj != nil {
-		logObj.mu.RLock()
-		defer logObj.mu.RUnlock()
+	if Gfilelog != nil && Gfilelog.LogObj != nil {
+		Gfilelog.fileCheck()
+		Gfilelog.LogObj.mu.RLock()
+		defer Gfilelog.LogObj.mu.RUnlock()
+		if Gfilelog.Logconf.Stdout && Gfilelog.Logconf.ColorFull && Gfilelog.Logconf.Loglevel <= INFO {
+			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf(Green+"trace_id-%s [DEBUG] "+fmtstr+Reset, append([]interface{}{trace_id}, v...)...))
+		} else if Gfilelog.Logconf.Loglevel <= DEBUG {
+			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf("trace_id-%s [DEBUG] "+fmtstr, append([]interface{}{trace_id}, v...)...))
+		}
 	}
 
-	if logLevel <= DEBUG {
-		if logObj != nil {
-			logObj.lg.Output(2, fmt.Sprintln("debug", v))
+}
+
+func Debug(ctx context.Context, fmtstr string, v ...interface{}) {
+	pDebugWithGid(ctx, 3, fmtstr, v...)
+
+}
+
+func Debugf(ctx context.Context, fmtstr string, v ...interface{}) {
+	pDebugWithGid(ctx, 3, fmtstr, v...)
+}
+
+func pInfoWithGid(ctx context.Context, depth int, fmtstr string, v ...interface{}) {
+	trace_id := ""
+	if m := ctx.Value("trace_id"); m != nil {
+		if value, ok := m.(string); ok {
+			trace_id = value
 		}
-		console("debug", v)
+	}
+	if Gfilelog != nil && Gfilelog.LogObj != nil {
+		Gfilelog.fileCheck()
+		Gfilelog.LogObj.mu.RLock()
+		defer Gfilelog.LogObj.mu.RUnlock()
+		if Gfilelog.Logconf.Stdout && Gfilelog.Logconf.ColorFull && Gfilelog.Logconf.Loglevel <= INFO {
+			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf(Green+"trace_id-%s [INFO] "+fmtstr+Reset, append([]interface{}{trace_id}, v...)...))
+		} else if Gfilelog.Logconf.Loglevel <= INFO {
+			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf("trace_id-%s [INFO] "+fmtstr, append([]interface{}{trace_id}, v...)...))
+		}
 	}
 }
 
-func Debugf(format string, v ...interface{}) {
-	if dailyRolling {
-		fileCheck()
-	}
-	defer catchError()
-	if logObj != nil {
-		logObj.mu.RLock()
-		defer logObj.mu.RUnlock()
-	}
+func Info(ctx context.Context, fmtstr string, v ...interface{}) {
+	pInfoWithGid(ctx, 3, fmtstr, v...)
+}
 
-	if logLevel <= DEBUG {
-		if logObj != nil {
-			//logObj.lg.Output(2, fmt.Sprintln("debug", v))
-			logObj.lg.Output(2, "[debug] "+fmt.Sprintf(format, v...))
+func Infof(ctx context.Context, fmtstr string, v ...interface{}) {
+	pInfoWithGid(ctx, 3, fmtstr, v...)
+
+}
+
+func pWarnWithGid(ctx context.Context, depth int, fmtstr string, v ...interface{}) {
+	trace_id := ""
+	if m := ctx.Value("trace_id"); m != nil {
+		if value, ok := m.(string); ok {
+			trace_id = value
 		}
-		//console("debug", v)
-		stdv := "[debug] " + fmt.Sprintf(format, v...)
-		console_new(stdv)
-
+	}
+	//fmt.Printf("trace_id: %s", trace_id)
+	if Gfilelog != nil && Gfilelog.LogObj != nil {
+		Gfilelog.fileCheck()
+		Gfilelog.LogObj.mu.RLock()
+		defer Gfilelog.LogObj.mu.RUnlock()
+		if Gfilelog.Logconf.Stdout && Gfilelog.Logconf.ColorFull && Gfilelog.Logconf.Loglevel <= WARN {
+			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf(Yellow+"trace_id-%s [WARN] "+fmtstr+Reset, append([]interface{}{trace_id}, v...)...))
+		} else if Gfilelog.Logconf.Stdout && Gfilelog.Logconf.Loglevel <= WARN {
+			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf("trace_id-%s [WARN] "+fmtstr, append([]interface{}{trace_id}, v...)...))
+		} else if Gfilelog.Logconf.Loglevel <= WARN {
+			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf("trace_id-%s [WARN] "+fmtstr, append([]interface{}{trace_id}, v...)...))
+			Gfilelog.LogObj.lg_err.Output(depth, fmt.Sprintf("trace_id-%s [WARN] "+fmtstr, append([]interface{}{trace_id}, v...)...))
+		}
 	}
 }
 
-func Info(v ...interface{}) {
-	if dailyRolling {
-		fileCheck()
-	}
-	defer catchError()
-	if logObj != nil {
-		logObj.mu.RLock()
-		defer logObj.mu.RUnlock()
-	}
-	if logLevel <= INFO {
-		if logObj != nil {
-			logObj.lg.Output(2, "[INFO] "+fmt.Sprintln(v))
+func Warn(ctx context.Context, fmtstr string, v ...interface{}) {
+	pWarnWithGid(ctx, 3, fmtstr, v...)
+}
+
+func Warnf(ctx context.Context, fmtstr string, v ...interface{}) {
+	pWarnWithGid(ctx, 3, fmtstr, v...)
+}
+
+func pErrorWithGid(ctx context.Context, depth int, fmtstr string, v ...interface{}) {
+	trace_id := ""
+	if m := ctx.Value("trace_id"); m != nil {
+		if value, ok := m.(string); ok {
+			trace_id = value
 		}
-		stdv := "[INFO] " + fmt.Sprintln(v)
-		console_new(stdv)
+	}
+	if Gfilelog != nil && Gfilelog.LogObj != nil {
+		Gfilelog.fileCheck()
+		Gfilelog.LogObj.mu.RLock()
+		defer Gfilelog.LogObj.mu.RUnlock()
+		if Gfilelog.Logconf.Stdout && Gfilelog.Logconf.ColorFull && Gfilelog.Logconf.Loglevel <= WARN {
+			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf(Red+"trace_id-%s [ERROR] "+fmtstr+Reset, append([]interface{}{trace_id}, v...)...))
+		} else if Gfilelog.Logconf.Stdout && Gfilelog.Logconf.Loglevel <= WARN {
+			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf("trace_id-%s [ERROR] "+fmtstr, append([]interface{}{trace_id}, v...)...))
+		} else if Gfilelog.Logconf.Loglevel <= WARN {
+			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf("trace_id-%s [ERROR] "+fmtstr, append([]interface{}{trace_id}, v...)...))
+			Gfilelog.LogObj.lg_err.Output(depth, fmt.Sprintf("trace_id-%s [ERROR] "+fmtstr, append([]interface{}{trace_id}, v...)...))
+		}
 	}
 }
 
-func Infof(format string, v ...interface{}) {
-	if dailyRolling {
-		fileCheck()
-	}
-	defer catchError()
-	if logObj != nil {
-		logObj.mu.RLock()
-		defer logObj.mu.RUnlock()
-	}
-	if logLevel <= INFO {
-		if logObj != nil {
-			logObj.lg.Output(2, "[INFO] "+fmt.Sprintf(format, v...))
-		}
-		stdv := "[INFO] " + fmt.Sprintf(format, v...)
-		console_new(stdv)
-	}
+func Error(ctx context.Context, fmtstr string, v ...interface{}) {
+	pErrorWithGid(ctx, 3, fmtstr, v...)
 }
 
-func Warnf(format string, v ...interface{}) {
-	if dailyRolling {
-		fileCheck()
-	}
-	defer catchError()
-	if logObj != nil {
-		logObj.mu.RLock()
-		defer logObj.mu.RUnlock()
-	}
-
-	if logLevel <= WARN {
-		if logObj != nil {
-			logObj.lg.Output(2, "[WARN] "+fmt.Sprintf(format, v...))
-			if dailyRolling {
-				logObj.lg_err.Output(2, "[WARN] "+fmt.Sprintf(format, v...))
-			}
-		}
-		stdv := "[WARN] " + fmt.Sprintf(format, v...)
-		console_new(stdv)
-	}
+func Errorf(ctx context.Context, fmtstr string, v ...interface{}) {
+	pErrorWithGid(ctx, 3, fmtstr, v...)
 }
 
-func Warn(v ...interface{}) {
-	if dailyRolling {
-		fileCheck()
-	}
-	defer catchError()
-	if logObj != nil {
-		logObj.mu.RLock()
-		defer logObj.mu.RUnlock()
-	}
-
-	if logLevel <= WARN {
-		if logObj != nil {
-			logObj.lg.Output(2, fmt.Sprintln("WARN", v))
-			if dailyRolling {
-				logObj.lg_err.Output(2, fmt.Sprintln("WARN", v))
-			}
-		}
-		stdv := "[warn] " + fmt.Sprintln(v)
-		console_new(stdv)
-	}
-}
-
-func Errorf(format string, v ...interface{}) {
-	if dailyRolling {
-		fileCheck()
-	}
-	defer catchError()
-	if logObj != nil {
-		logObj.mu.RLock()
-		defer logObj.mu.RUnlock()
-	}
-	if logLevel <= ERROR {
-		if logObj != nil {
-			logObj.lg.Output(2, "[ERROR] "+fmt.Sprintf(format, v...))
-			if dailyRolling {
-				logObj.lg_err.Output(2, "[ERROR] "+fmt.Sprintf(format, v...))
-			}
-		}
-		stdv := "[ERROR] " + fmt.Sprintf(format, v...)
-		console_new(stdv)
-
-	}
-}
-
-func Error(v ...interface{}) {
-	if dailyRolling {
-		fileCheck()
-	}
-	defer catchError()
-	if logObj != nil {
-		logObj.mu.RLock()
-		defer logObj.mu.RUnlock()
-	}
-	if logLevel <= ERROR {
-		if logObj != nil {
-			logObj.lg.Output(2, fmt.Sprintln("ERROR", v))
-			if dailyRolling {
-				logObj.lg_err.Output(2, fmt.Sprintln("ERROR", v))
-			}
-
-		}
-		stdv := "[error] " + fmt.Sprintln(v)
-		console_new(stdv)
-
-	}
-}
-
-func Fatalf(format string, v ...interface{}) {
-	if dailyRolling {
-		fileCheck()
-	}
-	defer catchError()
-	if logObj != nil {
-		logObj.mu.RLock()
-		defer logObj.mu.RUnlock()
-	}
-	if logLevel <= FATAL {
-		if logObj != nil {
-			logObj.lg.Output(2, "[FATAL] "+fmt.Sprintf(format, v...))
-			if dailyRolling {
-				logObj.lg_err.Output(2, "[FATAL] "+fmt.Sprintf(format, v...))
-			}
-
-		}
-		stdv := "[FATAL] " + fmt.Sprintf(format, v...)
-		console_new(stdv)
-
-	}
-}
-
-func Fatal(v ...interface{}) {
-	if dailyRolling {
-		fileCheck()
-	}
-	defer catchError()
-	if logObj != nil {
-		logObj.mu.RLock()
-		defer logObj.mu.RUnlock()
-	}
-	if logLevel <= FATAL {
-		if logObj != nil {
-			logObj.lg.Output(2, fmt.Sprintln("FATAL", v))
-			if dailyRolling {
-				logObj.lg_err.Output(2, fmt.Sprintln("FATAL", v))
-			}
-
-		}
-		stdv := "[fatal] " + fmt.Sprintln(v)
-		console_new(stdv)
-	}
-}
-
-func (f *_FILE) isMustRename() bool {
-	if dailyRolling {
+func (glog *Glog) isMustRename() bool {
+	/*if glog.Logconf.Stdout {
+		return false
+	}*/
+	if glog.Logconf.RotateMethod == ROTATE_FILE_DAILY {
 		t, _ := time.Parse(DATEFORMAT, time.Now().Format(DATEFORMAT))
-		if t.After(*f._date) {
+		if t.After(*(glog.LogObj.Ldate)) {
 			return true
 		}
 	} else {
-		if maxFileCount > 1 {
-			if fileSize(f.dir+"/"+f.filename) >= maxFileSize {
+		if glog.Logconf.MaxFileCount > 1 {
+			if glog.fileSize(glog.LogObj.dir+"/"+glog.LogObj.filename) >= glog.Logconf.MaxFileSize {
 				return true
 			}
 		}
@@ -377,12 +394,17 @@ func (f *_FILE) isMustRename() bool {
 	return false
 }
 
-func (f *_FILE) rename() {
-	if dailyRolling {
-		fn := f.dir + "/" + f.filename + "." + f._date.Format(DATEFORMAT)
-		fn_err := f.dir + "/" + f.filename_err + "." + f._date.Format(DATEFORMAT)
+func (glog *Glog) rename() {
+	if glog.Logconf.Stdout {
+		return
+	}
 
-		if !isExist(fn) && !isExist(fn_err) && f.isMustRename() {
+	f := glog.LogObj
+	if glog.Logconf.RotateMethod == ROTATE_FILE_DAILY {
+		fn := f.dir + "/" + f.filename + "." + f.Ldate.Format(DATEFORMAT)
+		fn_err := f.dir + "/" + f.filename_err + "." + f.Ldate.Format(DATEFORMAT)
+
+		if !isExist(fn) && !isExist(fn_err) && glog.isMustRename() {
 			if f.logfile != nil && f.logfile_err != nil {
 				f.logfile.Close()
 				f.logfile_err.Close()
@@ -393,23 +415,24 @@ func (f *_FILE) rename() {
 			}
 			err = os.Rename(f.dir+"/"+f.filename_err, fn_err)
 			t, _ := time.Parse(DATEFORMAT, time.Now().Format(DATEFORMAT))
-			f._date = &t
+			f.Ldate = &t
 
 			f.logfile, _ = os.Create(f.dir + "/" + f.filename)
-			f.lg = log.New(logObj.logfile, "", log.Ldate|log.Lmicroseconds|log.Lshortfile)
+			f.lg = log.New(glog.LogObj.logfile, "", log.Ldate|log.Lmicroseconds|log.Lshortfile)
 			f.logfile_err, _ = os.Create(f.dir + "/" + f.filename_err)
-			f.lg_err = log.New(logObj.logfile_err, "", log.Ldate|log.Lmicroseconds|log.Lshortfile)
+			f.lg_err = log.New(glog.LogObj.logfile_err, "", log.Ldate|log.Lmicroseconds|log.Lshortfile)
 		}
 	} else {
-		f.coverNextOne()
+		glog.coverNextOne()
 	}
 }
 
-func (f *_FILE) nextSuffix() int {
+func (f *FILE) nextSuffix() int {
 	return int(f._suffix%int(maxFileCount) + 1)
 }
 
-func (f *_FILE) coverNextOne() {
+func (glog *Glog) coverNextOne() {
+	f := glog.LogObj
 	f._suffix = f.nextSuffix()
 	if f.logfile != nil {
 		f.logfile.Close()
@@ -419,10 +442,10 @@ func (f *_FILE) coverNextOne() {
 	}
 	os.Rename(f.dir+"/"+f.filename, f.dir+"/"+f.filename+"."+strconv.Itoa(int(f._suffix)))
 	f.logfile, _ = os.Create(f.dir + "/" + f.filename)
-	f.lg = log.New(logObj.logfile, "", log.Ldate|log.Lmicroseconds|log.Lshortfile)
+	f.lg = log.New(f.logfile, "", log.Ldate|log.Lmicroseconds|log.Lshortfile)
 }
 
-func fileSize(file string) int64 {
+func (glog *Glog) fileSize(file string) int64 {
 	fmt.Println("fileSize", file)
 	f, e := os.Stat(file)
 	if e != nil {
@@ -435,29 +458,6 @@ func fileSize(file string) int64 {
 func isExist(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil || os.IsExist(err)
-}
-
-func fileMonitor() {
-	timer := time.NewTicker(1 * time.Second)
-	for {
-		select {
-		case <-timer.C:
-			fileCheck()
-		}
-	}
-}
-
-func fileCheck() {
-	defer func() {
-		if err := recover(); err != nil {
-			log.Println(err)
-		}
-	}()
-	if logObj != nil && logObj.isMustRename() {
-		logObj.mu.Lock()
-		defer logObj.mu.Unlock()
-		logObj.rename()
-	}
 }
 
 func LoggerLevelIndex(key string) (LEVEL, bool) {

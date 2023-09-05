@@ -120,7 +120,8 @@ func (gcf *Gconf) GconfParse() error {
 			fmt.Printf("k=%s v=%s\n", k, v)
 			imap[k] = v
 		} else {
-			fmt.Println("no match continue\n")
+			//fmt.Println("no match continue\n")
+			fmt.Println("no match continue")
 		}
 	}
 	fmt.Println(gcf.Gcf)
