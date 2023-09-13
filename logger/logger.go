@@ -94,7 +94,7 @@ type Glogconf struct {
 	Stdout      bool
 	ColorFull   bool
 	Goid        bool
-	Loglevel    int
+	Loglevel    LEVEL
 }
 
 type Glog struct {
