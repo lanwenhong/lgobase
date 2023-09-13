@@ -1,15 +1,17 @@
 package ghttpclient
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	"github.com/lanwenhong/lgobase/logger"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/lanwenhong/lgobase/logger"
 )
 
 const (
@@ -22,12 +24,14 @@ type QfHttpClient struct {
 	Protocol int
 	Domain   string
 	SslUse   bool
+	Ctx      context.Context
 }
 
 type HttpClientLong struct {
 	Timeout int
 	Client  *http.Client
 	Uhhb    UserHttpHeaderBuild
+	Ctx     context.Context
 }
 
 type Qfresp struct {
@@ -40,11 +44,12 @@ type Qfresp struct {
 	Header     http.Header
 }
 
-func NewHttpClient(timeout int) *HttpClientLong {
+func NewHttpClient(ctx context.Context, timeout int) *HttpClientLong {
 	c := new(HttpClientLong)
 	c.Timeout = timeout
 	c.Client = &http.Client{Timeout: time.Millisecond * time.Duration(timeout)}
 	c.Uhhb = nil
+	c.Ctx = ctx
 	return c
 }
 
@@ -100,13 +105,13 @@ func (c *HttpClientLong) realPost(qurl string, dreq interface{}, header map[stri
 		defer resp.Body.Close()
 	}
 	if err != nil {
-		logger.Warnf("get err: %s", err.Error())
+		logger.Warnf(c.Ctx, "get err: %s", err.Error())
 		return nil, err
 	}
 	return c.getResp(resp)
 }
 
-func HttpRealPost(curl string, timeout int32, dreq interface{}, header map[string]string) (ret []byte, err error) {
+func HttpRealPost(ctx context.Context, curl string, timeout int32, dreq interface{}, header map[string]string) (ret []byte, err error) {
 	var body io.Reader
 
 	if dreq == nil {
@@ -138,7 +143,7 @@ func HttpRealPost(curl string, timeout int32, dreq interface{}, header map[strin
 		defer resp.Body.Close()
 	}
 	if err != nil {
-		logger.Warnf("get err: %s", err.Error())
+		logger.Warnf(ctx, "get err: %s", err.Error())
 		return nil, err
 	}
 	ret, err = ioutil.ReadAll(resp.Body)
@@ -172,13 +177,13 @@ func (c *HttpClientLong) realGet(qurl string, dreq map[string]string, header map
 		defer resp.Body.Close()
 	}
 	if err != nil {
-		logger.Warnf("get err: %s", err.Error())
+		logger.Warnf(c.Ctx, "get err: %s", err.Error())
 		return nil, err
 	}
 	return c.getResp(resp)
 }
 
-func HttpRealGet(curl string, timeout int32, dreq map[string]string, header map[string]string) (ret []byte, err error) {
+func HttpRealGet(ctx context.Context, curl string, timeout int32, dreq map[string]string, header map[string]string) (ret []byte, err error) {
 	u, err := url.Parse(curl)
 	if err != nil {
 		return nil, err
@@ -205,19 +210,19 @@ func HttpRealGet(curl string, timeout int32, dreq map[string]string, header map[
 		defer resp.Body.Close()
 	}
 	if err != nil {
-		logger.Warnf("get err: %s", err.Error())
+		logger.Warnf(ctx, "get err: %s", err.Error())
 		return nil, err
 	}
 	ret, err = ioutil.ReadAll(resp.Body)
 	return ret, err
 }
 
-func QfHttpClientNew(protocol int, domain string, ssl_use bool) *QfHttpClient {
+func QfHttpClientNew(ctx context.Context, protocol int, domain string, ssl_use bool) *QfHttpClient {
 	qfh := new(QfHttpClient)
 	qfh.Protocol = protocol
 	qfh.Domain = domain
 	qfh.SslUse = ssl_use
-
+	qfh.Ctx = ctx
 	return qfh
 }
 
@@ -231,10 +236,10 @@ func (qfh *QfHttpClient) Get(path string, timeout int32, req map[string]string, 
 	}
 	snow := time.Now()
 	smicros := snow.UnixNano() / 1000
-	ret, err = HttpRealGet(url, timeout, req, header)
+	ret, err = HttpRealGet(qfh.ctx, url, timeout, req, header)
 	enow := time.Now()
 	emicros := enow.UnixNano() / 1000
-	logger.Infof("func=get|url=%s|req=%s|ret=%s|time=%d", url, req, ret, emicros-smicros)
+	logger.Infof(qfh.Ctx, "func=get|url=%s|req=%s|ret=%s|time=%d", url, req, ret, emicros-smicros)
 	return ret, err
 }
 
@@ -244,7 +249,7 @@ func (qfh *HttpClientLong) Getl(url string, req map[string]string, header map[st
 	r, err = qfh.realPost(url, req, header)
 	enow := time.Now()
 	emicros := enow.UnixNano() / 1000
-	logger.Infof("func=post|url=%s|req=%s|ret=%s|time=%d", url, req, r.Ret, emicros-smicros)
+	logger.Infof(qfh.Ctx, "func=post|url=%s|req=%s|ret=%s|time=%d", url, req, r.Ret, emicros-smicros)
 	return r, err
 }
 
@@ -257,10 +262,10 @@ func (qfh *QfHttpClient) Post(path string, timeout int32, req interface{}, heade
 	}
 	snow := time.Now()
 	smicros := snow.UnixNano() / 1000
-	ret, err = HttpRealPost(url, timeout, req, header)
+	ret, err = HttpRealPost(qfh.Ctx, url, timeout, req, header)
 	enow := time.Now()
 	emicros := enow.UnixNano() / 1000
-	logger.Infof("func=post|url=%s|req=%s|ret=%s|time=%d", url, req, ret, emicros-smicros)
+	logger.Infof(qfh.Ctx, "func=post|url=%s|req=%s|ret=%s|time=%d", url, req, ret, emicros-smicros)
 	return ret, err
 }
 
@@ -270,6 +275,6 @@ func (qfh *HttpClientLong) Postl(url string, req interface{}, header map[string]
 	r, err = qfh.realPost(url, req, header)
 	enow := time.Now()
 	emicros := enow.UnixNano() / 1000
-	logger.Infof("func=post|url=%s|req=%s|ret=%s|time=%d", url, req, r.Ret, emicros-smicros)
+	logger.Infof(qfh.Ctx, "func=post|url=%s|req=%s|ret=%s|time=%d", url, req, r.Ret, emicros-smicros)
 	return r, err
 }
