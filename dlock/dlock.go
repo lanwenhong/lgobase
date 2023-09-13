@@ -41,7 +41,7 @@ func (dl *Dlock) Lock() error {
 		t := time.Now().UnixNano()
 		//st := fmt.Sprintf("%d", t)
 		logger.Debugf(dl.Ctx, "%s try lock", dl.Flag)
-		ret, err := dl.Rrp.Do("set", dl.Key, t, "nx", "px", KEY_EX_TIME)
+		ret, err := dl.Rrp.Do(dl.Ctx, "set", dl.Key, t, "nx", "px", KEY_EX_TIME)
 		if err != nil {
 			return err
 		} else {
@@ -62,7 +62,7 @@ func (dl *Dlock) Lock() error {
 }
 
 func (dl *Dlock) Unlock() error {
-	ret, err := dl.Rrp.Do("get", dl.Key)
+	ret, err := dl.Rrp.Do(dl.Ctx, "get", dl.Key)
 	if err != nil {
 		return err
 	}
@@ -77,6 +77,6 @@ func (dl *Dlock) Unlock() error {
 		return nil
 	}
 	logger.Debugf(dl.Ctx, "%s release", dl.Flag)
-	_, err = dl.Rrp.Do("del", dl.Key)
+	_, err = dl.Rrp.Do(dl.Ctx, "del", dl.Key)
 	return err
 }

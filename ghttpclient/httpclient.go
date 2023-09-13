@@ -236,7 +236,7 @@ func (qfh *QfHttpClient) Get(path string, timeout int32, req map[string]string, 
 	}
 	snow := time.Now()
 	smicros := snow.UnixNano() / 1000
-	ret, err = HttpRealGet(qfh.ctx, url, timeout, req, header)
+	ret, err = HttpRealGet(qfh.Ctx, url, timeout, req, header)
 	enow := time.Now()
 	emicros := enow.UnixNano() / 1000
 	logger.Infof(qfh.Ctx, "func=get|url=%s|req=%s|ret=%s|time=%d", url, req, ret, emicros-smicros)
