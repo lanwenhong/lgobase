@@ -30,7 +30,7 @@ func DlockNew(rrp *redispool.RedisPool, lkey string) (dlock *Dlock, err error) {
 	dlock.Rrp = rrp
 
 	dlock.Flag = uuid.NewV4().String()
-	dlock.Ctx = ctx
+	//dlock.Ctx = ctx
 	err = nil
 
 	return dlock, err
@@ -40,7 +40,7 @@ func (dl *Dlock) Lock(ctx context.Context) error {
 	for {
 		t := time.Now().UnixNano()
 		//st := fmt.Sprintf("%d", t)
-		logger.Debugf(dl.Ctx, "%s try lock", dl.Flag)
+		logger.Debugf(ctx, "%s try lock", dl.Flag)
 		ret, err := dl.Rrp.Do(ctx, "set", dl.Key, t, "nx", "px", KEY_EX_TIME)
 		if err != nil {
 			return err

@@ -246,7 +246,7 @@ func (qfh *QfHttpClient) Get(ctx context.Context, path string, timeout int32, re
 func (qfh *HttpClientLong) Getl(ctx context.Context, url string, req map[string]string, header map[string]string) (r *Qfresp, err error) {
 	snow := time.Now()
 	smicros := snow.UnixNano() / 1000
-	r, err = qfh.realPost(url, req, header)
+	r, err = qfh.realPost(ctx, url, req, header)
 	enow := time.Now()
 	emicros := enow.UnixNano() / 1000
 	logger.Infof(ctx, "func=post|url=%s|req=%s|ret=%s|time=%d", url, req, r.Ret, emicros-smicros)
@@ -272,7 +272,7 @@ func (qfh *QfHttpClient) Post(ctx context.Context, path string, timeout int32, r
 func (qfh *HttpClientLong) Postl(ctx context.Context, url string, req interface{}, header map[string]string) (r *Qfresp, err error) {
 	snow := time.Now()
 	smicros := snow.UnixNano() / 1000
-	r, err = qfh.realPost(url, req, header)
+	r, err = qfh.realPost(ctx, url, req, header)
 	enow := time.Now()
 	emicros := enow.UnixNano() / 1000
 	logger.Infof(ctx, "func=post|url=%s|req=%s|ret=%s|time=%d", url, req, r.Ret, emicros-smicros)
