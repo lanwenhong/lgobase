@@ -31,7 +31,7 @@ type HttpClientLong struct {
 	Timeout int
 	Client  *http.Client
 	Uhhb    UserHttpHeaderBuild
-	Ctx     context.Context
+	//Ctx     context.Context
 }
 
 type Qfresp struct {
@@ -44,20 +44,21 @@ type Qfresp struct {
 	Header     http.Header
 }
 
-func NewHttpClient(ctx context.Context, timeout int) *HttpClientLong {
+// func NewHttpClient(ctx context.Context, timeout int) *HttpClientLong {
+func NewHttpClient(timeout int) *HttpClientLong {
 	c := new(HttpClientLong)
 	c.Timeout = timeout
 	c.Client = &http.Client{Timeout: time.Millisecond * time.Duration(timeout)}
 	c.Uhhb = nil
-	c.Ctx = ctx
+	//c.Ctx = ctx
 	return c
 }
 
-func (c *HttpClientLong) setHeaderBuildFunc(f UserHttpHeaderBuild) {
+func (c *HttpClientLong) setHeaderBuildFunc(ctx context.Context, f UserHttpHeaderBuild) {
 	c.Uhhb = f
 }
 
-func (c *HttpClientLong) getResp(resp *http.Response) (r *Qfresp, err error) {
+func (c *HttpClientLong) getResp(ctx context.Context, resp *http.Response) (r *Qfresp, err error) {
 	r = new(Qfresp)
 	r.Header = make(http.Header)
 	r.Status = resp.Status
@@ -72,7 +73,7 @@ func (c *HttpClientLong) getResp(resp *http.Response) (r *Qfresp, err error) {
 	return r, err
 }
 
-func (c *HttpClientLong) realPost(qurl string, dreq interface{}, header map[string]string) (r *Qfresp, err error) {
+func (c *HttpClientLong) realPost(ctx context.Context, qurl string, dreq interface{}, header map[string]string) (r *Qfresp, err error) {
 	var body io.Reader
 
 	if dreq == nil {
@@ -105,10 +106,10 @@ func (c *HttpClientLong) realPost(qurl string, dreq interface{}, header map[stri
 		defer resp.Body.Close()
 	}
 	if err != nil {
-		logger.Warnf(c.Ctx, "get err: %s", err.Error())
+		logger.Warnf(ctx, "get err: %s", err.Error())
 		return nil, err
 	}
-	return c.getResp(resp)
+	return c.getResp(ctx, resp)
 }
 
 func HttpRealPost(ctx context.Context, curl string, timeout int32, dreq interface{}, header map[string]string) (ret []byte, err error) {
@@ -150,7 +151,7 @@ func HttpRealPost(ctx context.Context, curl string, timeout int32, dreq interfac
 	return ret, err
 }
 
-func (c *HttpClientLong) realGet(qurl string, dreq map[string]string, header map[string]string) (r *Qfresp, err error) {
+func (c *HttpClientLong) realGet(ctx context.Context, qurl string, dreq map[string]string, header map[string]string) (r *Qfresp, err error) {
 	u, err := url.Parse(qurl)
 	if err != nil {
 		return nil, err
@@ -177,10 +178,10 @@ func (c *HttpClientLong) realGet(qurl string, dreq map[string]string, header map
 		defer resp.Body.Close()
 	}
 	if err != nil {
-		logger.Warnf(c.Ctx, "get err: %s", err.Error())
+		logger.Warnf(ctx, "get err: %s", err.Error())
 		return nil, err
 	}
-	return c.getResp(resp)
+	return c.getResp(ctx, resp)
 }
 
 func HttpRealGet(ctx context.Context, curl string, timeout int32, dreq map[string]string, header map[string]string) (ret []byte, err error) {
@@ -217,16 +218,15 @@ func HttpRealGet(ctx context.Context, curl string, timeout int32, dreq map[strin
 	return ret, err
 }
 
-func QfHttpClientNew(ctx context.Context, protocol int, domain string, ssl_use bool) *QfHttpClient {
+func QfHttpClientNew(protocol int, domain string, ssl_use bool) *QfHttpClient {
 	qfh := new(QfHttpClient)
 	qfh.Protocol = protocol
 	qfh.Domain = domain
 	qfh.SslUse = ssl_use
-	qfh.Ctx = ctx
 	return qfh
 }
 
-func (qfh *QfHttpClient) Get(path string, timeout int32, req map[string]string, header map[string]string) (ret []byte, err error) {
+func (qfh *QfHttpClient) Get(ctx context.Context, path string, timeout int32, req map[string]string, header map[string]string) (ret []byte, err error) {
 	var url = ""
 
 	if qfh.SslUse {
@@ -239,21 +239,21 @@ func (qfh *QfHttpClient) Get(path string, timeout int32, req map[string]string, 
 	ret, err = HttpRealGet(qfh.Ctx, url, timeout, req, header)
 	enow := time.Now()
 	emicros := enow.UnixNano() / 1000
-	logger.Infof(qfh.Ctx, "func=get|url=%s|req=%s|ret=%s|time=%d", url, req, ret, emicros-smicros)
+	logger.Infof(ctx, "func=get|url=%s|req=%s|ret=%s|time=%d", url, req, ret, emicros-smicros)
 	return ret, err
 }
 
-func (qfh *HttpClientLong) Getl(url string, req map[string]string, header map[string]string) (r *Qfresp, err error) {
+func (qfh *HttpClientLong) Getl(ctx context.Context, url string, req map[string]string, header map[string]string) (r *Qfresp, err error) {
 	snow := time.Now()
 	smicros := snow.UnixNano() / 1000
 	r, err = qfh.realPost(url, req, header)
 	enow := time.Now()
 	emicros := enow.UnixNano() / 1000
-	logger.Infof(qfh.Ctx, "func=post|url=%s|req=%s|ret=%s|time=%d", url, req, r.Ret, emicros-smicros)
+	logger.Infof(ctx, "func=post|url=%s|req=%s|ret=%s|time=%d", url, req, r.Ret, emicros-smicros)
 	return r, err
 }
 
-func (qfh *QfHttpClient) Post(path string, timeout int32, req interface{}, header map[string]string) (ret []byte, err error) {
+func (qfh *QfHttpClient) Post(ctx context.Context, path string, timeout int32, req interface{}, header map[string]string) (ret []byte, err error) {
 	var url = ""
 	if qfh.SslUse {
 		url = fmt.Sprintf("https://%s/%s", qfh.Domain, path)
@@ -265,16 +265,16 @@ func (qfh *QfHttpClient) Post(path string, timeout int32, req interface{}, heade
 	ret, err = HttpRealPost(qfh.Ctx, url, timeout, req, header)
 	enow := time.Now()
 	emicros := enow.UnixNano() / 1000
-	logger.Infof(qfh.Ctx, "func=post|url=%s|req=%s|ret=%s|time=%d", url, req, ret, emicros-smicros)
+	logger.Infof(ctx, "func=post|url=%s|req=%s|ret=%s|time=%d", url, req, ret, emicros-smicros)
 	return ret, err
 }
 
-func (qfh *HttpClientLong) Postl(url string, req interface{}, header map[string]string) (r *Qfresp, err error) {
+func (qfh *HttpClientLong) Postl(ctx context.Context, url string, req interface{}, header map[string]string) (r *Qfresp, err error) {
 	snow := time.Now()
 	smicros := snow.UnixNano() / 1000
 	r, err = qfh.realPost(url, req, header)
 	enow := time.Now()
 	emicros := enow.UnixNano() / 1000
-	logger.Infof(qfh.Ctx, "func=post|url=%s|req=%s|ret=%s|time=%d", url, req, r.Ret, emicros-smicros)
+	logger.Infof(ctx, "func=post|url=%s|req=%s|ret=%s|time=%d", url, req, r.Ret, emicros-smicros)
 	return r, err
 }
