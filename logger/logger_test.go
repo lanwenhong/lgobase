@@ -174,7 +174,7 @@ func TestLogRatate(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	logger.Info(ctx, "test")
+	logger.Debug(ctx, 11, 12, 13)
 	//logger.Info("test")
 	//logger.Info("test")
 	//logger.Warn("test")
@@ -185,6 +185,29 @@ func TestLogRatate(t *testing.T) {
 	rotate, _ := time.ParseInLocation("2006-01-02 15:04:05", stringTime, loc)
 	logger.Gfilelog.LogObj.Ldate = &rotate
 
-	logger.Info(ctx, "rotate")
+	logger.Debug(ctx, 33, 44, "jjy")
 	//logger.Warn(ctx, "rotate")
+}
+
+func TestLogDebug(t *testing.T) {
+	myconf := &logger.Glogconf{
+		RotateMethod: logger.ROTATE_FILE_DAILY,
+		ColorFull:    true,
+		//Stdout:       true,
+		Loglevel: logger.DEBUG,
+	}
+	logger.Newglog("./", "test.log", "test.log.err", myconf)
+	ctx := context.WithValue(context.Background(), "trace_id", NewRequestID())
+
+	logger.Debug(ctx, "xxx", 1, 3)
+
+	logger.Info(ctx, "liushishi", "jujingyi", 111, 2, 3)
+	logger.Infof(ctx, "%s %s %d %d %d", "liushishi", "jujingyi", 111, 2, 3)
+
+	logger.Warn(ctx, "ffff", 12, 13)
+	logger.Warnf(ctx, "%s %d %d", "ffff", 12, 13)
+
+	logger.Error(ctx, "liushishi", "jujingyi", 111, 2, 3)
+	logger.Errorf(ctx, "%s %s %d %d %d", "liushishi", "jujingyi", 111, 2, 3)
+
 }
