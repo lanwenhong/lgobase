@@ -198,8 +198,9 @@ func TestLogDebug(t *testing.T) {
 	}
 	logger.Newglog("./", "test.log", "test.log.err", myconf)
 	ctx := context.WithValue(context.Background(), "trace_id", NewRequestID())
-
+	//ctx := context.Background()
 	logger.Debug(ctx, "xxx", 1, 3)
+	logger.Debugf(ctx, "%s %d %d", "xxx", 1, 3)
 
 	logger.Info(ctx, "liushishi", "jujingyi", 111, 2, 3)
 	logger.Infof(ctx, "%s %s %d %d %d", "liushishi", "jujingyi", 111, 2, 3)
