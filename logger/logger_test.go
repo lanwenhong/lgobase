@@ -68,7 +68,8 @@ func TestDbTraceErrLog(t *testing.T) {
 
 	//ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	//defer cancel()
-	ctx := context.WithValue(context.Background(), "trace_id", NewRequestID())
+	//ctx := context.WithValue(context.Background(), "trace_id", NewRequestID())
+	ctx := context.Background()
 
 	mylog := logger.New(nil, d_conf)
 	stringTime := "2017-08-30 16:40:41"
@@ -105,7 +106,7 @@ func TestDbWithfilelog(t *testing.T) {
 		Stdout:       true,
 		ColorFull:    true,
 		Loglevel:     logger.DEBUG,
-		Goid:         true,
+		//Goid:         true,
 	}
 	logger.Newglog("./", "test.log", "test.log.err", myconf)
 
@@ -192,13 +193,13 @@ func TestLogRatate(t *testing.T) {
 func TestLogDebug(t *testing.T) {
 	myconf := &logger.Glogconf{
 		RotateMethod: logger.ROTATE_FILE_DAILY,
-		ColorFull:    true,
-		//Stdout:       true,
+		//ColorFull:    true,
+		Stdout:   true,
 		Loglevel: logger.DEBUG,
 	}
 	logger.Newglog("./", "test.log", "test.log.err", myconf)
-	ctx := context.WithValue(context.Background(), "trace_id", NewRequestID())
-	//ctx := context.Background()
+	//ctx := context.WithValue(context.Background(), "trace_id", NewRequestID())
+	ctx := context.Background()
 	logger.Debug(ctx, "xxx", 1, 3)
 	logger.Debugf(ctx, "%s %d %d", "xxx", 1, 3)
 
