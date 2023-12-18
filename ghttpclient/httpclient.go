@@ -24,7 +24,7 @@ type QfHttpClient struct {
 	Protocol int
 	Domain   string
 	SslUse   bool
-	Ctx      context.Context
+	//Ctx      context.Context
 }
 
 type HttpClientLong struct {
@@ -112,11 +112,12 @@ func (c *HttpClientLong) realPost(ctx context.Context, qurl string, dreq interfa
 	return c.getResp(ctx, resp)
 }
 
-func HttpRealPost(ctx context.Context, curl string, timeout int32, dreq interface{}, header map[string]string) (ret []byte, err error) {
+func HttpRealPost(ctx context.Context, curl string,
+	timeout int32, dreq interface{}, header map[string]string) (ret []byte, resp *http.Response, err error) {
 	var body io.Reader
 
 	if dreq == nil {
-		return nil, errors.New("post data nil")
+		return nil, nil, errors.New("post data nil")
 	}
 	client := http.Client{}
 	client.Timeout = time.Duration(timeout) * time.Millisecond
@@ -130,8 +131,25 @@ func HttpRealPost(ctx context.Context, curl string, timeout int32, dreq interfac
 		body = ioutil.NopCloser(strings.NewReader(v.Encode()))
 	case string:
 		body = strings.NewReader(dreq.(string))
+
+	case map[string]interface{}:
+		v := url.Values{}
+		for k, x := range dreq.(map[string]interface{}) {
+			switch x.(type) {
+			case string:
+				v.Add(k, x.(string))
+			case []string:
+				vx := x.([]string)
+				for _, s := range vx {
+					v.Add(k, s)
+				}
+			default:
+				return nil, nil, errors.New("type not support")
+			}
+		}
+		body = ioutil.NopCloser(strings.NewReader(v.Encode()))
 	default:
-		return nil, errors.New("type not support")
+		return nil, nil, errors.New("type not support")
 	}
 	req, _ := http.NewRequest("POST", curl, body)
 	if header != nil {
@@ -139,16 +157,16 @@ func HttpRealPost(ctx context.Context, curl string, timeout int32, dreq interfac
 			req.Header.Set(k, v)
 		}
 	}
-	resp, err := client.Do(req)
+	resp, err = client.Do(req)
 	if resp != nil {
 		defer resp.Body.Close()
 	}
 	if err != nil {
 		logger.Warnf(ctx, "get err: %s", err.Error())
-		return nil, err
+		return nil, nil, err
 	}
 	ret, err = ioutil.ReadAll(resp.Body)
-	return ret, err
+	return ret, resp, err
 }
 
 func (c *HttpClientLong) realGet(ctx context.Context, qurl string, dreq map[string]string, header map[string]string) (r *Qfresp, err error) {
@@ -184,18 +202,35 @@ func (c *HttpClientLong) realGet(ctx context.Context, qurl string, dreq map[stri
 	return c.getResp(ctx, resp)
 }
 
-func HttpRealGet(ctx context.Context, curl string, timeout int32, dreq map[string]string, header map[string]string) (ret []byte, err error) {
+func HttpRealGet(ctx context.Context, curl string, timeout int32,
+	dreq map[string]interface{}, header map[string]string) (ret []byte, resp *http.Response, err error) {
 	u, err := url.Parse(curl)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	q := u.Query()
 	if dreq != nil {
 		for k, v := range dreq {
-			q.Set(k, v)
+			switch v.(type) {
+			case string:
+				q.Set(k, v.(string))
+			case []string:
+				sv := v.([]string)
+				for _, inv := range sv {
+					q.Add(k, inv)
+				}
+			default:
+				return nil, nil, errors.New("type not support")
+			}
 		}
 		u.RawQuery = q.Encode()
 	}
+	/*if dreq != nil {
+		for k, v := range dreq {
+			q.Set(k, v)
+		}
+		u.RawQuery = q.Encode()
+	}*/
 
 	client := http.Client{}
 	client.Timeout = time.Duration(timeout) * time.Millisecond
@@ -206,16 +241,16 @@ func HttpRealGet(ctx context.Context, curl string, timeout int32, dreq map[strin
 		}
 	}
 
-	resp, err := client.Do(req)
+	resp, err = client.Do(req)
 	if resp != nil {
 		defer resp.Body.Close()
 	}
 	if err != nil {
 		logger.Warnf(ctx, "get err: %s", err.Error())
-		return nil, err
+		return nil, nil, err
 	}
 	ret, err = ioutil.ReadAll(resp.Body)
-	return ret, err
+	return ret, resp, err
 }
 
 func QfHttpClientNew(protocol int, domain string, ssl_use bool) *QfHttpClient {
@@ -226,7 +261,10 @@ func QfHttpClientNew(protocol int, domain string, ssl_use bool) *QfHttpClient {
 	return qfh
 }
 
-func (qfh *QfHttpClient) Get(ctx context.Context, path string, timeout int32, req map[string]string, header map[string]string) (ret []byte, err error) {
+// func (qfh *QfHttpClient) Get(ctx context.Context, path string, timeout int32,
+// req map[string]string, header map[string]string) (ret []byte, resp *http.Response, err error) {
+func (qfh *QfHttpClient) Get(ctx context.Context, path string, timeout int32,
+	req map[string]interface{}, header map[string]string) (ret []byte, resp *http.Response, err error) {
 	var url = ""
 
 	if qfh.SslUse {
@@ -236,11 +274,11 @@ func (qfh *QfHttpClient) Get(ctx context.Context, path string, timeout int32, re
 	}
 	snow := time.Now()
 	smicros := snow.UnixNano() / 1000
-	ret, err = HttpRealGet(qfh.Ctx, url, timeout, req, header)
+	ret, resp, err = HttpRealGet(ctx, url, timeout, req, header)
 	enow := time.Now()
 	emicros := enow.UnixNano() / 1000
 	logger.Infof(ctx, "func=get|url=%s|req=%s|ret=%s|time=%d", url, req, ret, emicros-smicros)
-	return ret, err
+	return ret, resp, err
 }
 
 func (qfh *HttpClientLong) Getl(ctx context.Context, url string, req map[string]string, header map[string]string) (r *Qfresp, err error) {
@@ -253,7 +291,8 @@ func (qfh *HttpClientLong) Getl(ctx context.Context, url string, req map[string]
 	return r, err
 }
 
-func (qfh *QfHttpClient) Post(ctx context.Context, path string, timeout int32, req interface{}, header map[string]string) (ret []byte, err error) {
+func (qfh *QfHttpClient) Post(ctx context.Context, path string,
+	timeout int32, req interface{}, header map[string]string) (ret []byte, resp *http.Response, err error) {
 	var url = ""
 	if qfh.SslUse {
 		url = fmt.Sprintf("https://%s/%s", qfh.Domain, path)
@@ -262,11 +301,11 @@ func (qfh *QfHttpClient) Post(ctx context.Context, path string, timeout int32, r
 	}
 	snow := time.Now()
 	smicros := snow.UnixNano() / 1000
-	ret, err = HttpRealPost(qfh.Ctx, url, timeout, req, header)
+	ret, resp, err = HttpRealPost(ctx, url, timeout, req, header)
 	enow := time.Now()
 	emicros := enow.UnixNano() / 1000
 	logger.Infof(ctx, "func=post|url=%s|req=%s|ret=%s|time=%d", url, req, ret, emicros-smicros)
-	return ret, err
+	return ret, resp, err
 }
 
 func (qfh *HttpClientLong) Postl(ctx context.Context, url string, req interface{}, header map[string]string) (r *Qfresp, err error) {

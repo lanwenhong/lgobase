@@ -1,6 +1,7 @@
 package util
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"math/rand"
@@ -9,9 +10,10 @@ import (
 
 	"github.com/chilts/sid"
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 
 	//"github.com/google/uuid"
-	"github.com/jmoiron/sqlx"
+
 	"github.com/kjk/betterguid"
 	"github.com/oklog/ulid"
 	"github.com/rs/xid"
@@ -19,33 +21,32 @@ import (
 	"github.com/sony/sonyflake"
 )
 
+type Serverid struct {
+	Svrid uint64 `gorm:"column:@@server_id"`
+}
+
 type UuidShort struct {
-	Id int64 `db:"uuid_short()"`
+	UuidShort uint64 `gorm:"column:uuid_short()"`
 }
 
-type SvrId struct {
-	Name string `db:"Variable_name"`
-	Id   int64  `db:"Value"`
-}
+func Genid(ctx context.Context, conn *gorm.DB) (uint64, error) {
+	s := []Serverid{}
+	su := []UuidShort{}
 
-func Genid(conn *sqlx.DB) (int64, error) {
-	sql := "select uuid_short()"
-	var u UuidShort
-	err := conn.Get(&u, sql)
-	if err != nil {
-		return -1, err
+	sql := "select @@server_id"
+	ret := conn.WithContext(ctx).Raw(sql).Scan(&s)
+	if ret.Error != nil {
+		return 0, ret.Error
 	}
-	sql = "show variables like 'server_id'"
-	var id SvrId
-	err = conn.Get(&id, sql)
-	if err != nil {
-		return -1, err
+	ret = conn.WithContext(ctx).Raw("select uuid_short()").Scan(&su)
+	if ret.Error != nil {
+		return 0, ret.Error
 	}
-	msec := time.Now().UnixNano() / 1e6
-	fmt.Printf("msec: %d\n", msec)
-	seq := u.Id % 65535
-	gid := msec<<22 + id.Id<<16 + seq
-	return int64(gid), nil
+	seq := su[0].UuidShort % 65535
+	tt := time.Now().Unix()
+	msec := tt * 1000
+	id := uint64(msec)<<22 + s[0].Svrid<<16 + uint64(seq)
+	return id, nil
 }
 
 func NewRequestID() string {
