@@ -42,7 +42,7 @@ func TestClusterLPush(t *testing.T) {
 		":9006",
 	}
 	ctx := context.WithValue(context.Background(), "trace_id", util.NewRequestID())
-	rdb := redispool.NewClusterPool(ctx, "", "", addrs, 100, 30,
+	rdb := redispool.NewClusterPool(ctx, "dc", "Abc12345%", addrs, 100, 30,
 		10*time.Second,
 		30*time.Second,
 		30*time.Second,
@@ -63,6 +63,12 @@ func TestClusterLPush(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Log(n)
+	tm, err := rdb.TTL(ctx, "I love").Result()
+	t.Log(err)
+	t.Log(tm)
+	if tm < 1*time.Nanosecond {
+		t.Log("xxx")
+	}
 }
 
 func TestClusterLRange(t *testing.T) {
@@ -75,7 +81,7 @@ func TestClusterLRange(t *testing.T) {
 		":9006",
 	}
 	ctx := context.WithValue(context.Background(), "trace_id", util.NewRequestID())
-	rdb := redispool.NewClusterPool(ctx, "", "", addrs, 100, 30,
+	rdb := redispool.NewClusterPool(ctx, "dc", "Abc12345%", addrs, 100, 30,
 		10*time.Second,
 		30*time.Second,
 		30*time.Second,
@@ -97,7 +103,7 @@ func TestClusterZAdd(t *testing.T) {
 		":9006",
 	}
 	ctx := context.WithValue(context.Background(), "trace_id", util.NewRequestID())
-	rdb := redispool.NewClusterPool(ctx, "", "", addrs, 100, 30,
+	rdb := redispool.NewClusterPool(ctx, "dc", "Abc12345%", addrs, 100, 30,
 		10*time.Second,
 		30*time.Second,
 		30*time.Second,
@@ -123,6 +129,16 @@ func TestClusterZAdd(t *testing.T) {
 		Score:  56.1,
 		Member: "c",
 	}
+
+	l4 := redis.Z{
+		Score:  15.1,
+		Member: "swift",
+	}
+
+	l5 := redis.Z{
+		Score:  16.1,
+		Member: "erlang",
+	}
 	n, err := rdb.ZAdd(ctx, "lan", lls...).Result()
 	if err != nil {
 		t.Fatal(err)
@@ -145,6 +161,28 @@ func TestClusterZAdd(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Log(n)
+
+	n, err = rdb.ZAddNX(ctx, "lan", l4).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Log(n)
+
+	n, err = rdb.ZAddNX(ctx, "lan", l5).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Log(n)
+
+	x, err := rdb.ZScore(ctx, "lan", "c").Result()
+	/*if err != nil {
+		t.Fatal(err)
+	}*/
+	t.Log(err)
+	if err == redis.Nil {
+		t.Log("ffffffff")
+		t.Log(x)
+	}
 }
 
 func TestClusterZRangeByScore(t *testing.T) {
@@ -157,19 +195,19 @@ func TestClusterZRangeByScore(t *testing.T) {
 		":9006",
 	}
 	ctx := context.WithValue(context.Background(), "trace_id", util.NewRequestID())
-	rdb := redispool.NewClusterPool(ctx, "", "", addrs, 100, 30,
+	rdb := redispool.NewClusterPool(ctx, "dc", "Abc12345%", addrs, 100, 30,
 		10*time.Second,
 		30*time.Second,
 		30*time.Second,
 	)
 
 	opt := redis.ZRangeBy{
-		Min:    "50.2",
+		Min:    "(1.1",
 		Max:    "100",
 		Offset: 0,
-		Count:  5,
+		Count:  10,
 	}
-	ret, err := rdb.ZRangeByScore(ctx, "lan", &opt).Result()
+	ret, err := rdb.ZRangeByScoreWithScores(ctx, "lan", &opt).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -277,4 +315,10 @@ func Test1RedisOP(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	c, err := op.Rdb.Get(ctx, "ffff").Int()
+	if err != nil {
+		t.Log(err)
+	}
+	t.Log(c)
 }

@@ -290,7 +290,9 @@ func pDebugWithGid(ctx context.Context, depth int, fmtstr string, v ...interface
 			//Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf("trace_id-%s [DEBUG] "+fmtstr, append([]interface{}{trace_id}, v...)...))
 			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf(p_fmt, append(values, v...)...))
 		}*/
-		Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf(p_fmt, append(values, v...)...))
+		if Gfilelog.Logconf.Loglevel <= DEBUG {
+			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf(p_fmt, append(values, v...)...))
+		}
 	}
 
 }
@@ -314,7 +316,7 @@ func pDebug(ctx context.Context, depth int, v ...interface{}) {
 		Gfilelog.fileCheck()
 		Gfilelog.LogObj.mu.RLock()
 		defer Gfilelog.LogObj.mu.RUnlock()
-		if Gfilelog.Logconf.Stdout && Gfilelog.Logconf.ColorFull && Gfilelog.Logconf.Loglevel <= INFO {
+		if Gfilelog.Logconf.Stdout && Gfilelog.Logconf.ColorFull && Gfilelog.Logconf.Loglevel <= DEBUG {
 			values := []interface{}{Green + prefix}
 			values = append(values, v...)
 			values = append(values, Reset)
@@ -367,7 +369,9 @@ func pInfoWithGid(ctx context.Context, depth int, fmtstr string, v ...interface{
 			//Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf("trace_id-%s [INFO] "+fmtstr, append([]interface{}{trace_id}, v...)...))
 			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf(p_fmt, append(values, v...)...))
 		}*/
-		Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf(p_fmt, append(values, v...)...))
+		if Gfilelog.Logconf.Loglevel <= INFO {
+			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf(p_fmt, append(values, v...)...))
+		}
 	}
 }
 
@@ -448,9 +452,11 @@ func pWarnWithGid(ctx context.Context, depth int, fmtstr string, v ...interface{
 			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf(p_fmt, append(values, v...)...))
 			Gfilelog.LogObj.lg_err.Output(depth, fmt.Sprintf(p_fmt, append(values, v...)...))
 		}*/
-		Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf(p_fmt, append(values, v...)...))
-		if !Gfilelog.Logconf.Stdout {
-			Gfilelog.LogObj.lg_err.Output(depth, fmt.Sprintf(p_fmt, append(values, v...)...))
+		if Gfilelog.Logconf.Loglevel <= WARN {
+			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf(p_fmt, append(values, v...)...))
+			if !Gfilelog.Logconf.Stdout {
+				Gfilelog.LogObj.lg_err.Output(depth, fmt.Sprintf(p_fmt, append(values, v...)...))
+			}
 		}
 	}
 }
@@ -532,9 +538,11 @@ func pErrorWithGid(ctx context.Context, depth int, fmtstr string, v ...interface
 			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf(p_fmt, append(values, v...)...))
 			Gfilelog.LogObj.lg_err.Output(depth, fmt.Sprintf(p_fmt, append(values, v...)...))
 		}*/
-		Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf(p_fmt, append(values, v...)...))
-		if !Gfilelog.Logconf.Stdout {
-			Gfilelog.LogObj.lg_err.Output(depth, fmt.Sprintf(p_fmt, append(values, v...)...))
+		if Gfilelog.Logconf.Loglevel <= ERROR {
+			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf(p_fmt, append(values, v...)...))
+			if !Gfilelog.Logconf.Stdout {
+				Gfilelog.LogObj.lg_err.Output(depth, fmt.Sprintf(p_fmt, append(values, v...)...))
+			}
 		}
 	}
 }
@@ -558,12 +566,12 @@ func pError(ctx context.Context, depth int, v ...interface{}) {
 		Gfilelog.fileCheck()
 		Gfilelog.LogObj.mu.RLock()
 		defer Gfilelog.LogObj.mu.RUnlock()
-		if Gfilelog.Logconf.Stdout && Gfilelog.Logconf.ColorFull && Gfilelog.Logconf.Loglevel <= WARN {
+		if Gfilelog.Logconf.Stdout && Gfilelog.Logconf.ColorFull && Gfilelog.Logconf.Loglevel <= ERROR {
 			values := []interface{}{Red + prefix}
 			values = append(values, v...)
 			values = append(values, Reset)
 			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintln(values...))
-		} else if Gfilelog.Logconf.Stdout && Gfilelog.Logconf.Loglevel <= WARN {
+		} else if Gfilelog.Logconf.Stdout && Gfilelog.Logconf.Loglevel <= ERROR {
 			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintln(append([]interface{}{prefix}, v...)...))
 		} else if Gfilelog.Logconf.Loglevel <= WARN {
 			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintln(append([]interface{}{prefix}, v...)...))

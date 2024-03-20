@@ -79,6 +79,6 @@ func (dl *Dlock[T]) Unlock(ctx context.Context) error {
 		logger.Warn(ctx, err.Error())
 		return err
 	}
-	logger.Debug(ctx, "unlock ret: %d", ret)
+	logger.Debugf(ctx, "unlock ret: %d", ret)
 	return nil
 }
