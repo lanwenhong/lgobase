@@ -52,7 +52,7 @@ func TestGenidFromDB(t *testing.T) {
 		Colorful:                  true,        // 禁用彩色打印
 	}
 
-	db_conf := dbenc.DbConfNew(ctx, "/home/lanwenhong/dev/lgobase/dbpool/db.ini")
+	db_conf := dbenc.DbConfNew(ctx, "/home/lanwenhong/dev/go/lgobase/dbpool/db.ini")
 	dbs := dbpool.DbpoolNew(db_conf)
 	dbs.SetormLog(ctx, dconfig)
 	tk := "qfconf://test1?maxopen=1000&maxidle=30"
@@ -61,7 +61,7 @@ func TestGenidFromDB(t *testing.T) {
 		t.Fatal(err)
 	}
 	tdb := dbs.OrmPools["test1"]
-	id, err := util.Genid(tdb)
+	id, err := util.Genid(ctx, tdb)
 	if err != nil {
 		t.Fatal(err)
 	}
