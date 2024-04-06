@@ -212,15 +212,49 @@ func (gp *Gpool[T]) ThriftCall(ctx context.Context, method string, arguments ...
 	}
 	if rpc_err != nil {
 		logger.Warnf(ctx, "call %s %s", method, rpc_err.Error())
-		switch rpc_err.(type) {
+		/*switch rpc_err.(type) {
 		case thrift.TTransportException:
 		case thrift.TProtocolException:
 			pc.Gc.Close()
-		}
+		}*/
 	}
 	if retlen == 1 {
 		return nil, rpc_err
 	} else {
 		return rets[0], rpc_err
 	}
+}
+
+func (gp *Gpool[T]) ThriftCall2(ctx context.Context, process func(client interface{}) (string, error)) error {
+	var rpc_err error = nil
+	var rpc_name string = ""
+	pc, err := gp.Get(ctx)
+	defer pc.Close(ctx, rpc_err)
+	tconn := pc.Gc.(*TConn[T])
+
+	starttime := time.Now().UnixNano()
+	defer func() {
+		endTime := time.Now().UnixNano()
+		errStr := ""
+		if rpc_err != nil {
+			errStr = rpc_err.Error()
+		}
+		address := fmt.Sprintf("%s:%d", tconn.Addr, tconn.Port)
+		logger.Infof(ctx, "func=ThriftCallFramed|method=%v|addr=%s:%d|time=%d|err=%s",
+			rpc_name, address, time.Duration(tconn.TimeOut)*1000, (endTime-starttime)/1000, errStr)
+	}()
+
+	if err != nil {
+		rpc_err = err
+		logger.Warnf(ctx, "pool get conn err: %s", err.Error())
+		return err
+	}
+	client := pc.Gc.GetThrfitClient()
+	rpc_name, err = process(client)
+	if err != nil {
+		rpc_err = err
+		logger.Warnf(ctx, "rpc ret %s", err.Error())
+		return err
+	}
+	return nil
 }
