@@ -20,16 +20,19 @@ const (
 	SVR_NOTVALID = 0
 )
 
-type SvrAddr interface {
-	GetAddr() string
-	GetPort() int
-	GetValid() int32
-	GetTimeOut() int32
-	SetStat(int32)
-	SetAddr(string)
-	SetTimeOut(int)
-	SetPort(int)
-}
+/*
+	type SvrAddr interface {
+		GetAddr() string
+		GetPort() int
+		GetValid() int32
+		GetTimeOut() int32
+		SetStat(int32)
+		SetAddr(string)
+		SetTimeOut(int)
+		SetPort(int)
+	}
+*/
+type SvrAddr interface{}
 
 type BaseSvr struct {
 	Port    int
@@ -88,7 +91,7 @@ func NewSelector() *Selector {
 	return s
 }
 
-func getAddrPort(x string) (string, string) {
+func (s *Selector) GetAddrPort(x string) (string, string) {
 	ret := strings.Split(x, "/")
 	return ret[0], ret[1]
 }
@@ -102,15 +105,16 @@ func (s *Selector) SparseAddr(pstr string) error {
 		if len(xx) != 2 {
 			return errors.New("addr format error!!!")
 		}
-		port, timeout := getAddrPort(xx[1])
+		port, timeout := s.GetAddrPort(xx[1])
 		iport, _ := strconv.Atoi(port)
 		itimeout, _ := strconv.Atoi(timeout)
-		bs := NewSvr()
+		//bs := NewSvr()
+		bs := BaseSvr{}
+		bs.SetAddr(xx[0])
+		bs.SetPort(iport)
+		bs.SetTimeOut(itimeout)
+		bs.SetStat(1)
 		s.Slist[i] = bs
-		s.Slist[i].SetAddr(xx[0])
-		s.Slist[i].SetPort(iport)
-		s.Slist[i].SetTimeOut(itimeout)
-		s.Slist[i].SetStat(1)
 	}
 	return nil
 }
@@ -119,10 +123,11 @@ func (s *Selector) SparseRedisAddr(pstr []string) error {
 	s.Slist = make([]SvrAddr, len(pstr))
 	for i := 0; i < len(pstr); i++ {
 		fmt.Printf("url: %s\n", pstr[i])
-		bs := NewSvr()
+		//bs := NewSvr()
+		bs := BaseSvr{}
+		bs.SetAddr(pstr[i])
+		bs.SetStat(1)
 		s.Slist[i] = bs
-		s.Slist[i].SetAddr(pstr[i])
-		s.Slist[i].SetStat(1)
 	}
 	return nil
 }
@@ -131,7 +136,8 @@ func (s *Selector) RoundRobin() SvrAddr {
 	var item []SvrAddr = make([]SvrAddr, len(s.Slist))
 	var j int32 = 0
 	for i := 0; i < len(s.Slist); i++ {
-		if s.Slist[i].GetValid() == SVR_VALID {
+		bs := s.Slist[i].(BaseSvr)
+		if bs.GetValid() == SVR_VALID {
 			item[i] = s.Slist[i]
 			j++
 		}
@@ -148,6 +154,6 @@ func (s *Selector) RoundRobin() SvrAddr {
 }
 
 func (s *Selector) SetSvrStat(i int, stat int32) {
-	svr := s.Slist[i]
+	svr := s.Slist[i].(BaseSvr)
 	svr.SetStat(stat)
 }
