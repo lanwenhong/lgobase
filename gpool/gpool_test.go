@@ -114,6 +114,35 @@ func Test1BufferClient(t *testing.T) {
 
 }
 
+func Test2BufferClient(t *testing.T) {
+	myconf := &logger.Glogconf{
+		RotateMethod: logger.ROTATE_FILE_DAILY,
+		Stdout:       true,
+		ColorFull:    true,
+		Loglevel:     logger.DEBUG,
+	}
+	logger.Newglog("./", "test.log", "test.log.err", myconf)
+	ctx := context.WithValue(context.Background(), "trace_id", NewRequestID())
+
+	gp := &gpool.Gpool[echo.EchoClient]{}
+	gp.GpoolInit("127.0.0.1", 9898, 3, 10, 5, gpool.CreateThriftBufferConn[echo.EchoClient], echo.NewEchoClientFactory)
+
+	var r *echo.EchoRes = nil
+	process := func(client interface{}) (string, error) {
+		var err error = nil
+		c := client.(*echo.EchoClient)
+		req := &echo.EchoReq{Msg: "You are welcome."}
+		r, err = c.Echo(ctx, req)
+		return "echo", err
+	}
+
+	err := gp.ThriftCall2(ctx, process)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	t.Log("rpc2 get: ", r.Msg)
+}
+
 func TestFramedClient(t *testing.T) {
 	ctx := context.WithValue(context.Background(), "trace_id", NewRequestID())
 	go func() {
@@ -146,7 +175,7 @@ func TestFramedClient(t *testing.T) {
 
 	var rpc_err error = nil
 	gc, _ := gp.Get(ctx)
-	defer gc.Close(ctx, rpc_err)
+	defer gc.CloseWithErr(ctx, rpc_err)
 
 	client := gc.Gc.GetThrfitClient()
 	c, rpc_err := client.Add(ctx, 1, 2)
@@ -177,7 +206,7 @@ func TestGpoolReconnect(t *testing.T) {
 		gc, err := gp.Get(ctx)
 		client := gc.Gc.GetThrfitClient()
 		ret, err := client.Echo(ctx, "ganni")
-		gc.Close(ctx, err)
+		gc.CloseWithErr(ctx, err)
 		if err != nil {
 			t.Log(err.Error())
 			time.Sleep(1 * time.Second)
@@ -209,7 +238,7 @@ func TestGpoolList(t *testing.T) {
 				t.Log("<<<<<DEBUG>>>>>")
 				client := gc.Gc.GetThrfitClient()
 				ret, err := client.Echo(ctx, "ganni")
-				gc.Close(ctx, err)
+				gc.CloseWithErr(ctx, err)
 				if err != nil {
 					t.Log(err.Error())
 					cs <- "ferror"
@@ -233,5 +262,46 @@ func TestGpoolList(t *testing.T) {
 
 	if gp.GetFreeLen() != 5 {
 		t.Fatal("free len error")
+	}
+}
+
+func TestSelectPool(t *testing.T) {
+	myconf := &logger.Glogconf{
+		RotateMethod: logger.ROTATE_FILE_DAILY,
+		Stdout:       true,
+		ColorFull:    true,
+		Loglevel:     logger.DEBUG,
+	}
+	logger.Newglog("./", "test.log", "test.log.err", myconf)
+
+	ctx := context.WithValue(context.Background(), "trace_id", NewRequestID())
+	g_conf := &gpool.GPoolConfig[echo.EchoClient]{
+		//Addrs:        "127.0.0.1:9898/3000,127.0.0.1:9898/3000",
+		Addrs:        "127.0.0.1:9898/3000",
+		MaxConns:     100,
+		MaxIdleConns: 10,
+		Cfunc:        gpool.CreateThriftBufferConn[echo.EchoClient],
+		Nc:           echo.NewEchoClientFactory,
+	}
+	rps := gpool.RpcPoolSelector[echo.EchoClient]{}
+	rps.RpcPoolInit(ctx, g_conf)
+
+	for i := 1; i < 10; i++ {
+		var r *echo.EchoRes = nil
+		process := func(client interface{}) (string, error) {
+			var err error = nil
+			c := client.(*echo.EchoClient)
+			req := &echo.EchoReq{Msg: "You are welcome."}
+			r, err = c.Echo(ctx, req)
+			return "echo", err
+		}
+		err := rps.ThriftCall(ctx, process)
+		if err != nil {
+			t.Log(err)
+		}
+		if r != nil {
+			t.Log("rpc get: ", r.Msg)
+		}
+		time.Sleep(1 * time.Second)
 	}
 }

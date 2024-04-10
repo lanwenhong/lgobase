@@ -46,11 +46,12 @@ func (tc *TConn[T]) Init(addr string, port int, timeout int) error {
 		transportFactory := thrift.NewTFramedTransportFactory(thrift.NewTTransportFactory())
 		tc.Tbp = thrift.NewTBinaryProtocolFactoryDefault()
 		addr := fmt.Sprintf("%s:%d", tc.Addr, tc.Port)
+		//transport, _ := thrift.NewTSocketTimeout(addr, time.Duration(tc.TimeOut)*time.Second, time.Duration(tc.TimeOut)*time.Second)
 		transport, _ := thrift.NewTSocketTimeout(addr, time.Duration(tc.TimeOut)*time.Second, time.Duration(tc.TimeOut)*time.Second)
 		tc.Tft, _ = transportFactory.GetTransport(transport)
 	} else if tc.Protocol == TH_PRO_BUFFER {
 		addr := fmt.Sprintf("%s:%d", tc.Addr, tc.Port)
-		socket, _ := thrift.NewTSocketTimeout(addr, time.Duration(tc.TimeOut)*time.Second, time.Duration(tc.TimeOut)*time.Second)
+		socket, _ := thrift.NewTSocketTimeout(addr, time.Duration(tc.TimeOut)*time.Millisecond, time.Duration(tc.TimeOut)*time.Millisecond)
 		tc.Tbt = thrift.NewTBufferedTransport(socket, 8192)
 		tc.Tbp = thrift.NewTBinaryProtocolFactoryDefault()
 	}
@@ -89,7 +90,7 @@ func (tc *TConn[T]) Close() error {
 		tc.isOpen = tc.Tft.IsOpen()
 	} else if tc.Protocol == TH_PRO_BUFFER {
 		tc.Tbt.Close()
-		tc.isOpen = tc.Tft.IsOpen()
+		tc.isOpen = tc.Tbt.IsOpen()
 	}
 	return errors.New("not support")
 }
