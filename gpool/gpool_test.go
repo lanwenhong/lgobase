@@ -175,7 +175,7 @@ func TestFramedClient(t *testing.T) {
 
 	var rpc_err error = nil
 	gc, _ := gp.Get(ctx)
-	defer gc.Close(ctx, rpc_err)
+	defer gc.CloseWithErr(ctx, rpc_err)
 
 	client := gc.Gc.GetThrfitClient()
 	c, rpc_err := client.Add(ctx, 1, 2)
@@ -206,7 +206,7 @@ func TestGpoolReconnect(t *testing.T) {
 		gc, err := gp.Get(ctx)
 		client := gc.Gc.GetThrfitClient()
 		ret, err := client.Echo(ctx, "ganni")
-		gc.Close(ctx, err)
+		gc.CloseWithErr(ctx, err)
 		if err != nil {
 			t.Log(err.Error())
 			time.Sleep(1 * time.Second)
@@ -238,7 +238,7 @@ func TestGpoolList(t *testing.T) {
 				t.Log("<<<<<DEBUG>>>>>")
 				client := gc.Gc.GetThrfitClient()
 				ret, err := client.Echo(ctx, "ganni")
-				gc.Close(ctx, err)
+				gc.CloseWithErr(ctx, err)
 				if err != nil {
 					t.Log(err.Error())
 					cs <- "ferror"
@@ -276,7 +276,8 @@ func TestSelectPool(t *testing.T) {
 
 	ctx := context.WithValue(context.Background(), "trace_id", NewRequestID())
 	g_conf := &gpool.GPoolConfig[echo.EchoClient]{
-		Addrs:        "127.0.0.1:9898/3000,127.0.0.1:9899/3000",
+		//Addrs:        "127.0.0.1:9898/3000,127.0.0.1:9898/3000",
+		Addrs:        "127.0.0.1:9898/3000",
 		MaxConns:     100,
 		MaxIdleConns: 10,
 		Cfunc:        gpool.CreateThriftBufferConn[echo.EchoClient],
@@ -296,8 +297,11 @@ func TestSelectPool(t *testing.T) {
 		}
 		err := rps.ThriftCall(ctx, process)
 		if err != nil {
-			t.Fatal(err)
+			t.Log(err)
 		}
-		t.Log("rpc get: ", r.Msg)
+		if r != nil {
+			t.Log("rpc get: ", r.Msg)
+		}
+		time.Sleep(1 * time.Second)
 	}
 }

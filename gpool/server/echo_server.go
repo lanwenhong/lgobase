@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/google/uuid"
@@ -21,8 +22,9 @@ func (e *EchoServer) Echo(ctx context.Context, req *echo.EchoReq) (*echo.EchoRes
 	res := &echo.EchoRes{
 		Msg: "success",
 	}
-
 	logger.Info(cctx, "succ")
+
+	time.Sleep(4 * time.Second)
 	return res, nil
 }
 
@@ -37,11 +39,18 @@ func main() {
 	}
 
 	logger.Newglog("./", "test.log", "test.log.err", myconf)
-	transport, err := thrift.NewTServerSocket(":9898")
+	/*transport, err := thrift.NewTServerSocket(":9898")
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}*/
+
+	transport, err := thrift.NewTServerSocketTimeout(":9898", time.Duration(3000*time.Millisecond))
 	if err != nil {
 		fmt.Println(err.Error())
 		return
 	}
+
 	handler := &EchoServer{}
 	processor := echo.NewEchoProcessor(handler)
 	transportFactory := thrift.NewTBufferedTransportFactory(8192)
