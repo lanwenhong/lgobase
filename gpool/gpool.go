@@ -174,7 +174,9 @@ func (gp *Gpool[T]) GetUseLen() int {
 func (gp *Gpool[T]) ThriftCall(ctx context.Context, method string, arguments ...interface{}) (interface{}, error) {
 	var rpc_err error = nil
 	pc, err := gp.Get(ctx)
-	defer pc.Close(ctx)
+	if pc != nil {
+		defer pc.Close(ctx)
+	}
 	tconn := pc.Gc.(*TConn[T])
 
 	c := reflect.ValueOf(tconn.Client)
@@ -236,12 +238,14 @@ func (gp *Gpool[T]) ThriftCall2(ctx context.Context, process func(client interfa
 	var rpc_err error
 	var rpc_name string = ""
 	pc, err := gp.Get(ctx)
+	if pc != nil {
+		defer pc.Close(ctx)
+	}
 	if err != nil {
 		logger.Warnf(ctx, "get conn err: %s", err.Error())
 		return err
 	}
 	tconn := pc.Gc.(*TConn[T])
-	defer pc.Close(ctx)
 
 	starttime := time.Now().UnixNano()
 	defer func() {

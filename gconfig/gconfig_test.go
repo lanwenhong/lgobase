@@ -28,6 +28,11 @@ func TestGparse(t *testing.T) {
 
 		if test3, ok := se["test3"]; ok {
 			t.Logf("get test3: %s", test3)
+			if ex, ok := g_cf.GlineExtend["test3"]; ok {
+				t.Logf("get test3 ex: %s", ex)
+			} else {
+				t.Errorf("test3 extend not found")
+			}
 		} else {
 			t.Errorf("test3 not found")
 		}

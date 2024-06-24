@@ -302,6 +302,60 @@ func TestSelectPool(t *testing.T) {
 		if r != nil {
 			t.Log("rpc get: ", r.Msg)
 		}
-		time.Sleep(1 * time.Second)
+		//time.Sleep(1 * time.Second)
 	}
+}
+
+func TestPing(t *testing.T) {
+	myconf := &logger.Glogconf{
+		RotateMethod: logger.ROTATE_FILE_DAILY,
+		Stdout:       true,
+		ColorFull:    true,
+		Loglevel:     logger.DEBUG,
+	}
+	logger.Newglog("./", "test.log", "test.log.err", myconf)
+	ctx := context.WithValue(context.Background(), "trace_id", NewRequestID())
+
+	ping := func(client interface{}) (string, error) {
+		var err error = nil
+		c := client.(*echo.EchoClient)
+		_, err = c.Ping(ctx)
+		return "ping", err
+	}
+
+	g_conf := &gpool.GPoolConfig[echo.EchoClient]{
+		Addrs:        "127.0.0.1:9898/3000,127.0.0.1:9899/3000",
+		MaxConns:     100,
+		MaxIdleConns: 10,
+		Cfunc:        gpool.CreateThriftBufferConn[echo.EchoClient],
+		Nc:           echo.NewEchoClientFactory,
+		Ping:         ping,
+		PingTicker:   1,
+	}
+	rps := gpool.RpcPoolSelector[echo.EchoClient]{}
+	rps.RpcPoolInit(ctx, g_conf)
+
+	for i := 0; i < 2; i++ {
+		go func() {
+			for i := 0; i < 100; i++ {
+				var r *echo.EchoRes = nil
+				process := func(client interface{}) (string, error) {
+					var err error = nil
+					c := client.(*echo.EchoClient)
+					req := &echo.EchoReq{Msg: "You are welcome."}
+					r, err = c.Echo(ctx, req)
+					return "echo", err
+				}
+				err := rps.ThriftCall(ctx, process)
+				if err != nil {
+					t.Log(err)
+				}
+				if r != nil {
+					t.Log("rpc get: ", r.Msg)
+				}
+				time.Sleep(2 * time.Second)
+			}
+		}()
+	}
+	time.Sleep(10000000 * time.Second)
 }

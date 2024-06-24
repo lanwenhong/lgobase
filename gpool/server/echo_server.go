@@ -14,6 +14,10 @@ import (
 type EchoServer struct {
 }
 
+func (e *EchoServer) Ping(ctx context.Context) (string, error) {
+	return "OK", nil
+}
+
 func (e *EchoServer) Echo(ctx context.Context, req *echo.EchoReq) (*echo.EchoRes, error) {
 	uuid := uuid.New()
 	v := uuid.String()
@@ -24,7 +28,7 @@ func (e *EchoServer) Echo(ctx context.Context, req *echo.EchoReq) (*echo.EchoRes
 	}
 	logger.Info(cctx, "succ")
 
-	time.Sleep(4 * time.Second)
+	//time.Sleep(4 * time.Second)
 	return res, nil
 }
 
@@ -45,7 +49,7 @@ func main() {
 		return
 	}*/
 
-	transport, err := thrift.NewTServerSocketTimeout(":9898", time.Duration(3000*time.Millisecond))
+	transport, err := thrift.NewTServerSocketTimeout(":9898", time.Duration(5000*time.Millisecond))
 	if err != nil {
 		fmt.Println(err.Error())
 		return

@@ -7,18 +7,19 @@ import (
 	"io"
 	"os"
 	"regexp"
-	"strings"
 )
 
 type Gconf struct {
-	Gcf  map[string]map[string]string
-	file string
+	Gcf         map[string]map[string]string
+	GlineExtend map[string][]string
+	file        string
 }
 
 func NewGconf(filename string) *Gconf {
 	gcf := new(Gconf)
 	gcf.file = filename
 	gcf.Gcf = make(map[string]map[string]string)
+	gcf.GlineExtend = make(map[string][]string)
 	return gcf
 }
 
@@ -28,8 +29,8 @@ func NewGconf(filename string) *Gconf {
 	return strings.TrimPrefix(s, " ")
 }*/
 
-func (gcf *Gconf) getMk(line string) (string, error) {
-	if len(line) < 3 {
+func (gcf *Gconf) getMk(line string, re *regexp.Regexp) (string, error) {
+	/*if len(line) < 3 {
 		return "", errors.New(fmt.Sprintf("%s len %d error", line, len(line)))
 	}
 	item := line[1 : len(line)-1]
@@ -38,12 +39,20 @@ func (gcf *Gconf) getMk(line string) (string, error) {
 	//注释掉的行
 	if mk[0] == '#' || mk[0] == ';' {
 		return "", nil
+	}*/
+	//return mk, nil
+	groups := re.SubexpNames()
+	match := re.FindStringSubmatch(line)
+	for i, _ := range groups {
+		if i == 1 {
+			return match[i], nil
+		}
 	}
-	return mk, nil
+	return "", nil
 }
 
-func (gcf *Gconf) getIk(line string) (string, string, error) {
-	if len(line) < 2 {
+func (gcf *Gconf) getIk(line string, re *regexp.Regexp) (string, string, error) {
+	/*if len(line) < 2 {
 		return "", "", errors.New(fmt.Sprintf("%s len %d error", line, len(line)))
 	}
 	index := strings.IndexAny(line, "=")
@@ -64,7 +73,40 @@ func (gcf *Gconf) getIk(line string) (string, string, error) {
 	if ik[0] == '#' || ik[0] == ';' {
 		return "", "", nil
 	}
-	return ik, iv, nil
+	return ik, iv, nil*/
+
+	rets := []string{}
+	groups := re.SubexpNames()
+	match := re.FindStringSubmatch(line)
+	fmt.Println(match)
+	for i, _ := range groups {
+		if i != 0 {
+			rets = append(rets, match[i])
+		}
+
+	}
+
+	return rets[0], rets[1], nil
+}
+
+func (gcf *Gconf) getIkExd(line_key string, exd_line string, re *regexp.Regexp) error {
+	groups := re.SubexpNames()
+	match := re.FindStringSubmatch(exd_line)
+
+	for i, _ := range groups {
+		if i != 0 {
+			fmt.Println(match[i])
+			if val, ok := gcf.GlineExtend[line_key]; ok {
+				val = append(val, match[i])
+				gcf.GlineExtend[line_key] = val
+			} else {
+				val := []string{}
+				val = append(val, match[i])
+				gcf.GlineExtend[line_key] = val
+			}
+		}
+	}
+	return nil
 }
 
 func (gcf *Gconf) GconfParse() error {
@@ -75,13 +117,19 @@ func (gcf *Gconf) GconfParse() error {
 	}
 	defer fi.Close()
 	br := bufio.NewReader(fi)
-	mkey_reg := `^\[.*\]$`
-	ikey_reg := `^(.*)\=(.*)$`
+	//mkey_reg := `^\[.*\]$`
+	mkey_reg := `^\[(\w+)]$`
+	//ikey_reg := `^(.*)\=(.*)$`
+	ikey_reg := `^(?P<k>\w+)\s*\=\s*(?P<v>.*)$`
+	ikey_reg_ex := `^\s{1,4}([\w][a-z,A-Z,0-9,=,<,>,>=,<=,!=,_,\,\s,\-,\\.]+)$`
+
 	mreg := regexp.MustCompile(mkey_reg)
 	ireg := regexp.MustCompile(ikey_reg)
+	ireg_ex := regexp.MustCompile(ikey_reg_ex)
 
 	var mkey string
 	var imap map[string]string
+	var line_key string = ""
 	for {
 		line, _, err := br.ReadLine()
 		if err == io.EOF {
@@ -89,7 +137,7 @@ func (gcf *Gconf) GconfParse() error {
 		}
 		sline := string(line)
 		if mreg.MatchString(sline) {
-			mk, err := gcf.getMk(sline)
+			mk, err := gcf.getMk(sline, mreg)
 			if err != nil {
 				return err
 			}
@@ -108,7 +156,7 @@ func (gcf *Gconf) GconfParse() error {
 				fmt.Printf("%s not found section\n", sline)
 				continue
 			}
-			k, v, err := gcf.getIk(sline)
+			k, v, err := gcf.getIk(sline, ireg)
 			if err != nil {
 				return err
 			}
@@ -119,12 +167,16 @@ func (gcf *Gconf) GconfParse() error {
 			}
 			fmt.Printf("k=%s v=%s\n", k, v)
 			imap[k] = v
+			line_key = k
+		} else if ireg_ex.MatchString(sline) {
+			//处理扩展行
+			gcf.getIkExd(line_key, sline, ireg_ex)
 		} else {
-			//fmt.Println("no match continue\n")
 			fmt.Println("no match continue")
 		}
 	}
 	fmt.Println(gcf.Gcf)
+	fmt.Println(gcf.GlineExtend)
 	return nil
 }
 
