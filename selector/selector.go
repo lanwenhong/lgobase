@@ -109,7 +109,7 @@ func (s *Selector) SparseAddr(pstr string) error {
 		iport, _ := strconv.Atoi(port)
 		itimeout, _ := strconv.Atoi(timeout)
 		//bs := NewSvr()
-		bs := BaseSvr{}
+		bs := &BaseSvr{}
 		bs.SetAddr(xx[0])
 		bs.SetPort(iport)
 		bs.SetTimeOut(itimeout)
@@ -124,9 +124,9 @@ func (s *Selector) SparseRedisAddr(pstr []string) error {
 	for i := 0; i < len(pstr); i++ {
 		fmt.Printf("url: %s\n", pstr[i])
 		//bs := NewSvr()
-		bs := BaseSvr{}
+		bs := &BaseSvr{}
 		bs.SetAddr(pstr[i])
-		bs.SetStat(1)
+		bs.SetStat(SVR_VALID)
 		s.Slist[i] = bs
 	}
 	return nil

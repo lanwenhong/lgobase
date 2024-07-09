@@ -10,4 +10,5 @@ struct EchoRes {
 
 service Echo {
     EchoRes echo(1: EchoReq req);
+    string ping();
 }

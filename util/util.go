@@ -188,3 +188,10 @@ func PKCS5UnPadding(origData []byte) []byte {
 	unpadding := int(origData[length-1])
 	return origData[:(length - unpadding)]
 }
+
+func Mapget(m map[string]interface{}, key string, defv interface{}) interface{} {
+	if val, ok := m[key]; ok {
+		return val
+	}
+	return defv
+}
