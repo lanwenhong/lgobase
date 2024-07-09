@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"regexp"
+	"strings"
 )
 
 type Gconf struct {
@@ -43,12 +44,14 @@ func (gcf *Gconf) getMk(line string, re *regexp.Regexp) (string, error) {
 	//return mk, nil
 	groups := re.SubexpNames()
 	match := re.FindStringSubmatch(line)
+	item := ""
 	for i, _ := range groups {
 		if i == 1 {
-			return match[i], nil
+			//return match[i], nil
+			item = strings.Trim(match[i], " ")
 		}
 	}
-	return "", nil
+	return item, nil
 }
 
 func (gcf *Gconf) getIk(line string, re *regexp.Regexp) (string, string, error) {
@@ -85,8 +88,9 @@ func (gcf *Gconf) getIk(line string, re *regexp.Regexp) (string, string, error) 
 		}
 
 	}
-
-	return rets[0], rets[1], nil
+	ret0 := strings.Trim(rets[0], " ")
+	ret1 := strings.Trim(rets[1], " ")
+	return ret0, ret1, nil
 }
 
 func (gcf *Gconf) getIkExd(line_key string, exd_line string, re *regexp.Regexp) error {
@@ -97,11 +101,13 @@ func (gcf *Gconf) getIkExd(line_key string, exd_line string, re *regexp.Regexp) 
 		if i != 0 {
 			fmt.Println(match[i])
 			if val, ok := gcf.GlineExtend[line_key]; ok {
-				val = append(val, match[i])
+				item := strings.Trim(match[i], " ")
+				val = append(val, item)
 				gcf.GlineExtend[line_key] = val
 			} else {
 				val := []string{}
-				val = append(val, match[i])
+				item := strings.Trim(match[i], " ")
+				val = append(val, item)
 				gcf.GlineExtend[line_key] = val
 			}
 		}
