@@ -3,10 +3,12 @@ package confparse
 import (
 	"errors"
 	"fmt"
-	config "github.com/lanwenhong/lgobase/gconfig"
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
+	
+	config "github.com/lanwenhong/lgobase/gconfig"
 )
 
 type UserSelfFunc func(interface{}, string) error
@@ -60,25 +62,25 @@ func (cp *Cparse) parseMapTag(v reflect.StructField) (string, string, string, st
 	slist := strings.Split(cpos, ":")
 	se := slist[0]
 	k := slist[1]
-
+	
 	is := v.Tag.Get(CP_TAG_ITEM_SPLIT)
 	if is == "" {
 		fmt_e := fmt.Sprintf("tag: %s not exist", CP_TAG_ITEM_SPLIT)
 		return "", "", "", "", errors.New(fmt_e)
 	}
-
+	
 	ks := v.Tag.Get(CP_TAG_KV_SPLIT)
 	if ks == "" {
 		fmt_e := fmt.Sprintf("tag: %s not exist", CP_TAG_KV_SPLIT)
 		return "", "", "", "", errors.New(fmt_e)
 	}
-
+	
 	return se, k, is, ks, nil
 }
 
 func (cp *Cparse) parseSliceTag(v reflect.StructField) (string, string, string, error) {
 	cpos := v.Tag.Get(CP_TAG_POS)
-
+	
 	if cpos == "" {
 		fmt_e := fmt.Sprintf("tag: %s not exist", CP_TAG_POS)
 		return "", "", "", errors.New(fmt_e)
@@ -87,7 +89,7 @@ func (cp *Cparse) parseSliceTag(v reflect.StructField) (string, string, string, 
 	slist := strings.Split(cpos, ":")
 	se := slist[0]
 	k := slist[1]
-
+	
 	is := v.Tag.Get(CP_TAG_ITEM_SPLIT)
 	if is == "" {
 		fmt_e := fmt.Sprintf("tag: %s not exist", CP_TAG_ITEM_SPLIT)
@@ -179,6 +181,27 @@ func (cp *Cparse) parseFloat(v reflect.Value, tv reflect.StructField, cfg *confi
 	return cp.setFloat(v, word)
 }
 
+func (cp *Cparse) parseDuration(v reflect.Value, tv reflect.StructField, cfg *config.Gconf) error {
+	section, key, err := cp.parseBaseTag(tv)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("section: %s key: %s\n", section, key)
+	word, err := cp.getDatafromIni(section, key, cfg)
+	if err != nil {
+		return err
+	}
+	return cp.setDuration(v, word)
+}
+
+func (cp *Cparse) setDuration(v reflect.Value, x string) (err error) {
+	var durationVal time.Duration
+	if durationVal, err = time.ParseDuration(x); err == nil {
+		v.Set(reflect.ValueOf(durationVal))
+	}
+	return
+}
+
 func (cp *Cparse) setString(v reflect.Value, x string) error {
 	v.SetString(x)
 	return nil
@@ -230,84 +253,84 @@ func (cp *Cparse) getBaseValue(k reflect.Kind, v string) (reflect.Value, error) 
 		x = x.Elem()
 		err := cp.setInt(x, v)
 		return x, err
-
+	
 	case reflect.Int8:
 		d := int8(data)
 		x := reflect.ValueOf(&d)
 		x = x.Elem()
 		err := cp.setInt(x, v)
 		return x, err
-
+	
 	case reflect.Int16:
 		d := int16(data)
 		x := reflect.ValueOf(&d)
 		x = x.Elem()
 		err := cp.setInt(x, v)
 		return x, err
-
+	
 	case reflect.Int32:
 		d := int32(data)
 		x := reflect.ValueOf(&d)
 		x = x.Elem()
 		err := cp.setInt(x, v)
-
+		
 		return x, err
-
+	
 	case reflect.Int64:
 		d := int64(data)
 		x := reflect.ValueOf(&d)
 		x = x.Elem()
 		err := cp.setInt(x, v)
 		return x, err
-
+	
 	case reflect.Uint8:
 		d := uint8(data)
 		x := reflect.ValueOf(&d)
 		x = x.Elem()
 		err := cp.setInt(x, v)
 		return x, err
-
+	
 	case reflect.Uint16:
 		d := uint16(data)
 		x := reflect.ValueOf(&d)
 		x = x.Elem()
 		err := cp.setInt(x, v)
 		return x, err
-
+	
 	case reflect.Uint32:
 		d := uint32(data)
 		x := reflect.ValueOf(&d)
 		x = x.Elem()
 		err := cp.setInt(x, v)
 		return x, err
-
+	
 	case reflect.Uint64:
 		d := uint64(data)
 		x := reflect.ValueOf(&d)
 		x = x.Elem()
 		err := cp.setInt(x, v)
 		return x, err
-
+	
 	case reflect.Float32:
 		d := float32(f)
 		x := reflect.ValueOf(&d)
 		x = x.Elem()
 		err := cp.setFloat(x, v)
 		return x, err
-
+	
 	case reflect.Float64:
 		d := float64(f)
 		x := reflect.ValueOf(&d)
 		x = x.Elem()
 		err := cp.setFloat(x, v)
 		return x, err
-
+	
 	case reflect.Bool:
 		x := reflect.ValueOf(&b)
 		x = x.Elem()
 		err := cp.setBool(x, v)
 		return x, err
-
+	
 	case reflect.String:
 		x := reflect.ValueOf(&s)
 		x = x.Elem()
@@ -341,10 +364,10 @@ func (cp *Cparse) fillSlice(v reflect.Value, sv string) (reflect.Value, error) {
 func (cp *Cparse) parseMap(v reflect.Value, tv reflect.StructField, cfg *config.Gconf) error {
 	ktype := v.Type().Key().Kind()
 	vtype := v.Type().Elem().Kind()
-
+	
 	fmt.Println("ktype: ", ktype)
 	fmt.Println("vtype: ", vtype)
-
+	
 	if ktype != reflect.String {
 		return errors.New("map key must string")
 	}
@@ -353,7 +376,7 @@ func (cp *Cparse) parseMap(v reflect.Value, tv reflect.StructField, cfg *config.
 		return err
 	}
 	fmt.Printf("se: %s k: %s is: %s kvs: %s\n", se, k, is, kvs)
-
+	
 	word, err := cp.getDatafromIni(se, k, cfg)
 	if err != nil {
 		return err
@@ -373,7 +396,7 @@ func (cp *Cparse) parseMap(v reflect.Value, tv reflect.StructField, cfg *config.
 func (cp *Cparse) parseSlice(v reflect.Value, tv reflect.StructField, cfg *config.Gconf) (reflect.Value, error) {
 	vtype := v.Type().Elem().Kind()
 	fmt.Println("vtype: ", vtype)
-
+	
 	se, k, is, err := cp.parseSliceTag(tv)
 	if err != nil {
 		return v, err
@@ -396,7 +419,7 @@ func (cp *Cparse) isUserSelfParse(tv reflect.StructField) (error, bool) {
 		fmt_e := fmt.Sprintf("tag: %s not exist", CP_TAG_DTYPE)
 		return errors.New(fmt_e), false
 	}
-
+	
 	fmt.Printf("dtype: %s\n", dtype)
 	if dtype == CP_DTYPE_BASE {
 		return nil, false
@@ -424,9 +447,15 @@ func (cp *Cparse) CparseGo(stru interface{}, cfg *config.Gconf) error {
 		item := v_stru.Field(i)
 		switch item.Kind() {
 		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-			err := cp.parseInt(item, t_item, cfg)
-			if err != nil {
-				return err
+			// 支持时间类型
+			if item.Type().Name() == "Duration" {
+				if err := cp.parseDuration(item, t_item, cfg); err != nil {
+					return err
+				}
+			} else {
+				if err := cp.parseInt(item, t_item, cfg); err != nil {
+					return err
+				}
 			}
 		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 			err := cp.parseUint(item, t_item, cfg)
@@ -461,7 +490,7 @@ func (cp *Cparse) CparseGo(stru interface{}, cfg *config.Gconf) error {
 			v_stru.Field(i).Set(xv)
 		}
 	}
-
+	
 	for mk, one_func := range cp.Funcs {
 		slist := strings.Split(mk, ":")
 		se := slist[0]
