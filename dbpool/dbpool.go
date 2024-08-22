@@ -4,18 +4,19 @@ import (
 	"context"
 	"errors"
 	"fmt"
-
+	
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
-
+	
 	"strconv"
 	"strings"
-
-	"github.com/lanwenhong/lgobase/dbenc"
-	"github.com/lanwenhong/lgobase/logger"
+	
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	dlog "gorm.io/gorm/logger"
+	
+	"github.com/lanwenhong/lgobase/dbenc"
+	"github.com/lanwenhong/lgobase/logger"
 )
 
 const (
@@ -27,7 +28,7 @@ type Dbpool struct {
 	Tset     *dbenc.DbConf
 	Pools    map[string]*sqlx.DB
 	OrmPools map[string]*gorm.DB
-
+	
 	//Logobj   *logger.FILE
 	Logobj   *logger.Glog
 	GormConf *dlog.Config
@@ -57,19 +58,19 @@ func (dbpool *Dbpool) SetormLog(ctx context.Context, gormConf *dlog.Config) {
 func (dbpool *Dbpool) Add(ctx context.Context, db string, url string, model int) error {
 	xdata := strings.Split(url, "?")
 	logger.Debugf(ctx, "xdata: %v", xdata)
-
+	
 	if len(xdata) != 2 {
 		return errors.New("url err not have ? url=" + url)
 	}
 	params := xdata[1]
 	logger.Debugf(ctx, "params: %s", params)
-
+	
 	pdata := strings.Split(params, "&")
-
+	
 	if len(pdata) != 2 {
 		return errors.New("param err pamam=" + params)
 	}
-
+	
 	maxopen := 100
 	maxidle := 50
 	var err error
@@ -86,7 +87,7 @@ func (dbpool *Dbpool) Add(ctx context.Context, db string, url string, model int)
 	}
 	logger.Debugf(ctx, "maxopen: %d maxidle: %d", maxopen, maxidle)
 	token_prefix := xdata[0]
-
+	
 	tdata := strings.Split(token_prefix, "://")
 	if len(tdata) != 2 {
 		return errors.New("token err token=" + token_prefix)
@@ -98,7 +99,7 @@ func (dbpool *Dbpool) Add(ctx context.Context, db string, url string, model int)
 	logger.Debugf(ctx, "db url: %s", dburl)
 	if model == USE_SQLX {
 		dbpool.Pools[db], err = sqlx.Connect("mysql", dburl)
-
+		
 		if err == nil {
 			dbpool.Pools[db].SetMaxOpenConns(maxopen)
 			dbpool.Pools[db].SetMaxIdleConns(maxidle)

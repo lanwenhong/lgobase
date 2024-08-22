@@ -7,13 +7,12 @@ import (
 	"math/rand"
 	"strings"
 	"time"
-
+	
+	"gorm.io/gorm"
+	
 	"github.com/chilts/sid"
 	"github.com/google/uuid"
-	"gorm.io/gorm"
-
-	//"github.com/google/uuid"
-
+	
 	"github.com/kjk/betterguid"
 	"github.com/oklog/ulid"
 	"github.com/rs/xid"
@@ -32,7 +31,7 @@ type UuidShort struct {
 func Genid(ctx context.Context, conn *gorm.DB) (uint64, error) {
 	s := []Serverid{}
 	su := []UuidShort{}
-
+	
 	sql := "select @@server_id"
 	ret := conn.WithContext(ctx).Raw(sql).Scan(&s)
 	if ret.Error != nil {
@@ -54,27 +53,21 @@ func NewRequestID() string {
 }
 
 func GenXid() string {
-	id := xid.New()
-	sid := fmt.Sprintf("%s", id)
-	return sid
+	return fmt.Sprintf("%s", xid.New())
 }
 
 func GenKsuid() string {
-	id := ksuid.New()
-	sid := fmt.Sprintf("%s", id)
-	return sid
+	return fmt.Sprintf("%s", ksuid.New())
 }
 
 func GenBetterGUID() string {
-	id := betterguid.New()
-	return id
+	return betterguid.New()
 }
 
 func GenUlid() string {
 	t := time.Now().UTC()
 	entropy := rand.New(rand.NewSource(t.UnixNano()))
-	id := ulid.MustNew(ulid.Timestamp(t), entropy)
-	return id.String()
+	return ulid.MustNew(ulid.Timestamp(t), entropy).String()
 }
 
 func GenSonyflake() string {
@@ -85,11 +78,9 @@ func GenSonyflake() string {
 	}
 	// Note: this is base16, could shorten by encoding as base62 string
 	//fmt.Printf("github.com/sony/sonyflake:   %x\n", id)
-	sid := fmt.Sprintf("%x", id)
-	return sid
+	return fmt.Sprintf("%x", id)
 }
 
 func GenSid() string {
-	id := sid.Id()
-	return id
+	return sid.Id()
 }

@@ -6,12 +6,13 @@ import (
 	"strings"
 	"testing"
 	"time"
-
+	
+	dlog "gorm.io/gorm/logger"
+	
 	"github.com/google/uuid"
 	"github.com/lanwenhong/lgobase/dbenc"
 	"github.com/lanwenhong/lgobase/dbpool"
 	"github.com/lanwenhong/lgobase/logger"
-	dlog "gorm.io/gorm/logger"
 )
 
 type Serverid struct {
@@ -96,21 +97,21 @@ func TestCreate(t *testing.T) {
 	//logger.SetRollingDaily("./", "test.log", "test.log.err")
 	//loglevel, _ := logger.LoggerLevelIndex("DEBUG")
 	//logger.SetLevel(loglevel)
-
+	
 	dconfig := &dlog.Config{
 		SlowThreshold:             time.Second, // 慢 SQL 阈值
 		LogLevel:                  dlog.Info,   // 日志级别
 		IgnoreRecordNotFoundError: true,        // 忽略ErrRecordNotFound（记录未找到）错误
 		Colorful:                  false,       // 禁用彩色打印
 	}
-
+	
 	db_conf := dbenc.DbConfNew(ctx, "db.ini")
 	dbs := dbpool.DbpoolNew(db_conf)
 	dbs.SetormLog(ctx, dconfig)
-
+	
 	tk := "qfconf://test1?maxopen=1000&maxidle=30"
 	err := dbs.Add(ctx, "test1", tk, dbpool.USE_GORM)
-
+	
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,7 +135,7 @@ func TestCreateMulti(t *testing.T) {
 	//logger.SetRollingDaily("./", "test.log", "test.log.err")
 	//loglevel, _ := logger.LoggerLevelIndex("DEBUG")
 	//logger.SetLevel(loglevel)
-
+	
 	myconf := &logger.Glogconf{
 		RotateMethod: logger.ROTATE_FILE_DAILY,
 		Stdout:       true,
@@ -149,7 +150,7 @@ func TestCreateMulti(t *testing.T) {
 		IgnoreRecordNotFoundError: true,        // 忽略ErrRecordNotFound（记录未找到）错误
 		Colorful:                  false,       // 禁用彩色打印
 	}
-
+	
 	db_conf := dbenc.DbConfNew(ctx, "db.ini")
 	dbs := dbpool.DbpoolNew(db_conf)
 	dbs.SetormLog(ctx, dconfig)
@@ -159,7 +160,7 @@ func TestCreateMulti(t *testing.T) {
 		t.Fatal(err)
 	}
 	tdb := dbs.OrmPools["test1"]
-
+	
 	users := []User{
 		{
 			Name:      "wowow1",
@@ -170,7 +171,7 @@ func TestCreateMulti(t *testing.T) {
 			UpdatedAt: time.Now(),
 			DeletedAt: time.Now(),
 		},
-
+		
 		{
 			Name:      "wowow2",
 			Age:       sql.NullInt64{14, true},
@@ -180,7 +181,7 @@ func TestCreateMulti(t *testing.T) {
 			UpdatedAt: time.Now(),
 			DeletedAt: time.Now(),
 		},
-
+		
 		{
 			Name:      "wowow3",
 			Age:       sql.NullInt64{15, true},
@@ -196,7 +197,7 @@ func TestCreateMulti(t *testing.T) {
 
 func TestQuery1(t *testing.T) {
 	ctx := context.WithValue(context.Background(), "trace_id", NewRequestID())
-
+	
 	myconf := &logger.Glogconf{
 		RotateMethod: logger.ROTATE_FILE_DAILY,
 		Stdout:       true,
@@ -204,21 +205,21 @@ func TestQuery1(t *testing.T) {
 		Loglevel:     logger.DEBUG,
 		//Goid:         true,
 	}
-
+	
 	user := User{}
 	logger.Newglog("./", "test.log", "test.log.err", myconf)
 	//logger.SetConsole(true)
 	//logger.SetRollingDaily("./", "test.log", "test.log.err")
 	//loglevel, _ := logger.LoggerLevelIndex("DEBUG")
 	//logger.SetLevel(loglevel)
-
+	
 	dconfig := &dlog.Config{
 		SlowThreshold:             time.Second, // 慢 SQL 阈值
 		LogLevel:                  dlog.Info,   // 日志级别
 		IgnoreRecordNotFoundError: true,        // 忽略ErrRecordNotFound（记录未找到）错误
 		Colorful:                  true,        // 禁用彩色打印
 	}
-
+	
 	db_conf := dbenc.DbConfNew(ctx, "db.ini")
 	dbs := dbpool.DbpoolNew(db_conf)
 	dbs.SetormLog(ctx, dconfig)
@@ -229,7 +230,7 @@ func TestQuery1(t *testing.T) {
 	}
 	tdb := dbs.OrmPools["test1"]
 	tdb.WithContext(ctx).Where("name = ?", "wowow").First(&user)
-
+	
 	t.Log(user)
 	c_tm := user.CreatedAt.Format("2006-01-02 15:04:05")
 	t.Log(c_tm)
@@ -237,7 +238,7 @@ func TestQuery1(t *testing.T) {
 
 func TestQuery2(t *testing.T) {
 	ctx := context.WithValue(context.Background(), "trace_id", NewRequestID())
-
+	
 	myconf := &logger.Glogconf{
 		RotateMethod: logger.ROTATE_FILE_DAILY,
 		Stdout:       true,
@@ -245,21 +246,21 @@ func TestQuery2(t *testing.T) {
 		Loglevel:     logger.DEBUG,
 		//Goid:         true,
 	}
-
+	
 	users := []User{}
 	logger.Newglog("./", "test.log", "test.log.err", myconf)
 	//logger.SetConsole(true)
 	//logger.SetRollingDaily("./", "test.log", "test.log.err")
 	//loglevel, _ := logger.LoggerLevelIndex("DEBUG")
 	//logger.SetLevel(loglevel)
-
+	
 	dconfig := &dlog.Config{
 		SlowThreshold:             time.Second, // 慢 SQL 阈值
 		LogLevel:                  dlog.Info,   // 日志级别
 		IgnoreRecordNotFoundError: true,        // 忽略ErrRecordNotFound（记录未找到）错误
 		Colorful:                  true,        // 禁用彩色打印
 	}
-
+	
 	db_conf := dbenc.DbConfNew(ctx, "db.ini")
 	dbs := dbpool.DbpoolNew(db_conf)
 	dbs.SetormLog(ctx, dconfig)
@@ -274,7 +275,7 @@ func TestQuery2(t *testing.T) {
 	end := time.Date(2023, 8, 12, 4, 12, 31, 0, time.Local)
 	logger.Debug(ctx, "start: %s end: %s", start, end)
 	tdb.WithContext(ctx).Where("createat between ? and ?", start, end).Find(&users)
-
+	
 	t.Log(users)
 	//c_tm := user.CreatedAt.Format("2006-01-02 15:04:05")
 	//t.Log(c_tm)
@@ -282,7 +283,7 @@ func TestQuery2(t *testing.T) {
 
 func TestGendiByDb(t *testing.T) {
 	ctx := context.WithValue(context.Background(), "trace_id", NewRequestID())
-
+	
 	myconf := &logger.Glogconf{
 		RotateMethod: logger.ROTATE_FILE_DAILY,
 		Stdout:       true,
@@ -290,7 +291,7 @@ func TestGendiByDb(t *testing.T) {
 		Loglevel:     logger.DEBUG,
 		//Goid:         true,
 	}
-
+	
 	//users := []User{}
 	s := []Serverid{}
 	logger.Newglog("./", "test.log", "test.log.err", myconf)
@@ -298,14 +299,14 @@ func TestGendiByDb(t *testing.T) {
 	//logger.SetRollingDaily("./", "test.log", "test.log.err")
 	//loglevel, _ := logger.LoggerLevelIndex("DEBUG")
 	//logger.SetLevel(loglevel)
-
+	
 	dconfig := &dlog.Config{
 		SlowThreshold:             time.Second, // 慢 SQL 阈值
 		LogLevel:                  dlog.Info,   // 日志级别
 		IgnoreRecordNotFoundError: true,        // 忽略ErrRecordNotFound（记录未找到）错误
 		Colorful:                  true,        // 禁用彩色打印
 	}
-
+	
 	db_conf := dbenc.DbConfNew(ctx, "db.ini")
 	dbs := dbpool.DbpoolNew(db_conf)
 	dbs.SetormLog(ctx, dconfig)
@@ -317,23 +318,23 @@ func TestGendiByDb(t *testing.T) {
 	tdb := dbs.OrmPools["test1"]
 	tdb.Raw("select @@server_id").Scan(&s)
 	logger.Debugf(ctx, "serverid: %d", s[0].Svrid)
-
+	
 	su := []UuidShort{}
 	tdb.Raw("select uuid_short()").Scan(&su)
 	logger.Debugf(ctx, "su: %d", su[0].UuidShort)
 	seq := su[0].UuidShort % 65535
-
+	
 	tt := time.Now().Unix()
 	msec := tt * 1000
 	logger.Debugf(ctx, "tt: %d", msec)
-
+	
 	id := uint64(msec)<<22 + s[0].Svrid<<16 + uint64(seq)
 	logger.Debugf(ctx, "id: %d", id)
 }
 
 func TestQueryMap(t *testing.T) {
 	ctx := context.WithValue(context.Background(), "trace_id", NewRequestID())
-
+	
 	myconf := &logger.Glogconf{
 		RotateMethod: logger.ROTATE_FILE_DAILY,
 		Stdout:       true,
@@ -341,21 +342,21 @@ func TestQueryMap(t *testing.T) {
 		Loglevel:     logger.DEBUG,
 		//Goid:         true,
 	}
-
+	
 	//users := []User{}
 	logger.Newglog("./", "test.log", "test.log.err", myconf)
 	//logger.SetConsole(true)
 	//logger.SetRollingDaily("./", "test.log", "test.log.err")
 	//loglevel, _ := logger.LoggerLevelIndex("DEBUG")
 	//logger.SetLevel(loglevel)
-
+	
 	dconfig := &dlog.Config{
 		SlowThreshold:             time.Second, // 慢 SQL 阈值
 		LogLevel:                  dlog.Info,   // 日志级别
 		IgnoreRecordNotFoundError: true,        // 忽略ErrRecordNotFound（记录未找到）错误
 		Colorful:                  true,        // 禁用彩色打印
 	}
-
+	
 	db_conf := dbenc.DbConfNew(ctx, "db.ini")
 	dbs := dbpool.DbpoolNew(db_conf)
 	dbs.SetormLog(ctx, dconfig)
@@ -368,12 +369,12 @@ func TestQueryMap(t *testing.T) {
 	var ret []map[string]interface{}
 	tdb.Raw("select id, username, FROM_UNIXTIME(ctime, '%Y-%m-%d %H:%i:%s') as ctime from users where id=?", 1).Scan(&ret)
 	t.Log(ret)
-
+	
 	var re []map[string]interface{}
 	var ilist interface{} = nil
 	ilist = []int64{7133368332320837558, 7060864841283604340}
 	tdb.Table("users").Select("*").Where("id in ?", ilist).Scan(&re)
-
+	
 	var re1 map[string]interface{}
 	xid := 7133368332320837558
 	var iid interface{} = nil
