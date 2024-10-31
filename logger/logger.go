@@ -10,7 +10,7 @@ import (
 	"strings"
 	"sync"
 	"time"
-	
+
 	dlog "gorm.io/gorm/logger"
 )
 
@@ -77,7 +77,7 @@ type FILE struct {
 	mu           *sync.RWMutex
 	logfile      *os.File
 	lg           *log.Logger
-	
+
 	logfile_err *os.File
 	lg_err      *log.Logger
 }
@@ -111,7 +111,7 @@ func GetGoid() uint64 {
 		n   = runtime.Stack(buf[:], false)
 		stk = strings.TrimPrefix(string(buf[:n]), "goroutine")
 	)
-	
+
 	idField := strings.Fields(stk)[0]
 	id, err := strconv.ParseUint(idField, 10, 64)
 	if err != nil {
@@ -129,7 +129,7 @@ func GetstrGoid() string {
 		n   = runtime.Stack(buf[:], false)
 		stk = strings.TrimPrefix(string(buf[:n]), "goroutine")
 	)
-	
+
 	idField := strings.Fields(stk)[0]
 	return idField
 }
@@ -165,7 +165,14 @@ func Newglog(fileDir string, fileName string, fileNameErr string, glog_conf *Glo
 		IgnoreRecordNotFoundError: true,        // 忽略ErrRecordNotFound（记录未找到）错误
 		Colorful:                  true,        // 禁用彩色打印
 	}
-	
+	switch glog_conf.Loglevel {
+	case DEBUG, INFO:
+		dconfig.LogLevel = dlog.Info
+	case WARN:
+		dconfig.LogLevel = dlog.Warn
+	case ERROR:
+		dconfig.LogLevel = dlog.Error
+	}
 	glog := &Glog{
 		Logconf:    glog_conf,
 		LogormConf: dconfig,
@@ -238,14 +245,14 @@ func (glog *Glog) SetRollingFile(fileDir, fileName string, stdout bool) error {
 		glog.rename()
 	}
 	go glog.fileMonitor()
-	
+
 	return nil
 }
 
 func (glog *Glog) SetRollingDaily(fileDir, fileName, fileName_err string, stdout bool) error {
 	var err error = nil
 	t, _ := time.Parse(DATEFORMAT, time.Now().Format(DATEFORMAT))
-	
+
 	glog.LogObj = &FILE{
 		dir:          fileDir,
 		filename:     fileName,
@@ -254,16 +261,15 @@ func (glog *Glog) SetRollingDaily(fileDir, fileName, fileName_err string, stdout
 		isCover:      false,
 		mu:           new(sync.RWMutex),
 	}
-	
+
 	glog.LogObj.mu.Lock()
 	defer glog.LogObj.mu.Unlock()
-	
+
 	if !glog.isMustRename() {
 		if !stdout {
-			fmt.Println("==0000000000000===")
 			glog.LogObj.logfile, err = os.OpenFile(fileDir+"/"+fileName, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
 			glog.LogObj.lg = log.New(glog.LogObj.logfile, "", log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile|log.LstdFlags)
-			
+
 			glog.LogObj.logfile_err, err = os.OpenFile(fileDir+"/"+fileName_err, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
 			glog.LogObj.lg_err = log.New(glog.LogObj.logfile_err, "", log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile|log.LstdFlags)
 		} else {
@@ -288,7 +294,7 @@ func pDebugWithGid(ctx context.Context, depth int, fmtstr string, v ...interface
 			trace_id = value
 		}
 	}
-	
+
 	p_fmt := ""
 	values := []interface{}{}
 	if trace_id != "" {
@@ -298,11 +304,11 @@ func pDebugWithGid(ctx context.Context, depth int, fmtstr string, v ...interface
 	} else {
 		p_fmt = "[DEBUG] " + fmtstr
 	}
-	
+
 	if Gfilelog.Logconf.Stdout && Gfilelog.Logconf.ColorFull {
 		p_fmt = Green + p_fmt + Reset
 	}
-	
+
 	if Gfilelog != nil && Gfilelog.LogObj != nil {
 		Gfilelog.fileCheck()
 		Gfilelog.LogObj.mu.RLock()
@@ -318,7 +324,7 @@ func pDebugWithGid(ctx context.Context, depth int, fmtstr string, v ...interface
 			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf(p_fmt, append(values, v...)...))
 		}
 	}
-	
+
 }
 
 func pDebug(ctx context.Context, depth int, v ...interface{}) {
@@ -328,14 +334,14 @@ func pDebug(ctx context.Context, depth int, v ...interface{}) {
 			trace_id = value
 		}
 	}
-	
+
 	prefix := ""
 	if trace_id != "" {
 		prefix = fmt.Sprintf("trace_id-%s [DEBUG]", trace_id)
 	} else {
 		prefix = fmt.Sprintf("%s", "[DEBUG]")
 	}
-	
+
 	if Gfilelog != nil && Gfilelog.LogObj != nil {
 		Gfilelog.fileCheck()
 		Gfilelog.LogObj.mu.RLock()
@@ -349,12 +355,12 @@ func pDebug(ctx context.Context, depth int, v ...interface{}) {
 			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintln(append([]interface{}{prefix}, v...)...))
 		}
 	}
-	
+
 }
 
 func Debug(ctx context.Context, v ...interface{}) {
 	pDebug(ctx, 3, v...)
-	
+
 }
 
 func Debugf(ctx context.Context, fmtstr string, v ...interface{}) {
@@ -368,7 +374,7 @@ func pInfoWithGid(ctx context.Context, depth int, fmtstr string, v ...interface{
 			trace_id = value
 		}
 	}
-	
+
 	p_fmt := ""
 	values := []interface{}{}
 	if trace_id != "" {
@@ -378,7 +384,7 @@ func pInfoWithGid(ctx context.Context, depth int, fmtstr string, v ...interface{
 	} else {
 		p_fmt = "[INFO] " + fmtstr
 	}
-	
+
 	if Gfilelog.Logconf.Stdout && Gfilelog.Logconf.ColorFull {
 		p_fmt = Green + p_fmt + Reset
 	}
@@ -413,7 +419,7 @@ func pInfo(ctx context.Context, depth int, v ...interface{}) {
 	} else {
 		prefix = fmt.Sprintf("%s", "[INFO]")
 	}
-	
+
 	if Gfilelog != nil && Gfilelog.LogObj != nil {
 		Gfilelog.fileCheck()
 		Gfilelog.LogObj.mu.RLock()
@@ -435,7 +441,7 @@ func Info(ctx context.Context, v ...interface{}) {
 
 func Infof(ctx context.Context, fmtstr string, v ...interface{}) {
 	pInfoWithGid(ctx, 3, fmtstr, v...)
-	
+
 }
 
 func pWarnWithGid(ctx context.Context, depth int, fmtstr string, v ...interface{}) {
@@ -445,7 +451,7 @@ func pWarnWithGid(ctx context.Context, depth int, fmtstr string, v ...interface{
 			trace_id = value
 		}
 	}
-	
+
 	p_fmt := ""
 	values := []interface{}{}
 	if trace_id != "" {
@@ -455,11 +461,11 @@ func pWarnWithGid(ctx context.Context, depth int, fmtstr string, v ...interface{
 	} else {
 		p_fmt = "[WARN] " + fmtstr
 	}
-	
+
 	if Gfilelog.Logconf.Stdout && Gfilelog.Logconf.ColorFull {
 		p_fmt = Yellow + p_fmt + Reset
 	}
-	
+
 	if Gfilelog != nil && Gfilelog.LogObj != nil {
 		Gfilelog.fileCheck()
 		Gfilelog.LogObj.mu.RLock()
@@ -499,7 +505,7 @@ func pWarn(ctx context.Context, depth int, v ...interface{}) {
 	} else {
 		prefix = fmt.Sprintf("%s", "[WARN]")
 	}
-	
+
 	if Gfilelog != nil && Gfilelog.LogObj != nil {
 		Gfilelog.fileCheck()
 		Gfilelog.LogObj.mu.RLock()
@@ -541,11 +547,11 @@ func pErrorWithGid(ctx context.Context, depth int, fmtstr string, v ...interface
 	} else {
 		p_fmt = "[ERROR] " + fmtstr
 	}
-	
+
 	if Gfilelog.Logconf.Stdout && Gfilelog.Logconf.ColorFull {
 		p_fmt = Red + p_fmt + Reset
 	}
-	
+
 	if Gfilelog != nil && Gfilelog.LogObj != nil {
 		Gfilelog.fileCheck()
 		Gfilelog.LogObj.mu.RLock()
@@ -585,7 +591,7 @@ func pError(ctx context.Context, depth int, v ...interface{}) {
 	} else {
 		prefix = fmt.Sprintf("%s", "[ERROR]")
 	}
-	
+
 	if Gfilelog != nil && Gfilelog.LogObj != nil {
 		Gfilelog.fileCheck()
 		Gfilelog.LogObj.mu.RLock()
@@ -635,12 +641,12 @@ func (glog *Glog) rename() {
 	if glog.Logconf.Stdout {
 		return
 	}
-	
+
 	f := glog.LogObj
 	if glog.Logconf.RotateMethod == ROTATE_FILE_DAILY {
 		fn := f.dir + "/" + f.filename + "." + f.Ldate.Format(DATEFORMAT)
 		fn_err := f.dir + "/" + f.filename_err + "." + f.Ldate.Format(DATEFORMAT)
-		
+
 		if !isExist(fn) && !isExist(fn_err) && glog.isMustRename() {
 			if f.logfile != nil && f.logfile_err != nil {
 				f.logfile.Close()
@@ -653,7 +659,7 @@ func (glog *Glog) rename() {
 			err = os.Rename(f.dir+"/"+f.filename_err, fn_err)
 			t, _ := time.Parse(DATEFORMAT, time.Now().Format(DATEFORMAT))
 			f.Ldate = &t
-			
+
 			f.logfile, _ = os.Create(f.dir + "/" + f.filename)
 			f.lg = log.New(glog.LogObj.logfile, "", log.Ldate|log.Lmicroseconds|log.Lshortfile)
 			f.logfile_err, _ = os.Create(f.dir + "/" + f.filename_err)
@@ -706,8 +712,8 @@ func LoggerLevelIndex(key string) (LEVEL, bool) {
 	index["ERROR"] = ERROR
 	index["FATAL"] = FATAL
 	index["OFF"] = OFF
-	
+
 	level, ok := index[key]
-	
+
 	return level, ok
 }
