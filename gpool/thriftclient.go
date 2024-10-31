@@ -47,7 +47,7 @@ func (tc *TConn[T]) Init(addr string, port int, timeout int) error {
 		tc.Tbp = thrift.NewTBinaryProtocolFactoryDefault()
 		addr := fmt.Sprintf("%s:%d", tc.Addr, tc.Port)
 		//transport, _ := thrift.NewTSocketTimeout(addr, time.Duration(tc.TimeOut)*time.Second, time.Duration(tc.TimeOut)*time.Second)
-		transport, _ := thrift.NewTSocketTimeout(addr, time.Duration(tc.TimeOut)*time.Second, time.Duration(tc.TimeOut)*time.Second)
+		transport, _ := thrift.NewTSocketTimeout(addr, time.Duration(tc.TimeOut)*time.Millisecond, time.Duration(tc.TimeOut)*time.Millisecond)
 		tc.Tft, _ = transportFactory.GetTransport(transport)
 	} else if tc.Protocol == TH_PRO_BUFFER {
 		addr := fmt.Sprintf("%s:%d", tc.Addr, tc.Port)
