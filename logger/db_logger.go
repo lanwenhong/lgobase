@@ -115,6 +115,11 @@ func New(glog *Glog, config dlog.Config) dlog.Interface {
 	}
 }
 
+func (l *MyDBlogger) fileCheck() {
+	l.glog.fileCheck()
+	l.Writer = l.glog.LogObj.lg
+}
+
 func (l *MyDBlogger) LogMode(level dlog.LogLevel) dlog.Interface {
 	newlogger := *l
 	newlogger.LogLevel = level
@@ -140,10 +145,10 @@ func (l MyDBlogger) Info(ctx context.Context, msg string, data ...interface{}) {
 	cmd = append(cmd, data...)
 	if l.glog != nil && l.glog.LogObj != nil {
 		l.glog.fileCheck()
-		if l.glog.LogObj != nil {
+		/*if l.glog.LogObj != nil {
 			l.glog.LogObj.mu.RLock()
 			defer l.glog.LogObj.mu.RUnlock()
-		}
+		}*/
 	}
 
 	if l.LogLevel >= dlog.Info {
@@ -180,10 +185,10 @@ func (l MyDBlogger) Warn(ctx context.Context, msg string, data ...interface{}) {
 
 	if l.glog != nil && l.glog.LogObj != nil {
 		l.glog.fileCheck()
-		if l.glog.LogObj != nil {
+		/*if l.glog.LogObj != nil {
 			l.glog.LogObj.mu.RLock()
 			defer l.glog.LogObj.mu.RUnlock()
-		}
+		}*/
 	}
 	if l.LogLevel >= dlog.Warn {
 		if l.Config.Colorful {
@@ -216,10 +221,10 @@ func (l MyDBlogger) Error(ctx context.Context, msg string, data ...interface{}) 
 
 	if l.glog != nil && l.glog.LogObj != nil {
 		l.glog.fileCheck()
-		if l.glog.LogObj != nil {
+		/*if l.glog.LogObj != nil {
 			l.glog.LogObj.mu.RLock()
 			defer l.glog.LogObj.mu.RUnlock()
-		}
+		}*/
 	}
 	if l.LogLevel >= dlog.Error {
 		if l.Config.Colorful {
@@ -251,11 +256,12 @@ func (l MyDBlogger) Trace(ctx context.Context, begin time.Time, fc func() (strin
 	}
 
 	if l.glog != nil && l.glog.LogObj != nil {
-		l.glog.fileCheck()
-		if l.glog.LogObj != nil {
+		l.fileCheck()
+		//l.glog.fileCheck()
+		/*if l.glog.LogObj != nil {
 			l.glog.LogObj.mu.RLock()
 			defer l.glog.LogObj.mu.RUnlock()
-		}
+		}*/
 	}
 	if l.LogLevel <= dlog.Silent {
 		return

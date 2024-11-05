@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lanwenhong/lgobase/dbenc"
+	"github.com/lanwenhong/lgobase/dbpool"
 	"github.com/lanwenhong/lgobase/logger"
 	"gorm.io/gorm"
 	dlog "gorm.io/gorm/logger"
@@ -104,7 +106,7 @@ func TestDbWithfilelog(t *testing.T) {
 	myconf := &logger.Glogconf{
 		RotateMethod: logger.ROTATE_FILE_DAILY,
 		Stdout:       true,
-		ColorFull:    true,
+		Colorful:     true,
 		Loglevel:     logger.DEBUG,
 		//Goid:         true,
 	}
@@ -140,7 +142,7 @@ func TestLogfile(t *testing.T) {
 	myconf := &logger.Glogconf{
 		RotateMethod: logger.ROTATE_FILE_DAILY,
 		Stdout:       false,
-		ColorFull:    true,
+		Colorful:     true,
 		Loglevel:     logger.DEBUG,
 		//Goid:         true,
 	}
@@ -168,12 +170,26 @@ func TestLogfile(t *testing.T) {
 func TestLogRatate(t *testing.T) {
 	myconf := &logger.Glogconf{
 		RotateMethod: logger.ROTATE_FILE_DAILY,
-		Stdout:       true,
+		Stdout:       false,
+		Colorful:     false,
 		Loglevel:     logger.DEBUG,
 	}
 	logger.Newglog("./", "test.log", "test.log.err", myconf)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+
+	db_conf := dbenc.DbConfNew(ctx, "../dbpool/db.ini")
+	dbs := dbpool.DbpoolNew(db_conf)
+	//dbs.SetormLog(ctx, db_conf)
+	tk := "qfconf://usercenter?maxopen=1000&maxidle=30"
+	err := dbs.Add(ctx, "usercenter", tk, dbpool.USE_GORM)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tdb := dbs.OrmPools["usercenter"]
+	var ret []map[string]interface{}
+	tdb.Raw("select id, username, FROM_UNIXTIME(ctime, '%Y-%m-%d %H:%i:%s') as ctime from users where id=?", 1).Scan(&ret)
+	//t.Log(ret)
 
 	logger.Debug(ctx, 11, 12, 13)
 	//logger.Info("test")
@@ -181,11 +197,12 @@ func TestLogRatate(t *testing.T) {
 	//logger.Warn("test")
 
 	time.Sleep(2 * time.Second)
-	stringTime := "2023-08-11 16:40:41"
+	stringTime := "2024-11-04 16:40:41"
 	loc, _ := time.LoadLocation("Local")
 	rotate, _ := time.ParseInLocation("2006-01-02 15:04:05", stringTime, loc)
 	logger.Gfilelog.LogObj.Ldate = &rotate
 
+	tdb.Raw("select id, username, FROM_UNIXTIME(ctime, '%Y-%m-%d %H:%i:%s') as ctime from users where id=?", 1).Scan(&ret)
 	logger.Debug(ctx, 33, 44, "jjy")
 	//logger.Warn(ctx, "rotate")
 }
