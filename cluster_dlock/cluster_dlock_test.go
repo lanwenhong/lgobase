@@ -16,7 +16,7 @@ func TestDlock(t *testing.T) {
 	myconf := &logger.Glogconf{
 		RotateMethod: logger.ROTATE_FILE_DAILY,
 		Stdout:       true,
-		ColorFull:    true,
+		Colorful:     true,
 		Loglevel:     logger.DEBUG,
 	}
 	logger.Newglog("./", "test.log", "test.log.err", myconf)
@@ -53,7 +53,7 @@ func TestNDlock(t *testing.T) {
 	myconf := &logger.Glogconf{
 		RotateMethod: logger.ROTATE_FILE_DAILY,
 		Stdout:       true,
-		ColorFull:    true,
+		Colorful:     true,
 		Loglevel:     logger.DEBUG,
 	}
 	logger.Newglog("./", "test.log", "test.log.err", myconf)

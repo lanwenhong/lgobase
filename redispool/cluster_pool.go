@@ -10,6 +10,7 @@ import (
 type RedisMethod interface {
 	*redis.ClusterClient | *redis.Client
 	redis.Cmdable
+	//redis.SortedSetCmdable
 }
 
 type RedisOP[T RedisMethod] struct {

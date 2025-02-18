@@ -3,13 +3,10 @@ package util
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/lanwenhong/lgobase/dbenc"
 	"github.com/lanwenhong/lgobase/dbpool"
-	"github.com/lanwenhong/lgobase/logger"
 	"github.com/lanwenhong/lgobase/util"
-	dlog "gorm.io/gorm/logger"
 )
 
 func TestGenid(t *testing.T) {
@@ -36,10 +33,10 @@ func TestGenid(t *testing.T) {
 func TestGenidFromDB(t *testing.T) {
 	ctx := context.WithValue(context.Background(), "trace_id", "1111")
 
-	myconf := &logger.Glogconf{
+	/*myconf := &logger.Glogconf{
 		RotateMethod: logger.ROTATE_FILE_DAILY,
 		Stdout:       true,
-		ColorFull:    true,
+		Colorful:     true,
 		Loglevel:     logger.DEBUG,
 		//Goid:         true,
 	}
@@ -50,11 +47,11 @@ func TestGenidFromDB(t *testing.T) {
 		LogLevel:                  dlog.Info,   // 日志级别
 		IgnoreRecordNotFoundError: true,        // 忽略ErrRecordNotFound（记录未找到）错误
 		Colorful:                  true,        // 禁用彩色打印
-	}
+	}*/
 
 	db_conf := dbenc.DbConfNew(ctx, "/home/lanwenhong/dev/go/lgobase/dbpool/db.ini")
 	dbs := dbpool.DbpoolNew(db_conf)
-	dbs.SetormLog(ctx, dconfig)
+	//dbs.SetormLog(ctx, dconfig)
 	tk := "qfconf://test1?maxopen=1000&maxidle=30"
 	err := dbs.Add(ctx, "test1", tk, dbpool.USE_GORM)
 	if err != nil {
