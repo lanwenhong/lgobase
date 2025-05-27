@@ -13,6 +13,7 @@ import (
 	"github.com/lanwenhong/lgobase/gpool/gen-go/echo"
 	"github.com/lanwenhong/lgobase/gpool/gen-go/example"
 	"github.com/lanwenhong/lgobase/logger"
+	"github.com/lanwenhong/lgobase/util"
 )
 
 func NewRequestID() string {
@@ -52,7 +53,7 @@ func TestBufferClient(t *testing.T) {
 	myconf := &logger.Glogconf{
 		RotateMethod: logger.ROTATE_FILE_DAILY,
 		Stdout:       true,
-		ColorFull:    true,
+		Colorful:     true,
 		Loglevel:     logger.DEBUG,
 	}
 	logger.Newglog("./", "test.log", "test.log.err", myconf)
@@ -78,7 +79,7 @@ func Test1BufferClient(t *testing.T) {
 	myconf := &logger.Glogconf{
 		RotateMethod: logger.ROTATE_FILE_DAILY,
 		Stdout:       true,
-		ColorFull:    true,
+		Colorful:     true,
 		Loglevel:     logger.DEBUG,
 	}
 	logger.Newglog("./", "test.log", "test.log.err", myconf)
@@ -118,7 +119,7 @@ func Test2BufferClient(t *testing.T) {
 	myconf := &logger.Glogconf{
 		RotateMethod: logger.ROTATE_FILE_DAILY,
 		Stdout:       true,
-		ColorFull:    true,
+		Colorful:     true,
 		Loglevel:     logger.DEBUG,
 	}
 	logger.Newglog("./", "test.log", "test.log.err", myconf)
@@ -269,7 +270,7 @@ func TestSelectPool(t *testing.T) {
 	myconf := &logger.Glogconf{
 		RotateMethod: logger.ROTATE_FILE_DAILY,
 		Stdout:       true,
-		ColorFull:    true,
+		Colorful:     true,
 		Loglevel:     logger.DEBUG,
 	}
 	logger.Newglog("./", "test.log", "test.log.err", myconf)
@@ -310,7 +311,7 @@ func TestPing(t *testing.T) {
 	myconf := &logger.Glogconf{
 		RotateMethod: logger.ROTATE_FILE_DAILY,
 		Stdout:       true,
-		ColorFull:    true,
+		Colorful:     true,
 		Loglevel:     logger.DEBUG,
 	}
 	logger.Newglog("./", "test.log", "test.log.err", myconf)
@@ -354,6 +355,64 @@ func TestPing(t *testing.T) {
 					t.Log("rpc get: ", r.Msg)
 				}
 				time.Sleep(2 * time.Second)
+			}
+		}()
+	}
+	time.Sleep(10000000 * time.Second)
+}
+
+func TestPingWait(t *testing.T) {
+	myconf := &logger.Glogconf{
+		RotateMethod: logger.ROTATE_FILE_DAILY,
+		Stdout:       false,
+		Colorful:     true,
+		Loglevel:     logger.DEBUG,
+	}
+	logger.Newglog("./", "test.log", "test.log.err", myconf)
+	ctx := context.WithValue(context.Background(), "trace_id", NewRequestID())
+
+	ping := func(client interface{}) (string, error) {
+		var err error = nil
+		c := client.(*echo.EchoClient)
+		_, err = c.Ping(ctx)
+		return "ping", err
+	}
+
+	g_conf := &gpool.GPoolConfig[echo.EchoClient]{
+		//Addrs:        "127.0.0.1:9898/3000,127.0.0.1:9898/3000",
+		Addrs:        "127.0.0.1:9898/3000",
+		MaxConns:     40,
+		MaxIdleConns: 40,
+		Cfunc:        gpool.CreateThriftBufferConn[echo.EchoClient],
+		Nc:           echo.NewEchoClientFactory,
+		Ping:         ping,
+		PingTicker:   1,
+	}
+	rps := gpool.RpcPoolSelector[echo.EchoClient]{}
+	rps.RpcPoolInit(ctx, g_conf)
+
+	for i := 0; i < 50; i++ {
+		go func() {
+			ctx := context.WithValue(ctx, "trace_id", util.GenXid())
+			for i := 0; i < 400; i++ {
+				var r *echo.EchoRes = nil
+				process := func(client interface{}) (string, error) {
+					var err error = nil
+					c := client.(*echo.EchoClient)
+					req := &echo.EchoReq{Msg: "You are welcome."}
+					r, err = c.Echo(ctx, req)
+					return "echo", err
+				}
+				err := rps.ThriftCall(ctx, process)
+
+				if err != nil {
+					//t.Log(err)
+					logger.Warnf(ctx, "rps.ThriftCall err: %v", err)
+				}
+				if r != nil {
+					t.Log("rpc get: ", r.Msg)
+				}
+				//time.Sleep(2 * time.Second)
 			}
 		}()
 	}

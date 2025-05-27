@@ -32,22 +32,26 @@ type PoolConn[T any] struct {
 type Gpool[T any] struct {
 	FreeList     *list.List
 	UseList      *list.List
+	PurgeList    *list.List
 	MaxConns     int
 	MaxIdleConns int
 	hold         int
 	mutex        sync.Mutex
 	Cfunc        CreateConn[T]
-	//for thrift
-	Nc      NewThriftClient[T]
-	Addr    string
-	Port    int
-	TimeOut int
+	Nc           NewThriftClient[T]
+	Addr         string
+	Port         int
+	TimeOut      int
+	Waits        uint
+	WaitNotify   chan struct{}
+	PurgeNotify  chan struct{}
 }
 
 func (gp *Gpool[T]) GpoolInit(addr string, port int, timeout int, maxconns int, maxidleconns int,
 	cfunc CreateConn[T], clfunc NewThriftClient[T]) {
 	gp.FreeList = list.New()
 	gp.UseList = list.New()
+	gp.PurgeList = list.New()
 	gp.MaxConns = maxconns
 	gp.MaxIdleConns = maxidleconns
 	gp.Addr = addr
@@ -55,11 +59,12 @@ func (gp *Gpool[T]) GpoolInit(addr string, port int, timeout int, maxconns int, 
 	gp.TimeOut = timeout
 	gp.Cfunc = cfunc
 	gp.Nc = clfunc
+	gp.WaitNotify = make(chan struct{})
+	gp.PurgeNotify = make(chan struct{})
 }
 
 func (gp *Gpool[T]) getConnFromFreeList(ctx context.Context) (*PoolConn[T], error) {
 	e := gp.FreeList.Front()
-	logger.Debugf(ctx, "after get flist len %d ulist len %d", gp.FreeList.Len(), gp.UseList.Len())
 	var reterr error
 	pc := e.Value.(*PoolConn[T])
 	if !pc.Gc.IsOpen() {
@@ -71,6 +76,7 @@ func (gp *Gpool[T]) getConnFromFreeList(ctx context.Context) (*PoolConn[T], erro
 	}
 	gp.FreeList.Remove(e)
 	e.Value.(*PoolConn[T]).e = gp.UseList.PushBack(e.Value)
+	logger.Debugf(ctx, "after get flist len %d ulist len %d", gp.FreeList.Len(), gp.UseList.Len())
 	return e.Value.(*PoolConn[T]), reterr
 }
 
@@ -96,8 +102,41 @@ func (gp *Gpool[T]) getConnFromNew(ctx context.Context) (*PoolConn[T], error) {
 	return pc, err
 }
 
+func (gp *Gpool[T]) getConnFromWait(ctx context.Context) (*PoolConn[T], error) {
+	gp.Waits += 1
+	for {
+		gp.mutex.Unlock()
+		logger.Debugf(ctx, "--------------------wait")
+		<-gp.WaitNotify
+		logger.Debugf(ctx, "--------------------try lock")
+		gp.mutex.Lock()
+		logger.Debugf(ctx, "--------------------locked")
+		//gp.Waits -= 1
+		logger.Debugf(ctx, "pool full flist %d ulist %d", gp.FreeList.Len(), gp.UseList.Len())
+		flen := gp.FreeList.Len()
+		if gp.FreeList.Len()+gp.UseList.Len() >= gp.MaxConns && flen <= 0 {
+			logger.Debugf(ctx, "wait again")
+			gp.Waits += 1
+			continue
+		}
+		if gp.FreeList.Len()+gp.UseList.Len() < gp.MaxConns {
+			if gp.FreeList.Len() > 0 {
+				return gp.getConnFromFreeList(ctx)
+			} else {
+				return gp.getConnFromNew(ctx)
+			}
+		} else {
+			if gp.FreeList.Len() > 0 {
+				return gp.getConnFromFreeList(ctx)
+			}
+		}
+	}
+}
+
 func (gp *Gpool[T]) Get(ctx context.Context) (*PoolConn[T], error) {
+	logger.Debugf(ctx, "pool full flist %d ulist %d", gp.FreeList.Len(), gp.UseList.Len())
 	gp.mutex.Lock()
+	logger.Debugf(ctx, "pool full flist %d ulist %d", gp.FreeList.Len(), gp.UseList.Len())
 	defer gp.mutex.Unlock()
 	if gp.FreeList.Len()+gp.UseList.Len() < gp.MaxConns {
 		if gp.FreeList.Len() > 0 {
@@ -110,14 +149,11 @@ func (gp *Gpool[T]) Get(ctx context.Context) (*PoolConn[T], error) {
 	} else {
 		logger.Debugf(ctx, "pool full flist %d ulist %d", gp.FreeList.Len(), gp.UseList.Len())
 		flen := gp.FreeList.Len()
-		/*for i := 0; i < flen-1; i++ {
-			e := gp.FreeList.Front()
-			pc := e.Value.(*PoolConn[T])
-			pc.Gc.Close()
-			gp.FreeList.Remove(e)
-		}*/
 		if flen > 0 {
 			return gp.getConnFromFreeList(ctx)
+		} else {
+			logger.Debugf(ctx, "wait conn")
+			return gp.getConnFromWait(ctx)
 		}
 	}
 	return nil, fmt.Errorf("pool is full flist len %d ulist len %d", gp.FreeList.Len(), gp.UseList.Len())
@@ -125,7 +161,7 @@ func (gp *Gpool[T]) Get(ctx context.Context) (*PoolConn[T], error) {
 
 func (pc *PoolConn[T]) put(ctx context.Context) error {
 	pc.gp.mutex.Lock()
-	defer pc.gp.mutex.Unlock()
+	//defer pc.gp.mutex.Unlock()
 	pc.gp.UseList.Remove(pc.e)
 	pc.gp.FreeList.PushBack(pc)
 	if pc.gp.FreeList.Len() > pc.gp.MaxIdleConns {
@@ -138,6 +174,15 @@ func (pc *PoolConn[T]) put(ctx context.Context) error {
 		}
 	}
 	logger.Debugf(ctx, "after put flist len %d ulist len %d", pc.gp.FreeList.Len(), pc.gp.UseList.Len())
+	if pc.gp.Waits > 0 {
+		logger.Debugf(ctx, "notify waits: %d", pc.gp.Waits)
+		pc.gp.Waits -= 1
+		logger.Debugf(ctx, "notified waits: %d", pc.gp.Waits)
+		pc.gp.mutex.Unlock()
+		pc.gp.WaitNotify <- struct{}{}
+	} else {
+		pc.gp.mutex.Unlock()
+	}
 	return nil
 }
 
@@ -247,22 +292,24 @@ func (gp *Gpool[T]) ThriftCall2(ctx context.Context, process func(client interfa
 	}
 	tconn := pc.Gc.(*TConn[T])
 
-	starttime := time.Now().UnixNano()
+	//starttime := time.Now().UnixNano()
+	starttime := time.Now()
 	defer func() {
-		endTime := time.Now().UnixNano()
+		//endTime := time.Now().UnixNano()
+		//endTime := time.Now()
 		errStr := ""
 		if rpc_err != nil {
 			errStr = rpc_err.Error()
 		}
 		address := fmt.Sprintf("%s:%d", tconn.Addr, tconn.Port)
-		logger.Infof(ctx, "func=ThriftCall2|method=%v|addr=%s:%d|time=%d|err=%s",
-			rpc_name, address, time.Duration(tconn.TimeOut), (endTime-starttime)/1000, errStr)
+		logger.Infof(ctx, "func=ThriftCall2|method=%v|addr=%s:%d|time=%v|err=%s",
+			rpc_name, address, time.Duration(tconn.TimeOut), time.Since(starttime), errStr)
 	}()
 
-	if err != nil {
+	/*if err != nil {
 		logger.Warnf(ctx, "pool get conn err: %s", err.Error())
 		return err
-	}
+	}*/
 	client := pc.Gc.GetThrfitClient()
 	rpc_name, err = process(client)
 	if err != nil {

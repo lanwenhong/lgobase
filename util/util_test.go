@@ -2,6 +2,7 @@ package util
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/binary"
 	"fmt"
 	"testing"
@@ -128,38 +129,36 @@ func TestTokenDec(t *testing.T) {
 }
 
 func TestPackToken(t *testing.T) {
+	ctx := context.Background()
+	randStr := "dx"
 	tkSrc := []byte{}
-	//tkEnc := []byte{}
+	tkEnc := []byte{}
 	randKey := []byte("IypMcRkPXkbeNDRl6Km43boHr98udp7o")
 	iv := []byte("'qfpay-----token")
 
-	var plen uint8 = 100
-	b_plen := []byte{plen}
-	tkSrc = append(tkSrc, b_plen...)
-
-	randStr := "ba"
-	tkSrc = append(tkSrc, randStr...)
-
-	ctx := context.Background()
-	var ver uint8 = 2
-	//b_ver := make([]byte, 1)
-	//binary.LittleEndian.PutUint8(b_ver, ver)
-	b_ver := []byte{ver}
-	tkSrc = append(tkSrc, b_ver...)
+	//uid_flag64 := 0x80000000
 
 	var idc uint8 = 22
-	//b_idc := make([]byte, 1)
-	//binary.LittleEndian.PutUint8(b_idc, idc)
 	b_idc := []byte{idc}
 	tkSrc = append(tkSrc, b_idc...)
 
 	flag := "u"
 	tkSrc = append(tkSrc, flag...)
 
-	var uid uint64 = 66666666666
-	b_uid := make([]byte, 8)
-	binary.LittleEndian.PutUint64(b_uid, uid)
-	tkSrc = append(tkSrc, b_uid...)
+	//var uid uint64 = 66666666666
+	var uid uint64 = 66666666
+	if uid > 0xFFFFFFFF {
+		logger.Debugf(ctx, "use uint64 pack")
+		b_uid := make([]byte, 8)
+		binary.LittleEndian.PutUint64(b_uid, uid)
+		tkSrc = append(tkSrc, b_uid...)
+	} else {
+		logger.Debugf(ctx, "use uint32 pack")
+		new_uid := uint32(uid)
+		b_uid := make([]byte, 4)
+		binary.LittleEndian.PutUint32(b_uid, new_uid)
+		tkSrc = append(tkSrc, b_uid...)
+	}
 
 	var expire uint32 = 2222
 	b_expire := make([]byte, 4)
@@ -167,9 +166,17 @@ func TestPackToken(t *testing.T) {
 	tkSrc = append(tkSrc, b_expire...)
 
 	var deadline uint64 = 444444444
-	b_deadline := make([]byte, 8)
-	binary.LittleEndian.PutUint64(b_deadline, deadline)
-	tkSrc = append(tkSrc, b_deadline...)
+	//var deadline uint64 = 44444444444
+	if deadline > 0xFFFFFFFF {
+		b_deadline := make([]byte, 8)
+		binary.LittleEndian.PutUint64(b_deadline, deadline)
+		tkSrc = append(tkSrc, b_deadline...)
+	} else {
+		new_deadline := uint32(deadline)
+		b_deadline := make([]byte, 4)
+		binary.LittleEndian.PutUint32(b_deadline, new_deadline)
+		tkSrc = append(tkSrc, b_deadline...)
+	}
 
 	var udid_len uint8 = 14
 	//b_udid_len := make([]byte, 1)
@@ -177,14 +184,14 @@ func TestPackToken(t *testing.T) {
 	b_udid_len := []byte{udid_len}
 	tkSrc = append(tkSrc, b_udid_len...)
 
-	udid := "33333333333333"
+	udid := "0"
 	tkSrc = append(tkSrc, udid...)
 
-	var mac uint32 = 33333
+	/*var mac uint32 = 33333
 	b_mac := make([]byte, 4)
 	binary.LittleEndian.PutUint32(b_mac, mac)
 	tkSrc = append(tkSrc, b_mac...)
-	logger.Debugf(ctx, "tkSrc len: %d", len(tkSrc))
+	logger.Debugf(ctx, "tkSrc len: %d", len(tkSrc))*/
 
 	aescbc := util.AesCbc{}
 	//rand key
@@ -202,11 +209,59 @@ func TestPackToken(t *testing.T) {
 	k = append(k, k2...)
 
 	logger.Debugf(ctx, "k len: %d", len(k))
-	ciphertextBase64, err := aescbc.AESEncryptCBC(ctx, tkSrc, k, iv)
+	//ciphertextBase64, err := aescbc.AESEncryptCBC(ctx, tkSrc, k, iv)
 	//ciphertextBase64, err := aescbc.AESEncryptCBC(ctx, k, randKey, iv)
+
+	logger.Debugf(ctx, "tkSrc len: %d", len(tkSrc))
+	tkBody, err := aescbc.AESEncryptCBCWithNoBase64(ctx, tkSrc, k, iv)
 	if err != nil {
 		logger.Warnf(ctx, "err: %v", err)
 		return
 	}
+
+	logger.Debugf(ctx, "body len: %d", len(tkBody))
+	//header
+	var ver uint32 = 1
+	if uid > 0xFFFFFFFF {
+		flag := uint32(0x01)
+		flag = flag << 31
+		logger.Debugf(ctx, "flag: %x", flag)
+		ver = ver | flag
+	}
+	if deadline > 0xFFFFFFFF {
+		flag := uint32(0x01)
+		flag = flag << 30
+		logger.Debugf(ctx, "flag: %x", flag)
+		ver = ver | flag
+	}
+	logger.Debugf(ctx, "ver: %x", ver)
+
+	b_ver := make([]byte, 4)
+	binary.LittleEndian.PutUint32(b_ver, ver)
+	tkEnc = append(tkEnc, b_ver...)
+
+	var mac uint64 = 100
+	b_mac := make([]byte, 8)
+	binary.LittleEndian.PutUint64(b_mac, mac)
+	tkEnc = append(tkEnc, b_mac...)
+
+	randInt := binary.LittleEndian.Uint16([]byte(randStr))
+	logger.Debugf(ctx, "randInt: %x", randInt)
+	ver = ver | (uint32(randInt) << 8)
+	logger.Debugf(ctx, "ver: %x", ver)
+
+	if 1 == 1 {
+		rt := (ver & uint32(0x00FFFF00)) >> 8
+		rt16 := uint16(rt)
+		brt := make([]byte, 2)
+		binary.LittleEndian.PutUint16(brt, rt16)
+		srt := string(brt)
+		logger.Debugf(ctx, "srt: %s", srt)
+	}
+
+	tkEnc = append(tkEnc, tkBody...)
+	logger.Debugf(ctx, "tkEnc len: %d", len(tkEnc))
+
+	ciphertextBase64 := base64.StdEncoding.EncodeToString(tkEnc)
 	logger.Debugf(ctx, "ciphertextBase64: %s", ciphertextBase64)
 }
