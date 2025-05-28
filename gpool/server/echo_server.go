@@ -37,7 +37,7 @@ func main() {
 	myconf := &logger.Glogconf{
 		RotateMethod: logger.ROTATE_FILE_DAILY,
 		Stdout:       true,
-		ColorFull:    true,
+		Colorful:     true,
 		Loglevel:     logger.DEBUG,
 		Goid:         true,
 	}
@@ -49,7 +49,7 @@ func main() {
 		return
 	}*/
 
-	transport, err := thrift.NewTServerSocketTimeout(":9898", time.Duration(5000*time.Millisecond))
+	transport, err := thrift.NewTServerSocketTimeout(":9897", time.Duration(5000*time.Millisecond))
 	if err != nil {
 		fmt.Println(err.Error())
 		return

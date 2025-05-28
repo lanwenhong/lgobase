@@ -11,7 +11,7 @@ require (
 	github.com/jmoiron/sqlx v1.3.4
 	github.com/kjk/betterguid v0.0.0-20170621091430-c442874ba63a
 	github.com/oklog/ulid v1.3.1
-	github.com/redis/go-redis/v9 v9.1.0
+	github.com/redis/go-redis/v9 v9.7.0
 	github.com/rs/xid v1.5.0
 	github.com/satori/go.uuid v1.2.0
 	github.com/segmentio/ksuid v1.0.4

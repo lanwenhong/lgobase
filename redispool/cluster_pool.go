@@ -2,23 +2,97 @@ package redispool
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/redis/go-redis/v9"
 )
 
+const (
+	CLUSTER_TYPE = "CLUSTER"
+	MASTER_SLAVE = "MASTER_SLAVE"
+)
+
 type RedisMethod interface {
 	*redis.ClusterClient | *redis.Client
 	redis.Cmdable
+	//redis.SortedSetCmdable
 }
 
 type RedisOP[T RedisMethod] struct {
 	Rdb T
 }
 
+type RedisNode interface {
+	red.Cmdable
+	red.BitMapCmdable
+}
+
+type GredisConf struct {
+	Username     string
+	Passwd       string
+	Addrs        []string
+	PoolSize     int
+	MinIdleConns int
+	Db           int
+	DialTimeout  time.Duration
+	ReadTimeout  time.Duration
+	WriteTimeout time.Duration
+}
+
+type GredisClient struct {
+	int           useType
+	ClusterClient *redis.ClusterClient
+	Client        *redis.Client
+}
+
 func NewRedisOP[T RedisMethod](client T) *RedisOP[T] {
 	return &RedisOP[T]{
 		Rdb: client,
+	}
+}
+
+func NewGredis(conf *GredisConf, use_type int) *GredisClient {
+	grc := &GredisClient{
+		useType: use_type,
+	}
+	if grc.useType == CLUSTER_TYPE {
+		grpc.ClusterClient = redis.NewClusterClient(&redis.ClusterOptions{
+			Addrs:        conf.Addrs,
+			PoolSize:     conf.PoolSize,
+			DialTimeout:  conf.DialTimeout,
+			ReadTimeout:  conf.ReadTimeout,
+			WriteTimeout: conf.WriteTimeout,
+			Username:     conf.Username,
+			Password:     conf.Passwd,
+			MinIdleConns: conf.MinIdleConns,
+			PoolSize:     conf.PoolSize,
+		})
+	} else if grc.useType == MASTER_SLAVE {
+		grpc.Client = redis.NewClient(&redis.ClusterOptions{
+			Addrs:        conf.Addrs,
+			PoolSize:     conf.PoolSize,
+			DialTimeout:  conf.DialTimeout,
+			ReadTimeout:  conf.ReadTimeout,
+			WriteTimeout: conf.WriteTimeout,
+			Username:     conf.Username,
+			Password:     conf.Passwd,
+			MinIdleConns: conf.MinIdleConns,
+			PoolSize:     conf.PoolSize,
+			DB:           conf.Db,
+		})
+	}
+	return grc
+}
+
+func (grc *GredisClient) GetRedisClient() (RedisNode, err) {
+	switch grc.useType {
+	case CLUSTER_TYPE:
+		return grc.ClusterClient, nil
+	case MASTER_SLAVE:
+		return grc.Client, nil
+	default:
+		return nil, fmt.Errorf("redis type '%s' is not supported", grc.useType)
 	}
 }
 

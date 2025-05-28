@@ -6,6 +6,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/md5"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -194,4 +195,212 @@ func Mapget(m map[string]interface{}, key string, defv interface{}) interface{} 
 		return val
 	}
 	return defv
+}
+
+type AesCbc struct {
+}
+
+func (aescbc *AesCbc) PKCS7Padding(ctx context.Context, data []byte, blockSize int) []byte {
+	padding := blockSize - len(data)%blockSize
+	padtext := bytes.Repeat([]byte{byte(padding)}, padding)
+	return append(data, padtext...)
+}
+
+func (aescbc *AesCbc) PKCS7UnPadding(ctx context.Context, data []byte) []byte {
+	length := len(data)
+	if length == 0 {
+		return nil
+	}
+	unpadding := int(data[length-1])
+	if unpadding > length || unpadding == 0 {
+		return nil
+	}
+	for i := length - unpadding; i < length; i++ {
+		if data[i] != byte(unpadding) {
+			return nil
+		}
+	}
+	return data[:(length - unpadding)]
+}
+
+// func (aescbc *AesCbc) AESEncryptCBC(ctx context.Context, plaintext []byte, key []byte) (string, error) {
+func (aescbc *AesCbc) AESEncryptCBC(ctx context.Context, plaintext []byte, key []byte, iv []byte) (string, error) {
+	// 检查密钥长度（必须为32字节，即256位）
+	if len(key) != 32 {
+		return "", fmt.Errorf("AES-256密钥长度必须为32字节，当前长度：%d", len(key))
+	}
+
+	if len(iv) != aes.BlockSize {
+		return "", fmt.Errorf("iv必须16字节，当前长度: %d", len(iv))
+	}
+
+	// 创建加密块
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return "", err
+	}
+
+	// 填充明文
+	plaintext = aescbc.PKCS7Padding(ctx, plaintext, block.BlockSize())
+
+	// 生成随机IV
+	/*ciphertext := make([]byte, aes.BlockSize+len(plaintext))
+	iv := ciphertext[:aes.BlockSize]
+	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
+		return "", err
+	}*/
+	ciphertext := make([]byte, len(plaintext))
+
+	// 创建CBC模式
+	mode := cipher.NewCBCEncrypter(block, iv)
+
+	// 加密数据
+	//mode.CryptBlocks(ciphertext[aes.BlockSize:], plaintext)
+	mode.CryptBlocks(ciphertext, plaintext)
+
+	// 返回Base64编码的结果（IV+密文）
+	return base64.StdEncoding.EncodeToString(ciphertext), nil
+}
+
+func (aescbc *AesCbc) AESEncryptCBCWithNoBase64(ctx context.Context, plaintext []byte, key []byte, iv []byte) ([]byte, error) {
+	// 检查密钥长度（必须为32字节，即256位）
+	if len(key) != 32 {
+		return []byte{}, fmt.Errorf("AES-256密钥长度必须为32字节，当前长度：%d", len(key))
+	}
+
+	if len(iv) != aes.BlockSize {
+		return []byte{}, fmt.Errorf("iv必须16字节，当前长度: %d", len(iv))
+	}
+
+	// 创建加密块
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return []byte{}, err
+	}
+
+	// 填充明文
+	plaintext = aescbc.PKCS7Padding(ctx, plaintext, block.BlockSize())
+
+	// 生成随机IV
+	/*ciphertext := make([]byte, aes.BlockSize+len(plaintext))
+	iv := ciphertext[:aes.BlockSize]
+	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
+		return "", err
+	}*/
+	ciphertext := make([]byte, len(plaintext))
+
+	// 创建CBC模式
+	mode := cipher.NewCBCEncrypter(block, iv)
+
+	// 加密数据
+	//mode.CryptBlocks(ciphertext[aes.BlockSize:], plaintext)
+	mode.CryptBlocks(ciphertext, plaintext)
+
+	//return base64.StdEncoding.EncodeToString(ciphertext), nil
+	return ciphertext, nil
+}
+
+func (aescbc *AesCbc) AESDecryptCBCSb(ctx context.Context, ciphertextBase64 string, key []byte) ([]byte, error) {
+	// 检查密钥长度
+	if len(key) != 32 {
+		return nil, fmt.Errorf("AES-256密钥长度必须为32字节，当前长度：%d", len(key))
+	}
+
+	// 解码Base64
+	ciphertext, err := base64.StdEncoding.DecodeString(ciphertextBase64)
+	if err != nil {
+		return nil, err
+	}
+
+	logger.Debugf(ctx, "ciphertext len: %d", len(ciphertext))
+	// 检查数据长度
+	if len(ciphertext) < aes.BlockSize {
+		return nil, fmt.Errorf("密文长度过短，至少需要 %d 字节", aes.BlockSize)
+	}
+
+	// 提取IV和密文
+	//iv := ciphertext[:aes.BlockSize]
+	//iv := [aes.BlockSize]byte{}
+	iv := make([]byte, aes.BlockSize)
+	//ciphertext = ciphertext[aes.BlockSize:]
+	ciphertext = ciphertext[4:]
+
+	// 创建解密块
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+
+	// 检查密文长度是否为块大小的整数倍
+	if len(ciphertext)%aes.BlockSize != 0 {
+		return nil, fmt.Errorf("密文长度不是块大小(%d字节)的整数倍", aes.BlockSize)
+	}
+
+	// 创建CBC模式
+	mode := cipher.NewCBCDecrypter(block, iv)
+
+	// 解密数据
+	plaintext := make([]byte, len(ciphertext))
+	mode.CryptBlocks(plaintext, ciphertext)
+
+	// 去除填充
+	/*plaintext = aescbc.PKCS7UnPadding(ctx, plaintext)
+	if plaintext == nil {
+		return nil, fmt.Errorf("无效的填充数据")
+	}*/
+
+	return plaintext, nil
+}
+
+// func (aescbc *AesCbc) AESDecryptCBC(ctx context.Context, ciphertextBase64 string, key []byte) ([]byte, error) {
+func (aescbc *AesCbc) AESDecryptCBC(ctx context.Context, ciphertextBase64 string, key []byte, iv []byte) ([]byte, error) {
+	// 检查密钥长度
+	if len(key) != 32 {
+		return nil, fmt.Errorf("AES-256密钥长度必须为32字节，当前长度：%d", len(key))
+	}
+
+	if len(iv) != aes.BlockSize {
+		return nil, fmt.Errorf("iv必须16字节，当前长度：%d", len(iv))
+	}
+
+	// 解码Base64
+	ciphertext, err := base64.StdEncoding.DecodeString(ciphertextBase64)
+	if err != nil {
+		return nil, err
+	}
+
+	logger.Debugf(ctx, "ciphertext len: %d", len(ciphertext))
+	// 检查数据长度
+	if len(ciphertext) < aes.BlockSize {
+		return nil, fmt.Errorf("密文长度过短，至少需要 %d 字节", aes.BlockSize)
+	}
+
+	// 提取IV和密文
+	//iv := ciphertext[:aes.BlockSize]
+	//iv := make([]byte, aes.BlockSize)
+
+	// 创建解密块
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+
+	// 检查密文长度是否为块大小的整数倍
+	if len(ciphertext)%aes.BlockSize != 0 {
+		return nil, fmt.Errorf("密文长度不是块大小(%d字节)的整数倍", aes.BlockSize)
+	}
+
+	// 创建CBC模式
+	mode := cipher.NewCBCDecrypter(block, iv)
+
+	// 解密数据
+	plaintext := make([]byte, len(ciphertext))
+	mode.CryptBlocks(plaintext, ciphertext)
+
+	// 去除填充
+	plaintext = aescbc.PKCS7UnPadding(ctx, plaintext)
+	if plaintext == nil {
+		return nil, fmt.Errorf("无效的填充数据")
+	}
+	return plaintext, nil
 }
