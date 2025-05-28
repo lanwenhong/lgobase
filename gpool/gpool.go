@@ -10,7 +10,9 @@ import (
 	"time"
 
 	"github.com/apache/thrift/lib/go/thrift"
+	"github.com/lanwenhong/lgobase/cas"
 	"github.com/lanwenhong/lgobase/logger"
+	"github.com/lanwenhong/lgobase/util"
 )
 
 type Conn[T any] interface {
@@ -32,7 +34,7 @@ type PoolConn[T any] struct {
 type Gpool[T any] struct {
 	FreeList     *list.List
 	UseList      *list.List
-	PurgeList    *list.List
+	PurgeQueue   cas.Queue
 	MaxConns     int
 	MaxIdleConns int
 	hold         int
@@ -51,7 +53,7 @@ func (gp *Gpool[T]) GpoolInit(addr string, port int, timeout int, maxconns int, 
 	cfunc CreateConn[T], clfunc NewThriftClient[T]) {
 	gp.FreeList = list.New()
 	gp.UseList = list.New()
-	gp.PurgeList = list.New()
+	gp.PurgeQueue = cas.CreateCasQueue()
 	gp.MaxConns = maxconns
 	gp.MaxIdleConns = maxidleconns
 	gp.Addr = addr
@@ -60,7 +62,26 @@ func (gp *Gpool[T]) GpoolInit(addr string, port int, timeout int, maxconns int, 
 	gp.Cfunc = cfunc
 	gp.Nc = clfunc
 	gp.WaitNotify = make(chan struct{})
-	gp.PurgeNotify = make(chan struct{})
+	gp.PurgeNotify = make(chan struct{}, 1)
+
+	go func() {
+		ctx := context.WithValue(context.Background(), "trace_id", util.GenXid())
+		for {
+			select {
+			case <-gp.PurgeNotify:
+				for {
+					e, _ := gp.PurgeQueue.PopFront(ctx)
+					if e != nil {
+						logger.Debugf(ctx, "host %s:%d purge conn: %v", addr, port, e)
+						pc := e.(*PoolConn[T])
+						pc.Gc.Close()
+					} else {
+						break
+					}
+				}
+			}
+		}
+	}()
 }
 
 func (gp *Gpool[T]) getConnFromFreeList(ctx context.Context) (*PoolConn[T], error) {
@@ -166,11 +187,19 @@ func (pc *PoolConn[T]) put(ctx context.Context) error {
 	pc.gp.FreeList.PushBack(pc)
 	if pc.gp.FreeList.Len() > pc.gp.MaxIdleConns {
 		flen := pc.gp.FreeList.Len() - pc.gp.MaxIdleConns
+		logger.Debugf(ctx, "purge len: %d", flen)
 		for i := 0; i < flen; i++ {
 			e := pc.gp.FreeList.Front()
 			pc := e.Value.(*PoolConn[T])
 			pc.Gc.Close()
 			pc.gp.FreeList.Remove(e)
+			pc.gp.PurgeQueue.PushBack(ctx, pc)
+			//notify
+			select {
+			case pc.gp.PurgeNotify <- struct{}{}:
+			default:
+				continue
+			}
 		}
 	}
 	logger.Debugf(ctx, "after put flist len %d ulist len %d", pc.gp.FreeList.Len(), pc.gp.UseList.Len())

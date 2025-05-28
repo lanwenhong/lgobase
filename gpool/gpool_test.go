@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -379,10 +380,10 @@ func TestPingWait(t *testing.T) {
 	}
 
 	g_conf := &gpool.GPoolConfig[echo.EchoClient]{
-		//Addrs:        "127.0.0.1:9898/3000,127.0.0.1:9898/3000",
-		Addrs:        "127.0.0.1:9898/3000",
+		Addrs: "127.0.0.1:9897/3000,127.0.0.1:9898/3000",
+		//Addrs:        "127.0.0.1:9898/3000",
 		MaxConns:     40,
-		MaxIdleConns: 40,
+		MaxIdleConns: 30,
 		Cfunc:        gpool.CreateThriftBufferConn[echo.EchoClient],
 		Nc:           echo.NewEchoClientFactory,
 		Ping:         ping,
@@ -391,8 +392,12 @@ func TestPingWait(t *testing.T) {
 	rps := gpool.RpcPoolSelector[echo.EchoClient]{}
 	rps.RpcPoolInit(ctx, g_conf)
 
+	wg := sync.WaitGroup{}
+
 	for i := 0; i < 50; i++ {
+		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			ctx := context.WithValue(ctx, "trace_id", util.GenXid())
 			for i := 0; i < 400; i++ {
 				var r *echo.EchoRes = nil
@@ -412,9 +417,10 @@ func TestPingWait(t *testing.T) {
 				if r != nil {
 					t.Log("rpc get: ", r.Msg)
 				}
-				//time.Sleep(2 * time.Second)
+				//time.Sleep(1 * time.Second)
 			}
 		}()
 	}
-	time.Sleep(10000000 * time.Second)
+	wg.Wait()
+	//time.Sleep(10000000 * time.Second)
 }
