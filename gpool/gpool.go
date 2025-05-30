@@ -133,7 +133,7 @@ func (gp *Gpool[T]) getConnFromWait(ctx context.Context) (*PoolConn[T], error) {
 		gp.mutex.Lock()
 		logger.Debugf(ctx, "--------------------locked")
 		//gp.Waits -= 1
-		logger.Debugf(ctx, "pool full flist %d ulist %d", gp.FreeList.Len(), gp.UseList.Len())
+		logger.Debugf(ctx, "pool  flist %d ulist %d", gp.FreeList.Len(), gp.UseList.Len())
 		flen := gp.FreeList.Len()
 		if gp.FreeList.Len()+gp.UseList.Len() >= gp.MaxConns && flen <= 0 {
 			logger.Debugf(ctx, "wait again")
@@ -185,9 +185,11 @@ func (pc *PoolConn[T]) put(ctx context.Context) error {
 	//defer pc.gp.mutex.Unlock()
 	pc.gp.UseList.Remove(pc.e)
 	pc.gp.FreeList.PushBack(pc)
-	if pc.gp.FreeList.Len() > pc.gp.MaxIdleConns {
-		flen := pc.gp.FreeList.Len() - pc.gp.MaxIdleConns
-		logger.Debugf(ctx, "purge len: %d", flen)
+	flen := pc.gp.FreeList.Len() - pc.gp.MaxIdleConns
+	logger.Debugf(ctx, "need purge len: %d waits: %d", flen, pc.gp.Waits)
+	if pc.gp.FreeList.Len() > pc.gp.MaxIdleConns && pc.gp.Waits == 0 {
+		//flen := pc.gp.FreeList.Len() - pc.gp.MaxIdleConns
+		//logger.Debugf(ctx, "purge len: %d", flen)
 		for i := 0; i < flen; i++ {
 			e := pc.gp.FreeList.Front()
 			pc := e.Value.(*PoolConn[T])
