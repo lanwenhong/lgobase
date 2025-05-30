@@ -380,10 +380,10 @@ func TestPingWait(t *testing.T) {
 	}
 
 	g_conf := &gpool.GPoolConfig[echo.EchoClient]{
-		Addrs: "127.0.0.1:9897/3000,127.0.0.1:9898/3000",
-		//Addrs:        "127.0.0.1:9898/3000",
-		MaxConns:     40,
-		MaxIdleConns: 30,
+		//Addrs: "127.0.0.1:9897/3000,127.0.0.1:9898/3000",
+		Addrs:        "127.0.0.1:9898/3000",
+		MaxConns:     140,
+		MaxIdleConns: 130,
 		Cfunc:        gpool.CreateThriftBufferConn[echo.EchoClient],
 		Nc:           echo.NewEchoClientFactory,
 		Ping:         ping,

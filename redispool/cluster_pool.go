@@ -24,8 +24,8 @@ type RedisOP[T RedisMethod] struct {
 }
 
 type RedisNode interface {
-	red.Cmdable
-	red.BitMapCmdable
+	redis.Cmdable
+	redis.BitMapCmdable
 }
 
 type GredisConf struct {
@@ -41,7 +41,7 @@ type GredisConf struct {
 }
 
 type GredisClient struct {
-	int           useType
+	useType       string
 	ClusterClient *redis.ClusterClient
 	Client        *redis.Client
 }
@@ -52,12 +52,12 @@ func NewRedisOP[T RedisMethod](client T) *RedisOP[T] {
 	}
 }
 
-func NewGredis(conf *GredisConf, use_type int) *GredisClient {
+func NewGredis(conf *GredisConf, use_type string) *GredisClient {
 	grc := &GredisClient{
 		useType: use_type,
 	}
 	if grc.useType == CLUSTER_TYPE {
-		grpc.ClusterClient = redis.NewClusterClient(&redis.ClusterOptions{
+		grc.ClusterClient = redis.NewClusterClient(&redis.ClusterOptions{
 			Addrs:        conf.Addrs,
 			PoolSize:     conf.PoolSize,
 			DialTimeout:  conf.DialTimeout,
@@ -66,11 +66,10 @@ func NewGredis(conf *GredisConf, use_type int) *GredisClient {
 			Username:     conf.Username,
 			Password:     conf.Passwd,
 			MinIdleConns: conf.MinIdleConns,
-			PoolSize:     conf.PoolSize,
 		})
 	} else if grc.useType == MASTER_SLAVE {
-		grpc.Client = redis.NewClient(&redis.ClusterOptions{
-			Addrs:        conf.Addrs,
+		grc.Client = redis.NewClient(&redis.Options{
+			Addr:         conf.Addrs[0],
 			PoolSize:     conf.PoolSize,
 			DialTimeout:  conf.DialTimeout,
 			ReadTimeout:  conf.ReadTimeout,
@@ -78,14 +77,13 @@ func NewGredis(conf *GredisConf, use_type int) *GredisClient {
 			Username:     conf.Username,
 			Password:     conf.Passwd,
 			MinIdleConns: conf.MinIdleConns,
-			PoolSize:     conf.PoolSize,
 			DB:           conf.Db,
 		})
 	}
 	return grc
 }
 
-func (grc *GredisClient) GetRedisClient() (RedisNode, err) {
+func (grc *GredisClient) GetRedisClient() (RedisNode, error) {
 	switch grc.useType {
 	case CLUSTER_TYPE:
 		return grc.ClusterClient, nil
