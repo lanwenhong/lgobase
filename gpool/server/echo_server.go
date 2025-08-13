@@ -49,7 +49,7 @@ func main() {
 		return
 	}*/
 
-	transport, err := thrift.NewTServerSocketTimeout(":9897", time.Duration(5000*time.Millisecond))
+	transport, err := thrift.NewTServerSocketTimeout(":9897", time.Duration(500000*time.Millisecond))
 	if err != nil {
 		fmt.Println(err.Error())
 		return
