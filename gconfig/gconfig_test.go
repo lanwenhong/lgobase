@@ -1,9 +1,11 @@
 package gconfig
 
 import (
+	"context"
 	"testing"
 
 	"github.com/lanwenhong/lgobase/gconfig"
+	"github.com/lanwenhong/lgobase/logger"
 )
 
 func TestGparse(t *testing.T) {
@@ -39,5 +41,26 @@ func TestGparse(t *testing.T) {
 
 	} else {
 		t.Errorf("section1 not found")
+	}
+}
+
+func buildRule(ctx context.Context, ex map[string]map[string][]string) {
+	logger.Debugf(ctx, "ex: %v", ex)
+
+	//logger.Debugf(ctx, "when: %s", ex[0])
+	//logger.Debugf(ctx, "Salience: %s", ex[1])
+}
+
+func TestRule(t *testing.T) {
+	ctx := context.Background()
+	t.Log("start")
+	g_cf := gconfig.NewGconf("test_rule.ini")
+	err := g_cf.GconfParse()
+	if err != nil {
+		t.Errorf("err: %s", err.Error())
+	}
+	//g_cf.AddExd("test1", "test1 = 192.168.100.105/1000")
+	if _, ok := g_cf.Gcf["section1"]; ok {
+		buildRule(ctx, g_cf.GlineExtend)
 	}
 }
