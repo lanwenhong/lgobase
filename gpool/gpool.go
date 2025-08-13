@@ -89,11 +89,15 @@ func (gp *Gpool[T]) getConnFromFreeList(ctx context.Context) (*PoolConn[T], erro
 	var reterr error
 	pc := e.Value.(*PoolConn[T])
 	if !pc.Gc.IsOpen() {
-		logger.Debugf(ctx, "reopen conn")
-		reterr = pc.Gc.Open()
-		if reterr != nil {
-			logger.Warnf(ctx, "open err %s", reterr.Error())
-		}
+		logger.Warnf(ctx, "reopen conn")
+		// reterr = pc.Gc.Open()
+		// if reterr != nil {
+		// 	logger.Warnf(ctx, "open err %s", reterr.Error())
+		// }
+		pc.Gc.Close()
+		gp.FreeList.Remove(e)
+		connNew, err := gp.getConnFromNew(ctx)
+		return connNew, err
 	}
 	gp.FreeList.Remove(e)
 	e.Value.(*PoolConn[T]).e = gp.UseList.PushBack(e.Value)
