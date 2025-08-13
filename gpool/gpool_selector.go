@@ -19,6 +19,7 @@ type GPoolConfig[T any] struct {
 	Addrs        string
 	MaxConns     int
 	MaxIdleConns int
+	MaxConnLife  int64
 	Cfunc        CreateConn[T]
 	Nc           NewThriftClient[T]
 	Ping         PingSvr
@@ -81,7 +82,7 @@ func (rps *RpcPoolSelector[T]) RpcPoolInit(ctx context.Context, g_conf *GPoolCon
 		rs.SetStat(selector.SVR_VALID)
 
 		rs.Gp = &Gpool[T]{}
-		rs.Gp.GpoolInit(xx[0], iport, itimeout, g_conf.MaxConns, g_conf.MaxIdleConns,
+		rs.Gp.GpoolInit(xx[0], iport, itimeout, g_conf.MaxConns, g_conf.MaxIdleConns, g_conf.MaxConnLife,
 			g_conf.Cfunc, g_conf.Nc)
 		rps.Slist[i] = rs
 	}
