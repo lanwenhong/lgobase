@@ -29,6 +29,7 @@ type GConfRule struct {
 type Trade struct {
 	Busicd string `json:"busicd"`
 	Txamt  int    `json:"txamt"`
+	STxamt string `json:"s_txamt"`
 }
 
 type Ret struct {
@@ -207,9 +208,10 @@ func TestGConfRule(t *testing.T) {
 	gcr := gconfig.NewGConfRule("test1")
 	gcr.AddRule(ctx, g_cf)
 	trade := Trade{
-		Busicd: "5000",
-		Txamt:  2000,
+		Busicd: "7000",
+		Txamt:  3000,
 	}
+	trade.STxamt = strconv.Itoa(trade.Txamt)
 
 	pTrade, _ := json.Marshal(trade)
 	logger.Debugf(ctx, "pTrade: %s", string(pTrade))
