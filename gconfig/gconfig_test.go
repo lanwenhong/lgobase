@@ -184,3 +184,34 @@ func TestRule(t *testing.T) {
 		}
 	}
 }
+
+func TestGConfRule(t *testing.T) {
+	xlogger := logrus.New()
+	xlogger.Level = logrus.InfoLevel
+
+	//glog.Log = noop.WithFields(glog.Fields{"lib": "grule-rule-engine"})
+	/*glog.Log = glog.LogEntry{
+		Logger: glog.NewLogrus(logger).WithFields(glog.Fields{"lib": "grule-rule-engine"}),
+		Level:  glog.DebugLevel,
+	}*/
+
+	antlr.SetLogger(xlogger)
+	ctx := context.Background()
+	//t.Log("start")
+	g_cf := gconfig.NewGconf("test_rule.ini")
+	err := g_cf.GconfParse()
+	if err != nil {
+		t.Errorf("err: %s", err.Error())
+	}
+
+	gcr := gconfig.NewGConfRule("test1")
+	gcr.AddRule(ctx, g_cf)
+	trade := Trade{
+		Busicd: "5000",
+		Txamt:  2000,
+	}
+
+	pTrade, _ := json.Marshal(trade)
+	logger.Debugf(ctx, "pTrade: %s", string(pTrade))
+	gcr.SvrSelectFromJson(ctx, string(pTrade), "trade")
+}
