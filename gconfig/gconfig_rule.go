@@ -126,3 +126,19 @@ func (cr *GConfRule) SvrSelectFromJson(ctx context.Context, jData string, jDataK
 	logger.Debugf(ctx, "ret: %v", rRet)
 	return rRet, nil
 }
+
+func (cr *GConfRule) SvrSelectFromDataCtx(ctx context.Context, dataContext ast.IDataContext) (*RuleRet, error) {
+	rRet := &RuleRet{}
+	dataContext.Add("R", rRet)
+	kb := cr.GrulePool.Get().(*ast.KnowledgeBase)
+	defer cr.GrulePool.Put(kb)
+
+	eng := engine.NewGruleEngine()
+	err := eng.Execute(dataContext, kb)
+	if err != nil {
+		logger.Debugf(ctx, "exec err %s", err.Error())
+		return nil, err
+	}
+	logger.Debugf(ctx, "ret: %v", rRet)
+	return rRet, nil
+}
