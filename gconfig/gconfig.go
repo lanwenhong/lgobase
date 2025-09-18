@@ -190,6 +190,7 @@ func (gcf *Gconf) GconfParse() error {
 		}
 		sline := string(line)
 		if mreg.MatchString(sline) {
+			//parse section
 			mk, err := gcf.getMk(sline, mreg)
 			if err != nil {
 				return err
@@ -207,6 +208,7 @@ func (gcf *Gconf) GconfParse() error {
 				gcf.Gcf[mkey] = imap
 			}
 		} else if ireg.MatchString(sline) {
+			//parse line
 			if imap == nil {
 				//fmt.Printf("%s not found section\n", sline)
 				logger.Debugf(ctx, "%s not found section", sline)

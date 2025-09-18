@@ -32,6 +32,12 @@ func TestGenid(t *testing.T) {
 	id = util.GenSid()
 	t.Log(id)
 
+	s, _ := util.GenerateSecureRandomString(20)
+	t.Log(s)
+
+	id = util.GenerateUniqueStringWithTimestamp("id")
+	t.Log(id)
+
 }
 
 func TestGenidFromDB(t *testing.T) {
