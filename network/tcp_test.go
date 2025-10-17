@@ -36,8 +36,14 @@ func TestEcho(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	conn.SetOptLinger(ctx, 0)
+	//conn.SetOptLinger(ctx, 0)
 
-	conn.Writen(ctx, b)
+	time.Sleep(5 * time.Second)
+	for {
+		err = conn.Writen(ctx, b)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
 
 }

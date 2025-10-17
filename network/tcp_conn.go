@@ -34,12 +34,12 @@ func NewTcpFromConn(c net.Conn) *TcpConn {
 	return conn
 }
 
-func (conn *TcpConn) SetRTimeout(ctx context.Context, cTimeout time.Duration) {
-	conn.ConnectTimout = cTimeout
+func (conn *TcpConn) SetRTimeout(ctx context.Context, rTimeout time.Duration) {
+	conn.ReadTimeout = rTimeout
 }
 
 func (conn *TcpConn) SetWTimeout(ctx context.Context, wTimeout time.Duration) {
-	conn.ConnectTimout = wTimeout
+	conn.WriteTimeout = wTimeout
 }
 
 func (conn *TcpConn) Open(ctx context.Context) error {
@@ -53,10 +53,12 @@ func (conn *TcpConn) Open(ctx context.Context) error {
 }
 
 func (conn *TcpConn) Close(ctx context.Context) {
+	logger.Debugf(ctx, "conn close")
 	conn.Conn.Close()
 }
 
 func (conn *TcpConn) Readn(ctx context.Context, n_byte int) ([]byte, error) {
+	logger.Debugf(ctx, "conn.ReadTimeout: %d", conn.ReadTimeout)
 	if int64(conn.ReadTimeout) > 0 {
 		conn.Conn.SetDeadline(time.Now().Add(conn.ReadTimeout))
 	}
