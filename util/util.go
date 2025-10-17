@@ -240,6 +240,7 @@ func (aescbc *AesCbc) AESEncryptCBC(ctx context.Context, plaintext []byte, key [
 		return "", err
 	}
 
+	logger.Debugf(ctx, "plaintext len: %d", len(plaintext))
 	// 填充明文
 	plaintext = aescbc.PKCS7Padding(ctx, plaintext, block.BlockSize())
 
@@ -258,6 +259,7 @@ func (aescbc *AesCbc) AESEncryptCBC(ctx context.Context, plaintext []byte, key [
 	//mode.CryptBlocks(ciphertext[aes.BlockSize:], plaintext)
 	mode.CryptBlocks(ciphertext, plaintext)
 
+	logger.Debugf(ctx, "ciphertext len: %d", len(ciphertext))
 	// 返回Base64编码的结果（IV+密文）
 	return base64.StdEncoding.EncodeToString(ciphertext), nil
 }

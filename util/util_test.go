@@ -79,7 +79,8 @@ func TestAesCbc(t *testing.T) {
 	ctx := context.Background()
 	aescbc := util.AesCbc{}
 	key := []byte("11111111111111111111111111111111")
-	plaintext := []byte("aaaaaaaaaaaaaaaaaaaaaaaa")
+	//key := []byte("8888888888888888AAAAAAAAAAAAAAAAFFFFFFFFFFFFFFFF1111111111111111")
+	plaintext := []byte("111111111111111111111111111111111111111111111111")
 	//plaintext := []byte{117, 1, 0, 0, 0, 10, 0, 10, 0, 0, 0, 255, 255, 255, 255, 15, 0, 0, 0, 1, 48}
 	//iv := make([]byte, aes.BlockSize)
 	//iv := []byte("'qfpay-----token")
@@ -98,7 +99,7 @@ func TestAesCbc(t *testing.T) {
 		fmt.Println("Error decrypting:", err)
 		return
 	}
-	fmt.Printf("解密后: %s\n", string(decrypted))
+	fmt.Printf("解密后: %s len: %d\n", string(decrypted), len(decrypted))
 }
 
 func TestAesCbcWithNoB64(t *testing.T) {
