@@ -10,42 +10,47 @@ import (
 	"github.com/lanwenhong/lgobase/logger"
 )
 
-type TcpConn struct {
-	Conn          net.Conn
+type TcpSslConn struct {
+	Conn          *tls.Conn
 	ConnectTimout time.Duration
 	ReadTimeout   time.Duration
 	WriteTimeout  time.Duration
-	TlsConf       *tls.Config
 	Addr          string
+	TlsConf       *tls.Config
 }
 
-func NewTcpConn(addr string, cTimeout time.Duration, rTimeout time.Duration, wTimeout time.Duration) *TcpConn {
-	conn := &TcpConn{
+func NewTcpSsslConn(addr string, cTimeout time.Duration, rTimeout time.Duration, wTimeout time.Duration, tslConf *tls.Config) *TcpSslConn {
+	conn := &TcpSslConn{
 		Addr:          addr,
 		ConnectTimout: cTimeout,
 		ReadTimeout:   rTimeout,
 		WriteTimeout:  wTimeout,
+		TlsConf:       tslConf,
 	}
 	return conn
 }
 
-func NewTcpFromConn(c net.Conn) *TcpConn {
-	conn := &TcpConn{
+func NewTcpSslFromConn(c *tls.Conn) *TcpSslConn {
+	conn := &TcpSslConn{
 		Conn: c,
 	}
 	return conn
 }
 
-func (conn *TcpConn) SetRTimeout(ctx context.Context, rTimeout time.Duration) {
+func (conn *TcpSslConn) SetRTimeout(ctx context.Context, rTimeout time.Duration) {
 	conn.ReadTimeout = rTimeout
 }
 
-func (conn *TcpConn) SetWTimeout(ctx context.Context, wTimeout time.Duration) {
+func (conn *TcpSslConn) SetWTimeout(ctx context.Context, wTimeout time.Duration) {
 	conn.WriteTimeout = wTimeout
 }
 
-func (conn *TcpConn) Open(ctx context.Context) error {
-	c, err := net.DialTimeout("tcp", conn.Addr, conn.ConnectTimout)
+func (conn *TcpSslConn) Open(ctx context.Context) error {
+	//c, err := net.DialTimeout("tcp", conn.Addr, conn.ConnectTimout)
+	dialer := &net.Dialer{
+		Timeout: conn.ConnectTimout, // 连接超时（包括 TCP 握手 + TLS 握手）
+	}
+	c, err := tls.DialWithDialer(dialer, "tcp", conn.Addr, conn.TlsConf)
 	if err != nil {
 		logger.Warnf(ctx, "connect err: %s", err.Error())
 		return err
@@ -54,12 +59,12 @@ func (conn *TcpConn) Open(ctx context.Context) error {
 	return nil
 }
 
-func (conn *TcpConn) Close(ctx context.Context) {
+func (conn *TcpSslConn) Close(ctx context.Context) {
 	logger.Debugf(ctx, "conn close")
 	conn.Conn.Close()
 }
 
-func (conn *TcpConn) Readn(ctx context.Context, n_byte int) ([]byte, error) {
+func (conn *TcpSslConn) Readn(ctx context.Context, n_byte int) ([]byte, error) {
 	logger.Debugf(ctx, "conn.ReadTimeout: %d", conn.ReadTimeout)
 	if int64(conn.ReadTimeout) > 0 {
 		conn.Conn.SetDeadline(time.Now().Add(conn.ReadTimeout))
@@ -74,15 +79,15 @@ func (conn *TcpConn) Readn(ctx context.Context, n_byte int) ([]byte, error) {
 
 }
 
-func (conn *TcpConn) Writen(ctx context.Context, b []byte) error {
+func (conn *TcpSslConn) Writen(ctx context.Context, b []byte) error {
 	if int64(conn.WriteTimeout) > 0 {
 		conn.Conn.SetDeadline(time.Now().Add(conn.WriteTimeout))
 	}
 	/*n, err := io.WriteFull(conn.Conn, b)
-	if err != nil {
-		logger.Warnf(ctx, "write err: %s", err.Error())
-	}
-	logger.Debugf(ctx, "write: %d", n)
+	  if err != nil {
+	      logger.Warnf(ctx, "write err: %s", err.Error())
+	  }
+	  logger.Debugf(ctx, "write: %d", n)
 	*/
 	var start int = 0
 	for {
@@ -100,8 +105,8 @@ func (conn *TcpConn) Writen(ctx context.Context, b []byte) error {
 	return nil
 }
 
-func (conn *TcpConn) SetOptLinger(ctx context.Context, sec int) error {
-	tcpConn := conn.Conn.(*net.TCPConn)
+func (conn *TcpSslConn) SetOptLinger(ctx context.Context, sec int) error {
+	tcpConn := conn.Conn.NetConn().(*net.TCPConn)
 	err := tcpConn.SetLinger(sec)
 	if err != nil {
 		logger.Warnf(ctx, "err: %s", err.Error())
