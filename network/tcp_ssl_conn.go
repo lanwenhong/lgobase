@@ -17,9 +17,10 @@ type TcpSslConn struct {
 	WriteTimeout  time.Duration
 	Addr          string
 	TlsConf       *tls.Config
+	Opened        bool
 }
 
-func NewTcpSsslConn(addr string, cTimeout time.Duration, rTimeout time.Duration, wTimeout time.Duration, tslConf *tls.Config) *TcpSslConn {
+func NewTcpSslConn(addr string, cTimeout time.Duration, rTimeout time.Duration, wTimeout time.Duration, tslConf *tls.Config) *TcpSslConn {
 	conn := &TcpSslConn{
 		Addr:          addr,
 		ConnectTimout: cTimeout,
@@ -45,8 +46,13 @@ func (conn *TcpSslConn) SetWTimeout(ctx context.Context, wTimeout time.Duration)
 	conn.WriteTimeout = wTimeout
 }
 
+func (conn *TcpSslConn) IsOpen(ctx context.Context) bool {
+	return conn.Opened
+}
+
 func (conn *TcpSslConn) Open(ctx context.Context) error {
 	//c, err := net.DialTimeout("tcp", conn.Addr, conn.ConnectTimout)
+	logger.Debugf(ctx, "Timeout: %d", conn.ConnectTimout)
 	dialer := &net.Dialer{
 		Timeout: conn.ConnectTimout, // 连接超时（包括 TCP 握手 + TLS 握手）
 	}

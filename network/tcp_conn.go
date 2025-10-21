@@ -2,7 +2,6 @@ package network
 
 import (
 	"context"
-	"crypto/tls"
 	"io"
 	"net"
 	"time"
@@ -15,8 +14,8 @@ type TcpConn struct {
 	ConnectTimout time.Duration
 	ReadTimeout   time.Duration
 	WriteTimeout  time.Duration
-	TlsConf       *tls.Config
 	Addr          string
+	Opened        bool
 }
 
 func NewTcpConn(addr string, cTimeout time.Duration, rTimeout time.Duration, wTimeout time.Duration) *TcpConn {
@@ -36,6 +35,9 @@ func NewTcpFromConn(c net.Conn) *TcpConn {
 	return conn
 }
 
+func (conn *TcpConn) IsOpen(ctx context.Context) bool {
+	return conn.Opened
+}
 func (conn *TcpConn) SetRTimeout(ctx context.Context, rTimeout time.Duration) {
 	conn.ReadTimeout = rTimeout
 }
