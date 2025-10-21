@@ -32,6 +32,12 @@ func TestGenid(t *testing.T) {
 	id = util.GenSid()
 	t.Log(id)
 
+	s, _ := util.GenerateSecureRandomString(20)
+	t.Log(s)
+
+	id = util.GenerateUniqueStringWithTimestamp("id")
+	t.Log(id)
+
 }
 
 func TestGenidFromDB(t *testing.T) {
@@ -73,9 +79,12 @@ func TestAesCbc(t *testing.T) {
 	ctx := context.Background()
 	aescbc := util.AesCbc{}
 	key := []byte("11111111111111111111111111111111")
-	plaintext := []byte("aaaaaaaaaaaaaaaaaaaaaaaa")
+	//key := []byte("8888888888888888AAAAAAAAAAAAAAAAFFFFFFFFFFFFFFFF1111111111111111")
+	plaintext := []byte("111111111111111111111111111111111111111111111111")
+	//plaintext := []byte{117, 1, 0, 0, 0, 10, 0, 10, 0, 0, 0, 255, 255, 255, 255, 15, 0, 0, 0, 1, 48}
 	//iv := make([]byte, aes.BlockSize)
-	iv := []byte("'qfpay-----token")
+	//iv := []byte("'qfpay-----token")
+	iv := []byte("llss-------token")
 	// 加密
 	ciphertextBase64, err := aescbc.AESEncryptCBC(ctx, plaintext, key, iv)
 	if err != nil {
@@ -90,7 +99,42 @@ func TestAesCbc(t *testing.T) {
 		fmt.Println("Error decrypting:", err)
 		return
 	}
-	fmt.Printf("解密后: %s\n", string(decrypted))
+	fmt.Printf("解密后: %s len: %d\n", string(decrypted), len(decrypted))
+}
+
+func TestAesCbcWithNoB64(t *testing.T) {
+	ctx := context.Background()
+	aescbc := util.AesCbc{}
+	//key := []byte("11111111111111111111111111111111")
+	//key := []byte{68, 87, 80, 80, 47, 112, 77, 57, 51, 86, 112, 67, 48, 74, 90, 90, 82, 106, 47, 69, 118, 103, 61, 61, 68, 87, 80, 80, 47, 112, 77, 57}
+	key := []byte{78, 102, 68, 120, 72, 112, 117, 77, 120, 112, 54, 57, 97, 49, 108, 82, 82, 79, 53, 81, 50, 103, 61, 61, 78, 102, 68, 120, 72, 112, 117, 77}
+	fmt.Printf("key: %v\n", key)
+	//plaintext := []byte("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+	plaintext := []byte{117, 1, 0, 0, 0, 10, 0, 10, 0, 0, 0, 255, 255, 255, 255, 15, 0, 0, 0, 1, 48}
+	//iv := make([]byte, aes.BlockSize)
+	//iv := []byte("'qfpay-----token")
+	iv := []byte("llss-------token")
+	// 加密
+	ciphertext, err := aescbc.AESEncryptCBCWithNoBase64(ctx, plaintext, key, iv)
+	if err != nil {
+		fmt.Println("Error encrypting:", err)
+		return
+	}
+	fmt.Printf("加密后(Base64): %v\n", ciphertext)
+	//ciphertext = []byte{87, 180, 206, 244, 69, 224, 210, 178, 62, 90, 23, 129, 222, 132, 35, 34, 173, 112, 230, 44, 195, 114, 15, 204, 28, 158, 89, 140, 207, 133, 226, 97}
+
+	// 解密
+	decrypted, err := aescbc.AESDecryptCBCWithNoBase64(ctx, ciphertext, key, iv)
+	if err != nil {
+		fmt.Println("Error decrypting:", err)
+		return
+	}
+	/*if string(decrypted) == string(plaintext) {
+		fmt.Printf("succ\n")
+	}
+	fmt.Printf("解密后: %s\n", string(decrypted))*/
+	fmt.Printf("%v\n", decrypted)
+
 }
 
 func TestTokenDec(t *testing.T) {
@@ -160,12 +204,18 @@ func TestPackToken(t *testing.T) {
 		tkSrc = append(tkSrc, b_uid...)
 	}
 
+	var opuid uint16 = 16
+	logger.Debugf(ctx, "use uint16 pack")
+	b_uid := make([]byte, 16)
+	binary.LittleEndian.PutUint16(b_uid, opuid)
+	tkSrc = append(tkSrc, b_uid...)
+
 	var expire uint32 = 2222
 	b_expire := make([]byte, 4)
 	binary.LittleEndian.PutUint32(b_expire, expire)
 	tkSrc = append(tkSrc, b_expire...)
 
-	var deadline uint64 = 444444444
+	var deadline uint64 = 444444
 	//var deadline uint64 = 44444444444
 	if deadline > 0xFFFFFFFF {
 		b_deadline := make([]byte, 8)

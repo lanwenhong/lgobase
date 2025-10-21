@@ -430,7 +430,7 @@ func TestMaxConnLife(t *testing.T) {
 		RotateMethod: logger.ROTATE_FILE_DAILY,
 		Stdout:       true,
 		Colorful:     true,
-		Loglevel:     logger.INFO,
+		Loglevel:     logger.DEBUG,
 	}
 	logger.Newglog("./", "test.log", "test.log.err", myconf)
 	ctx := context.WithValue(context.Background(), "trace_id", NewRequestID())
@@ -447,6 +447,7 @@ func TestMaxConnLife(t *testing.T) {
 		MaxConns:     100,
 		MaxIdleConns: 10,
 		MaxConnLife:  10,
+		PurgeRate:    0.5,
 		Cfunc:        gpool.CreateThriftBufferConn[echo.EchoClient],
 		Nc:           echo.NewEchoClientFactory,
 		//Ping:         ping,

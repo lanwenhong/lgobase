@@ -2,9 +2,11 @@ package util
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"log"
 	"math/rand"
+	"strconv"
 	"strings"
 	"time"
 
@@ -92,4 +94,55 @@ func GenSonyflake() string {
 func GenSid() string {
 	id := sid.Id()
 	return id
+}
+
+func GenerateSecureRandomString(length int) (string, error) {
+	// 需要的字节数，base64编码会增加约1/3的长度
+	buffer := make([]byte, length)
+	_, err := rand.Read(buffer)
+	if err != nil {
+		return "", err
+	}
+	// 使用URLEncoding避免生成+和/字符
+	return base64.URLEncoding.EncodeToString(buffer)[:length], nil
+}
+
+// 生成指定长度的普通随机字符串（性能更好，适用于非敏感场景）
+func GenerateRandomString(length int) string {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+	// 初始化随机数生成器
+	rand.Seed(time.Now().UnixNano())
+
+	b := make([]byte, length)
+	for i := range b {
+		b[i] = charset[rand.Intn(len(charset))]
+	}
+	return string(b)
+}
+
+func generateRandomString(length int) (string, error) {
+	// 计算需要的字节数，base64编码会增加约1/3的长度
+	bytesNeeded := (length * 3) / 4
+	if (length*3)%4 != 0 {
+		bytesNeeded++
+	}
+
+	buffer := make([]byte, bytesNeeded)
+	_, err := rand.Read(buffer)
+	if err != nil {
+		return "", err
+	}
+
+	// 使用URLEncoding避免生成+和/字符，并截取到指定长度
+	return base64.URLEncoding.EncodeToString(buffer)[:length], nil
+}
+
+func GenerateUniqueStringWithTimestamp(prefix string) string {
+	// 时间戳+随机字符串组合
+	timestamp := time.Now().UnixNano()
+	randomPart, _ := generateRandomString(8)
+	//return fmt.Sprintf("%s_%d_%s", prefix, timestamp, randomPart)
+	ret := prefix + "_" + strconv.FormatInt(timestamp, 10) + "_" + randomPart
+	return ret
 }

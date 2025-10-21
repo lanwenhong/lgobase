@@ -39,6 +39,7 @@ type Gpool[T any] struct {
 	MaxConns     int
 	MaxIdleConns int
 	MaxConnLife  int64
+	PurgeRate    float64
 	hold         int
 	mutex        sync.Mutex
 	Cfunc        CreateConn[T]
@@ -65,6 +66,42 @@ func (gp *Gpool[T]) GpoolInit(addr string, port int, timeout int,
 	gp.TimeOut = timeout
 	gp.Cfunc = cfunc
 	gp.Nc = clfunc
+	gp.WaitNotify = make(chan struct{})
+	gp.PurgeNotify = make(chan struct{}, 1)
+
+	go func() {
+		ctx := context.WithValue(context.Background(), "trace_id", util.GenXid())
+		for {
+			select {
+			case <-gp.PurgeNotify:
+				for {
+					e, _ := gp.PurgeQueue.PopFront(ctx)
+					if e != nil {
+						logger.Debugf(ctx, "host %s:%d purge conn: %v", addr, port, e)
+						pc := e.(*PoolConn[T])
+						pc.Gc.Close()
+					} else {
+						break
+					}
+				}
+			}
+		}
+	}()
+}
+
+func (gp *Gpool[T]) GpoolInit2(addr string, port int, timeout int, gp_conf *GPoolConfig[T]) {
+	gp.FreeList = list.New()
+	gp.UseList = list.New()
+	gp.PurgeQueue = cas.CreateCasQueue()
+	gp.MaxConns = gp_conf.MaxConns
+	gp.MaxIdleConns = gp_conf.MaxIdleConns
+	gp.MaxConnLife = gp_conf.MaxConnLife
+	gp.PurgeRate = gp_conf.PurgeRate
+	gp.Addr = addr
+	gp.Port = port
+	gp.TimeOut = timeout
+	gp.Cfunc = gp_conf.Cfunc
+	gp.Nc = gp_conf.Nc
 	gp.WaitNotify = make(chan struct{})
 	gp.PurgeNotify = make(chan struct{}, 1)
 
@@ -209,8 +246,15 @@ func (pc *PoolConn[T]) put(ctx context.Context) error {
 	pc.gp.UseList.Remove(pc.e)
 	pc.gp.FreeList.PushBack(pc)
 	flen := pc.gp.FreeList.Len() - pc.gp.MaxIdleConns
-	logger.Debugf(ctx, "need purge len: %d waits: %d", flen, pc.gp.Waits)
-	if pc.gp.FreeList.Len() > pc.gp.MaxIdleConns && pc.gp.Waits == 0 {
+	if flen < 0 {
+		flen = 0
+	}
+	fMaxConns := float64(pc.gp.MaxConns)
+	fflen := float64(pc.gp.FreeList.Len())
+	rate := fflen / fMaxConns
+
+	logger.Debugf(ctx, "need purge len: %d waits: %d purge_rate: %f", flen, pc.gp.Waits, rate)
+	if pc.gp.FreeList.Len() > pc.gp.MaxIdleConns && pc.gp.Waits == 0 && rate >= pc.gp.PurgeRate {
 		//flen := pc.gp.FreeList.Len() - pc.gp.MaxIdleConns
 		//logger.Debugf(ctx, "purge len: %d", flen)
 		for i := 0; i < flen; i++ {

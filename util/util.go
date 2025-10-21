@@ -240,6 +240,7 @@ func (aescbc *AesCbc) AESEncryptCBC(ctx context.Context, plaintext []byte, key [
 		return "", err
 	}
 
+	logger.Debugf(ctx, "plaintext len: %d", len(plaintext))
 	// 填充明文
 	plaintext = aescbc.PKCS7Padding(ctx, plaintext, block.BlockSize())
 
@@ -258,6 +259,7 @@ func (aescbc *AesCbc) AESEncryptCBC(ctx context.Context, plaintext []byte, key [
 	//mode.CryptBlocks(ciphertext[aes.BlockSize:], plaintext)
 	mode.CryptBlocks(ciphertext, plaintext)
 
+	logger.Debugf(ctx, "ciphertext len: %d", len(ciphertext))
 	// 返回Base64编码的结果（IV+密文）
 	return base64.StdEncoding.EncodeToString(ciphertext), nil
 }
@@ -298,6 +300,59 @@ func (aescbc *AesCbc) AESEncryptCBCWithNoBase64(ctx context.Context, plaintext [
 
 	//return base64.StdEncoding.EncodeToString(ciphertext), nil
 	return ciphertext, nil
+}
+
+func (aescbc *AesCbc) AESDecryptCBCWithNoBase64(ctx context.Context, ciphertext []byte, key []byte, iv []byte) ([]byte, error) {
+	// 检查密钥长度
+	if len(key) != 32 {
+		return nil, fmt.Errorf("AES-256密钥长度必须为32字节，当前长度：%d", len(key))
+	}
+
+	if len(iv) != aes.BlockSize {
+		return nil, fmt.Errorf("iv必须16字节，当前长度：%d", len(iv))
+	}
+
+	// 解码Base64
+	/*ciphertext, err := base64.StdEncoding.DecodeString(ciphertextBase64)
+	if err != nil {
+		return nil, err
+	}*/
+
+	logger.Debugf(ctx, "ciphertext len: %d", len(ciphertext))
+	// 检查数据长度
+	if len(ciphertext) < aes.BlockSize {
+		return nil, fmt.Errorf("密文长度过短，至少需要 %d 字节", aes.BlockSize)
+	}
+
+	// 提取IV和密文
+	//iv := ciphertext[:aes.BlockSize]
+	//iv := make([]byte, aes.BlockSize)
+
+	// 创建解密块
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+
+	// 检查密文长度是否为块大小的整数倍
+	if len(ciphertext)%aes.BlockSize != 0 {
+		return nil, fmt.Errorf("密文长度不是块大小(%d字节)的整数倍", aes.BlockSize)
+	}
+
+	// 创建CBC模式
+	mode := cipher.NewCBCDecrypter(block, iv)
+
+	// 解密数据
+	plaintext := make([]byte, len(ciphertext))
+	mode.CryptBlocks(plaintext, ciphertext)
+
+	// 去除填充
+	plaintext = aescbc.PKCS7UnPadding(ctx, plaintext)
+	if plaintext == nil {
+		return nil, fmt.Errorf("无效的填充数据")
+	}
+	return plaintext, nil
+
 }
 
 func (aescbc *AesCbc) AESDecryptCBCSb(ctx context.Context, ciphertextBase64 string, key []byte) ([]byte, error) {
