@@ -291,14 +291,14 @@ func (gp *GTcpPool[T]) Process(ctx context.Context, process func(client interfac
 			errStr = rpc_err.Error()
 		}
 		address := fmt.Sprintf("%s:%d", gp.Addr, gp.Port)
-		logger.Infof(ctx, "func=TcpProcess|method=%v|addr=%s:%d|time=%v|err=%s",
+		logger.Infof(ctx, "func=TcpProcess|msg=%v|addr=%s:%d|time=%v|err=%s",
 			rpc_name, address, time.Duration(gp.TimeOut), time.Since(starttime), errStr)
 	}()
 	rpc_name, err = process(pc.Gc)
 	if err != nil {
 		rpc_err = err
 		logger.Warnf(ctx, "err: %s", err.Error())
-		//pc.Gc.Close()
+		pc.Gc.Close(ctx)
 	}
 	return err
 }
