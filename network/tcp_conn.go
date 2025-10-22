@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/lanwenhong/lgobase/logger"
@@ -16,6 +17,7 @@ type TcpConn struct {
 	WriteTimeout  time.Duration
 	Addr          string
 	Opened        bool
+	once          sync.Once
 }
 
 func NewTcpConn(addr string, cTimeout time.Duration, rTimeout time.Duration, wTimeout time.Duration) *TcpConn {
@@ -53,12 +55,18 @@ func (conn *TcpConn) Open(ctx context.Context) error {
 		return err
 	}
 	conn.Conn = c
+	conn.Opened = true
 	return nil
 }
 
 func (conn *TcpConn) Close(ctx context.Context) {
 	logger.Debugf(ctx, "conn close")
-	conn.Conn.Close()
+	conn.Opened = false
+	conn.once.Do(func() {
+		if err := conn.Conn.Close(); err != nil {
+			logger.Warnf(ctx, "close err: %s", err.Error())
+		}
+	})
 }
 
 func (conn *TcpConn) Readn(ctx context.Context, n_byte int) ([]byte, error) {
@@ -70,6 +78,7 @@ func (conn *TcpConn) Readn(ctx context.Context, n_byte int) ([]byte, error) {
 	n, err := io.ReadFull(conn.Conn, b)
 	if err != nil {
 		logger.Warnf(ctx, "read err: %s", err.Error())
+		conn.Opened = false
 	}
 	logger.Debugf(ctx, "read: %d", n)
 	return b, err
@@ -91,6 +100,7 @@ func (conn *TcpConn) Writen(ctx context.Context, b []byte) error {
 		n, err := conn.Conn.Write(b[start:])
 		if err != nil {
 			logger.Warnf(ctx, "write error: %s", err.Error())
+			conn.Opened = false
 			return err
 		}
 		logger.Debugf(ctx, "write: %d", n)

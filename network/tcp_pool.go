@@ -26,10 +26,11 @@ type TcpConnInter interface {
 type CreateTcpConn[T TcpConnInter] func(context.Context, string, int, int, *tls.Config) TcpConnInter
 
 type PoolTcpConn[T TcpConnInter] struct {
-	Gc    TcpConnInter
-	gp    *GTcpPool[T]
-	e     *list.Element
-	Ctime int64
+	Gc     TcpConnInter
+	gp     *GTcpPool[T]
+	e      *list.Element
+	Ctime  int64
+	Opened bool
 }
 
 type GTcpPool[T TcpConnInter] struct {
