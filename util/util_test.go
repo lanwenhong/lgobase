@@ -6,78 +6,39 @@ import (
 	"encoding/binary"
 	"fmt"
 	"testing"
-
-	"github.com/lanwenhong/lgobase/dbenc"
-	"github.com/lanwenhong/lgobase/dbpool"
+	
 	"github.com/lanwenhong/lgobase/logger"
-	"github.com/lanwenhong/lgobase/util"
 )
 
 func TestGenid(t *testing.T) {
-
-	id := util.GenXid()
+	id := GenXid()
 	t.Log(id)
-	id = util.GenKsuid()
+	id = GenKsuid()
 	t.Log(id)
-
-	id = util.GenBetterGUID()
+	
+	id = GenBetterGUID()
 	t.Log(id)
-
-	id = util.GenUlid()
+	
+	id = GenUlid()
 	t.Log(id)
-
-	id = util.GenSonyflake()
+	
+	id = GenSonyflake()
 	t.Log(id)
-
-	id = util.GenSid()
+	
+	id = GenSid()
 	t.Log(id)
-
-	s, _ := util.GenerateSecureRandomString(20)
+	
+	s, _ := GenerateSecureRandomString(20)
 	t.Log(s)
-
-	id = util.GenerateUniqueStringWithTimestamp("id")
+	
+	id = GenerateUniqueStringWithTimestamp("id")
 	t.Log(id)
-
-}
-
-func TestGenidFromDB(t *testing.T) {
-	ctx := context.WithValue(context.Background(), "trace_id", "1111")
-
-	/*myconf := &logger.Glogconf{
-		RotateMethod: logger.ROTATE_FILE_DAILY,
-		Stdout:       true,
-		Colorful:     true,
-		Loglevel:     logger.DEBUG,
-		//Goid:         true,
-	}
-
-	logger.Newglog("./", "test.log", "test.log.err", myconf)
-	dconfig := &dlog.Config{
-		SlowThreshold:             time.Second, // 慢 SQL 阈值
-		LogLevel:                  dlog.Info,   // 日志级别
-		IgnoreRecordNotFoundError: true,        // 忽略ErrRecordNotFound（记录未找到）错误
-		Colorful:                  true,        // 禁用彩色打印
-	}*/
-
-	db_conf := dbenc.DbConfNew(ctx, "/home/lanwenhong/dev/go/lgobase/dbpool/db.ini")
-	dbs := dbpool.DbpoolNew(db_conf)
-	//dbs.SetormLog(ctx, dconfig)
-	tk := "qfconf://test1?maxopen=1000&maxidle=30"
-	err := dbs.Add(ctx, "test1", tk, dbpool.USE_GORM)
-	if err != nil {
-		t.Fatal(err)
-	}
-	tdb := dbs.OrmPools["test1"]
-	id, err := util.Genid(ctx, tdb)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Log(id)
+	
 }
 
 func TestAesCbc(t *testing.T) {
 	ctx := context.Background()
-	aescbc := util.AesCbc{}
+	aescbc := AesCbc{}
 	key := []byte("11111111111111111111111111111111")
 	//key := []byte("8888888888888888AAAAAAAAAAAAAAAAFFFFFFFFFFFFFFFF1111111111111111")
 	plaintext := []byte("111111111111111111111111111111111111111111111111")
@@ -92,7 +53,7 @@ func TestAesCbc(t *testing.T) {
 		return
 	}
 	fmt.Printf("加密后(Base64): %s\n", ciphertextBase64)
-
+	
 	// 解密
 	decrypted, err := aescbc.AESDecryptCBC(ctx, ciphertextBase64, key, iv)
 	if err != nil {
@@ -104,7 +65,7 @@ func TestAesCbc(t *testing.T) {
 
 func TestAesCbcWithNoB64(t *testing.T) {
 	ctx := context.Background()
-	aescbc := util.AesCbc{}
+	aescbc := AesCbc{}
 	//key := []byte("11111111111111111111111111111111")
 	//key := []byte{68, 87, 80, 80, 47, 112, 77, 57, 51, 86, 112, 67, 48, 74, 90, 90, 82, 106, 47, 69, 118, 103, 61, 61, 68, 87, 80, 80, 47, 112, 77, 57}
 	key := []byte{78, 102, 68, 120, 72, 112, 117, 77, 120, 112, 54, 57, 97, 49, 108, 82, 82, 79, 53, 81, 50, 103, 61, 61, 78, 102, 68, 120, 72, 112, 117, 77}
@@ -122,7 +83,7 @@ func TestAesCbcWithNoB64(t *testing.T) {
 	}
 	fmt.Printf("加密后(Base64): %v\n", ciphertext)
 	//ciphertext = []byte{87, 180, 206, 244, 69, 224, 210, 178, 62, 90, 23, 129, 222, 132, 35, 34, 173, 112, 230, 44, 195, 114, 15, 204, 28, 158, 89, 140, 207, 133, 226, 97}
-
+	
 	// 解密
 	decrypted, err := aescbc.AESDecryptCBCWithNoBase64(ctx, ciphertext, key, iv)
 	if err != nil {
@@ -134,16 +95,16 @@ func TestAesCbcWithNoB64(t *testing.T) {
 	}
 	fmt.Printf("解密后: %s\n", string(decrypted))*/
 	fmt.Printf("%v\n", decrypted)
-
+	
 }
 
 func TestTokenDec(t *testing.T) {
 	ctx := context.Background()
-	aes := util.AesCbc{}
+	aes := AesCbc{}
 	//token := "CgAAAHSJ7px6VggEx4eVVFGn4p151HI8pONVLuogox9+Fm9q"
 	//token := "CgAAANinWXRZdg6b+kO1c+hCUgP2KxVUWwxxQkR9OR0wpf1h"
 	token := "CgAAAFKlK/BV/KsMFva5t9dmD2fugmfsoc3yK9wIiqV+CEwX"
-
+	
 	key := []byte("IypMcRkPXkbeNDRl6Km43boHr98udp7o")
 	decrypted, err := aes.AESDecryptCBCSb(ctx, token, key)
 	if err != nil {
@@ -179,16 +140,16 @@ func TestPackToken(t *testing.T) {
 	tkEnc := []byte{}
 	randKey := []byte("IypMcRkPXkbeNDRl6Km43boHr98udp7o")
 	iv := []byte("'qfpay-----token")
-
+	
 	//uid_flag64 := 0x80000000
-
+	
 	var idc uint8 = 22
 	b_idc := []byte{idc}
 	tkSrc = append(tkSrc, b_idc...)
-
+	
 	flag := "u"
 	tkSrc = append(tkSrc, flag...)
-
+	
 	//var uid uint64 = 66666666666
 	var uid uint64 = 66666666
 	if uid > 0xFFFFFFFF {
@@ -203,18 +164,18 @@ func TestPackToken(t *testing.T) {
 		binary.LittleEndian.PutUint32(b_uid, new_uid)
 		tkSrc = append(tkSrc, b_uid...)
 	}
-
+	
 	var opuid uint16 = 16
 	logger.Debugf(ctx, "use uint16 pack")
 	b_uid := make([]byte, 16)
 	binary.LittleEndian.PutUint16(b_uid, opuid)
 	tkSrc = append(tkSrc, b_uid...)
-
+	
 	var expire uint32 = 2222
 	b_expire := make([]byte, 4)
 	binary.LittleEndian.PutUint32(b_expire, expire)
 	tkSrc = append(tkSrc, b_expire...)
-
+	
 	var deadline uint64 = 444444
 	//var deadline uint64 = 44444444444
 	if deadline > 0xFFFFFFFF {
@@ -227,23 +188,23 @@ func TestPackToken(t *testing.T) {
 		binary.LittleEndian.PutUint32(b_deadline, new_deadline)
 		tkSrc = append(tkSrc, b_deadline...)
 	}
-
+	
 	var udid_len uint8 = 14
 	//b_udid_len := make([]byte, 1)
 	//binary.LittleEndian.PutUint8(b_udid_len, udid_len)
 	b_udid_len := []byte{udid_len}
 	tkSrc = append(tkSrc, b_udid_len...)
-
+	
 	udid := "0"
 	tkSrc = append(tkSrc, udid...)
-
+	
 	/*var mac uint32 = 33333
 	b_mac := make([]byte, 4)
 	binary.LittleEndian.PutUint32(b_mac, mac)
 	tkSrc = append(tkSrc, b_mac...)
 	logger.Debugf(ctx, "tkSrc len: %d", len(tkSrc))*/
-
-	aescbc := util.AesCbc{}
+	
+	aescbc := AesCbc{}
 	//rand key
 	gkey, err := aescbc.AESEncryptCBC(ctx, []byte(randStr), randKey, iv)
 	if err != nil {
@@ -251,24 +212,24 @@ func TestPackToken(t *testing.T) {
 		return
 	}
 	logger.Debugf(ctx, "gkey: %s", gkey)
-
+	
 	k := []byte{}
 	k1 := []byte(gkey)
 	k2 := []byte(gkey[0:8])
 	k = append(k, k1...)
 	k = append(k, k2...)
-
+	
 	logger.Debugf(ctx, "k len: %d", len(k))
 	//ciphertextBase64, err := aescbc.AESEncryptCBC(ctx, tkSrc, k, iv)
 	//ciphertextBase64, err := aescbc.AESEncryptCBC(ctx, k, randKey, iv)
-
+	
 	logger.Debugf(ctx, "tkSrc len: %d", len(tkSrc))
 	tkBody, err := aescbc.AESEncryptCBCWithNoBase64(ctx, tkSrc, k, iv)
 	if err != nil {
 		logger.Warnf(ctx, "err: %v", err)
 		return
 	}
-
+	
 	logger.Debugf(ctx, "body len: %d", len(tkBody))
 	//header
 	var ver uint32 = 1
@@ -285,21 +246,21 @@ func TestPackToken(t *testing.T) {
 		ver = ver | flag
 	}
 	logger.Debugf(ctx, "ver: %x", ver)
-
+	
 	b_ver := make([]byte, 4)
 	binary.LittleEndian.PutUint32(b_ver, ver)
 	tkEnc = append(tkEnc, b_ver...)
-
+	
 	var mac uint64 = 100
 	b_mac := make([]byte, 8)
 	binary.LittleEndian.PutUint64(b_mac, mac)
 	tkEnc = append(tkEnc, b_mac...)
-
+	
 	randInt := binary.LittleEndian.Uint16([]byte(randStr))
 	logger.Debugf(ctx, "randInt: %x", randInt)
 	ver = ver | (uint32(randInt) << 8)
 	logger.Debugf(ctx, "ver: %x", ver)
-
+	
 	if 1 == 1 {
 		rt := (ver & uint32(0x00FFFF00)) >> 8
 		rt16 := uint16(rt)
@@ -308,10 +269,10 @@ func TestPackToken(t *testing.T) {
 		srt := string(brt)
 		logger.Debugf(ctx, "srt: %s", srt)
 	}
-
+	
 	tkEnc = append(tkEnc, tkBody...)
 	logger.Debugf(ctx, "tkEnc len: %d", len(tkEnc))
-
+	
 	ciphertextBase64 := base64.StdEncoding.EncodeToString(tkEnc)
 	logger.Debugf(ctx, "ciphertextBase64: %s", ciphertextBase64)
 }
