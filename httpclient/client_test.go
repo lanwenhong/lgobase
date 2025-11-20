@@ -15,7 +15,7 @@ import (
 func TestHttpGet(t *testing.T) {
 	ctx := context.WithValue(context.Background(), "trace_id", util.GenXid())
 	client := httpclient.NewHttpClient(nil)
-	caCertPath := "../network/cert1/server.crt" // 你的 CA 根证书路径（PEM 格式）
+	caCertPath := "../network/cert1/ca.crt" // 你的 CA 根证书路径（PEM 格式）
 	caCert, err := ioutil.ReadFile(caCertPath)
 	if err != nil {
 		//log.Fatalf("读取 CA 证书失败：%v", err)
