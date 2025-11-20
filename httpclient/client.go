@@ -38,7 +38,7 @@ func NewHttpClient(transport *http.Transport) *resty.Client {
 			s = "NonStringBody"
 		}
 		ctx := req.Context()
-		logger.Infof(ctx, "send|url=%s|body=%s", req.URL, s)
+		logger.Infof(ctx, "send|mehtod=%s|url=%s|body=%s", req.Method, req.URL, s)
 		return nil
 	})
 
