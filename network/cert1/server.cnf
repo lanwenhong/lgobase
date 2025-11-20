@@ -1,0 +1,23 @@
+[req]
+default_bits = 2048
+prompt = no  # 生成时不弹出交互提示（自动用配置中的值）
+default_md = sha256
+distinguished_name = dn  # 引用下方 [dn] 段的身份信息
+req_extensions = req_extensions  # 引用下方 [req_extensions] 段的扩展配置
+
+[dn]
+C = CN          # 国家（随意填，如 CN=中国）
+ST = Beijing    # 省份（随意填，如 Beijing=北京）
+L = Beijing     # 城市（随意填，如 Beijing=北京）
+O = TestOrg     # 组织（随意填，如 TestOrg=测试组织）
+OU = TestDept   # 部门（随意填，如 TestDept=测试部门）
+CN = localhost  # 传统 CN 字段（仅占位，Go 1.15+ 不再用于验证）
+
+[req_extensions]
+subjectAltName = @alt_names  # 启用 SAN 字段，引用下方 [alt_names] 段
+
+[alt_names]
+DNS.1 = localhost           # 允许的域名 1（本地测试必填）
+DNS.2 = your-domain.com     # 允许的域名 2（替换为你的实际域名，可选）
+IP.1 = 127.0.0.1            # 允许的 IP 1（本地测试必填）
+IP.2 = 192.168.1.100        # 允许的 IP 2（局域网测试，替换为你的服务器 IP，可选）

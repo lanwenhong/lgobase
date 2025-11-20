@@ -1,0 +1,30 @@
+[req]
+default_bits = 4096  # CA 证书建议用 4096 位（更安全）
+prompt = no
+default_md = sha256
+distinguished_name = dn
+req_extensions = req_ext  # 启用扩展字段
+x509_extensions = x509_ext  # 自签名时的扩展字段（关键）
+
+[dn]
+C = CN          # 国家（随意填）
+ST = Beijing    # 省份
+L = Beijing     # 城市
+O = InternalCA  # 组织（如“内部 CA 机构”）
+OU = CA Dept    # 部门
+CN = InternalRootCA  # 根 CA 的 CN（仅占位，带 SAN 后不依赖）
+
+[req_ext]
+subjectAltName = @ca_san  # 根 CA 的 SAN（可选，推荐添加）
+keyUsage = critical, digitalSignature, cRLSign, keyCertSign  # CA 必须的密钥用途（签名证书、CRL）
+
+[x509_ext]
+subjectAltName = @ca_san  # 自签名证书需重复 SAN 配置
+keyUsage = critical, digitalSignature, cRLSign, keyCertSign  # 关键：CA 权限
+basicConstraints = critical, CA:TRUE, pathlen:0  # 允许签发证书，pathlen:0 表示不能再签发子 CA（仅允许签终端证书）
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid:always, issuer:always
+
+[ca_san]
+DNS.1 = InternalRootCA  # 根 CA 的 SAN（可填域名或标识，无实际访问需求，仅满足格式）
+DNS.2 = ca.your-internal.com  # 可选：根 CA 的逻辑域名

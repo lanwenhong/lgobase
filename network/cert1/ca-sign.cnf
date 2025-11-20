@@ -1,0 +1,39 @@
+[ca]
+default_ca = myca  # 引用下方 [myca] 段
+
+[myca]
+dir = ./  # CA 文件目录（当前目录）
+certs = $dir  # 证书存储目录
+private_key = $dir/ca.key  # 根 CA 私钥路径
+certificate = $dir/ca.crt  # 根 CA 证书路径
+default_md = sha256
+policy = policy_anything  # 宽松策略（无需与 CA 字段完全一致）
+serial = $dir/ca.srl  # 证书序列号文件（自动生成）
+database = $dir/ca.db  # 证书数据库（自动生成）
+new_certs_dir = $dir  # 新生成的证书存储目录
+default_days = 365  # 服务器证书有效期（1 年）
+x509_extensions = server_ext  # 服务器证书的扩展字段（关键）
+
+[policy_anything]
+countryName = optional
+stateOrProvinceName = optional
+localityName = optional
+organizationName = optional
+organizationalUnitName = optional
+commonName = supplied
+emailAddress = optional
+
+[server_ext]
+subjectAltName = @server_san  # 继承服务器 CSR 中的 SAN（或重新指定）
+keyUsage = digitalSignature, keyEncipherment
+extendedKeyUsage = serverAuth  # 服务端认证
+basicConstraints = CA:FALSE  # 不可作为 CA
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid:always, issuer:always  # 绑定根 CA 标识（信任链关键）
+
+# 此处的 server_san 需与服务器 CSR 一致（或直接复用 CSR 中的 SAN，注释掉此行则自动继承）
+[server_san]
+DNS.1 = server.your-internal.com
+DNS.2 = localhost
+IP.1 = 192.168.1.100
+IP.2 = 127.0.0.1
