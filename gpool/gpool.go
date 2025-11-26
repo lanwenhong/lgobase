@@ -50,7 +50,7 @@ type Gpool[T any] struct {
 	Waits        uint
 	WaitNotify   chan struct{}
 	PurgeNotify  chan struct{}
-	Gpconf       *GPoolConfig
+	Gpconf       *GPoolConfig[T]
 }
 
 func (gp *Gpool[T]) GpoolInit(addr string, port int, timeout int,
@@ -412,6 +412,57 @@ func (gp *Gpool[T]) ThriftCall2(ctx context.Context, process func(client interfa
 	}*/
 	client := pc.Gc.GetThrfitClient()
 	rpc_name, err = process(client)
+	if err != nil {
+		rpc_err = err
+		logger.Warnf(ctx, "rpc ret %s", err.Error())
+		switch err.(type) {
+		case thrift.TTransportException:
+			tte := err.(thrift.TTransportException)
+			e_type_id := tte.TypeId()
+			logger.Warnf(ctx, "e id: %d", e_type_id)
+			pc.Gc.Close()
+		case thrift.TProtocolException:
+			tpe := err.(thrift.TProtocolException)
+			e_type_id := tpe.TypeId()
+			logger.Warnf(ctx, "e id: %d", e_type_id)
+			pc.Gc.Close()
+		default:
+			logger.Warnf(ctx, "e: %v", err)
+		}
+		return err
+	}
+	return nil
+}
+
+func (gp *Gpool[T]) ThriftCall2WithReqId(ctx context.Context, process func(ctx context.Context, client interface{}) (string, error)) error {
+	var rpc_err error
+	var rpc_name string = ""
+	pc, err := gp.Get(ctx)
+	if pc != nil {
+		defer pc.Close(ctx)
+	}
+	if err != nil {
+		logger.Warnf(ctx, "get conn err: %s", err.Error())
+		return err
+	}
+	tconn := pc.Gc.(*TConn[T])
+
+	//starttime := time.Now().UnixNano()
+	starttime := time.Now()
+	defer func() {
+		//endTime := time.Now().UnixNano()
+		//endTime := time.Now()
+		errStr := ""
+		if rpc_err != nil {
+			errStr = rpc_err.Error()
+		}
+		rid := GetRequestID(ctx)
+		address := fmt.Sprintf("%s:%d", tconn.Addr, tconn.Port)
+		logger.Infof(ctx, "func=ThriftCall2|method=%v|addr=%s:%d|request_id=%s|time=%v|err=%s",
+			rpc_name, address, time.Duration(tconn.TimeOut), rid, time.Since(starttime), errStr)
+	}()
+	client := pc.Gc.GetThrfitClient()
+	rpc_name, err = process(ctx, client)
 	if err != nil {
 		rpc_err = err
 		logger.Warnf(ctx, "rpc ret %s", err.Error())

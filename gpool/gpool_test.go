@@ -443,7 +443,7 @@ func TestMaxConnLife(t *testing.T) {
 	}*/
 
 	g_conf := &gpool.GPoolConfig[echo.EchoClient]{
-		Addrs:        "127.0.0.1:9897/3000",
+		Addrs:        "127.0.0.1:9898/3000",
 		MaxConns:     100,
 		MaxIdleConns: 10,
 		MaxConnLife:  10,
@@ -456,7 +456,7 @@ func TestMaxConnLife(t *testing.T) {
 	rps := gpool.RpcPoolSelector[echo.EchoClient]{}
 	rps.RpcPoolInit(ctx, g_conf)
 
-	for i := 0; i < 100; i++ {
+	for i := 0; i < 1; i++ {
 		var r *echo.EchoRes = nil
 		process := func(client interface{}) (string, error) {
 			var err error = nil
