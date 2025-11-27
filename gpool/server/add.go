@@ -25,6 +25,15 @@ func (sh *SvrHandler) Add(ctx context.Context, a int32, b int32) (int32, error) 
 	return c, nil
 }
 
+func (sh *SvrHandler) PostUser(ctx context.Context, req *server.GetUserRequest) (int32, error) {
+	rid := gpool.GetRequestID(ctx)
+	logger.Debugf(ctx, "rid: %s", rid)
+	//logger.Debugf(ctx, "Rp: %p rquestID: %s rid: %s", sh.Rp, sh.Rp.RequestID, rid)
+	//logger.Debugf(ctx, "Rp: %p rquestID: %s", sh.Rp, rid)
+	logger.Debugf(ctx, "req: %v", req)
+	return 0, nil
+}
+
 func main() {
 	ctx := context.WithValue(context.Background(), "trace_id", util.GenXid())
 	// 1. 创建服务端监听 socket

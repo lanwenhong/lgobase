@@ -28,6 +28,7 @@ func (e *ExampleServer) Echo(ctx context.Context, req string) (ret *example.Myre
 }
 
 func main() {
+	ctx := context.Background()
 	transport, err := thrift.NewTServerSocket(":9899")
 	if err != nil {
 		fmt.Println(err.Error())
