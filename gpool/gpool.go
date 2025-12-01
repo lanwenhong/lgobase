@@ -434,7 +434,8 @@ func (gp *Gpool[T]) ThriftCall2(ctx context.Context, process func(client interfa
 	return nil
 }
 
-func (gp *Gpool[T]) ThriftCall2WithReqId(ctx context.Context, process func(ctx context.Context, client interface{}) (string, error)) error {
+// func (gp *Gpool[T]) ThriftCall2WithReqId(ctx context.Context, process func(ctx context.Context, client interface{}) (string, error)) error {
+func (gp *Gpool[T]) ThriftExtCall2(ctx context.Context, process func(ctx context.Context, client interface{}) (string, error)) error {
 	var rpc_err error
 	var rpc_name string = ""
 	pc, err := gp.Get(ctx)
@@ -456,7 +457,8 @@ func (gp *Gpool[T]) ThriftCall2WithReqId(ctx context.Context, process func(ctx c
 		if rpc_err != nil {
 			errStr = rpc_err.Error()
 		}
-		rid := GetRequestID(ctx)
+		nCtx := ctx.(*ExtContext)
+		rid := nCtx.GetReqExtData("request_id")
 		address := fmt.Sprintf("%s:%d", tconn.Addr, tconn.Port)
 		logger.Infof(ctx, "func=ThriftCall2|method=%v|addr=%s:%d|request_id=%s|time=%v|err=%s",
 			rpc_name, address, time.Duration(tconn.TimeOut), rid, time.Since(starttime), errStr)

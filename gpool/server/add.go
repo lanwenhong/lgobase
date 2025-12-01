@@ -51,10 +51,11 @@ func main() {
 	// 5. 创建处理器并启动服务
 	sh := &SvrHandler{}
 	processor := server.NewServerTestProcessor(sh)
-	processor1 := gpool.NewRequestIDProcessor(processor, rawProtoFactory)
+	processor1 := gpool.NewExtProcessor(processor, rawProtoFactory)
 
 	server := thrift.NewTSimpleServer4(
 		processor1,
+		//processor,
 		serverSocket,
 		transportFactory,
 		rawProtoFactory,

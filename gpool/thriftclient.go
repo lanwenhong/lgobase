@@ -57,7 +57,7 @@ func (tc *TConn[T]) Init(addr string, port int, timeout int) error {
 	return nil
 }
 
-func (tc *TConn[T]) InitWithReqId(addr string, port int, timeout int) error {
+func (tc *TConn[T]) InitThriftExt(addr string, port int, timeout int) error {
 	tc.Addr = addr
 	tc.Port = port
 	tc.TimeOut = timeout
@@ -74,7 +74,7 @@ func (tc *TConn[T]) InitWithReqId(addr string, port int, timeout int) error {
 		tc.Tbt = thrift.NewTBufferedTransport(socket, 8192)
 		tc.Tbp = thrift.NewTBinaryProtocolFactoryDefault()
 	}
-	tc.Tbp = NewRequestIDProtocolClient(tc.Tbp)
+	tc.Tbp = NewThriftExtProtocolClient(tc.Tbp)
 	return nil
 }
 
@@ -139,11 +139,11 @@ func CreateThriftFramedConn[T any](ctx context.Context, addr string, port int, t
 	return c, err
 }
 
-func CreateThriftFramedConnWithReqId[T any](ctx context.Context, addr string, port int, timeout int) (c Conn[T], err error) {
+func CreateThriftFramedConnThriftExt[T any](ctx context.Context, addr string, port int, timeout int) (c Conn[T], err error) {
 	tc := &TConn[T]{}
 	tc.Protocol = TH_PRO_FRAMED
 	tc.isOpen = false
-	tc.InitWithReqId(addr, port, timeout)
+	tc.InitThriftExt(addr, port, timeout)
 	err = tc.Open()
 	c = tc
 	return c, err
@@ -159,11 +159,11 @@ func CreateThriftBufferConn[T any](ctx context.Context, addr string, port int, t
 	return c, err
 }
 
-func CreateThriftBufferConnWithReqId[T any](ctx context.Context, addr string, port int, timeout int) (c Conn[T], err error) {
+func CreateThriftBufferConnThriftExt[T any](ctx context.Context, addr string, port int, timeout int) (c Conn[T], err error) {
 	tc := &TConn[T]{}
 	tc.Protocol = TH_PRO_BUFFER
 	tc.isOpen = false
-	tc.InitWithReqId(addr, port, timeout)
+	tc.InitThriftExt(addr, port, timeout)
 	err = tc.Open()
 	c = tc
 	return c, err
