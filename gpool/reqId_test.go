@@ -23,11 +23,11 @@ func TestReqId(t *testing.T) {
 	addPool := gpool.NewRpcPoolSelector[server.ServerTestClient](ctx, g_conf)
 
 	wg := sync.WaitGroup{}
-	for i := 0; i < 2; i++ {
+	for i := 0; i < 3; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for i := 0; i < 100; i++ {
+			for i := 0; i < 50; i++ {
 				process := func(ctx context.Context, client interface{}) (string, error) {
 					//process := func(client interface{}) (string, error) {
 					c := client.(*server.ServerTestClient)

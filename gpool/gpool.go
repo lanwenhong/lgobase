@@ -71,13 +71,7 @@ func (gp *Gpool[T]) GpoolInit(addr string, port int, timeout int,
 	gp.PurgeNotify = make(chan struct{}, 1)
 
 	ctx := context.Background()
-	for i := 0; i < gp.MaxIdleConns; i++ {
-		c, err := gp.Get(ctx)
-		if err == nil {
-			c.Close(ctx)
-		}
-
-	}
+	gp.CreateIdleConn(ctx)
 
 	go func() {
 		ctx := context.WithValue(context.Background(), "trace_id", util.GenXid())
@@ -134,6 +128,16 @@ func (gp *Gpool[T]) GpoolInit2(addr string, port int, timeout int, gp_conf *GPoo
 			}
 		}
 	}()
+}
+
+func (gp *Gpool[T]) CreateIdleConn(ctx context.Context) {
+	for i := 0; i < gp.MaxIdleConns; i++ {
+		c, err := gp.getConnFromFreeList(ctx)
+		if err == nil {
+			c.Close(ctx)
+		}
+
+	}
 }
 
 func (gp *Gpool[T]) getConnFromFreeList(ctx context.Context) (*PoolConn[T], error) {
