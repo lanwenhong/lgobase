@@ -70,6 +70,15 @@ func (gp *Gpool[T]) GpoolInit(addr string, port int, timeout int,
 	gp.WaitNotify = make(chan struct{})
 	gp.PurgeNotify = make(chan struct{}, 1)
 
+	ctx := context.Background()
+	for i := 0; i < gp.MaxIdleConns; i++ {
+		c, err := gp.Get(ctx)
+		if err == nil {
+			c.Close(ctx)
+		}
+
+	}
+
 	go func() {
 		ctx := context.WithValue(context.Background(), "trace_id", util.GenXid())
 		for {

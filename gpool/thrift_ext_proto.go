@@ -156,30 +156,37 @@ func (p *ExtProcessor) ReadMetaVer(ctx context.Context, in, out thrift.TProtocol
 	return ver, true, nil
 }
 
-func (p *ExtProcessor) ReadMetaMap(ctx context.Context, in, out thrift.TProtocol) (map[string]string, error) {
-	reqData := make(map[string]string)
+// func (p *ExtProcessor) ReadMetaMap(ctx context.Context, in, out thrift.TProtocol) (map[string]string, error) {
+func (p *ExtProcessor) ReadMetaMap(ctx context.Context, in, out thrift.TProtocol) (context.Context, error) {
+	//reqData := make(map[string]string)
 	_, _, size, err := in.ReadMapBegin(ctx)
 	if err != nil {
 		logger.Warnf(ctx, "read map header err: %v", err)
-		return reqData, err
+		//return ctx, reqData, err
+		return ctx, err
 	}
 	logger.Debugf(ctx, "size: %d", size)
 	for i := 0; i < size; i++ {
 		k, err := in.ReadString(ctx)
 		if err != nil {
 			logger.Warnf(ctx, "read map key err: %v", err)
-			return reqData, err
+			//return ctx, reqData, err
+			return ctx, err
 		}
 		v, err := in.ReadString(ctx)
 		if err != nil {
 			logger.Warnf(ctx, "read map v err: %v", err)
-			return reqData, err
+			//return ctx, reqData, err
+			return ctx, err
 		}
 		logger.Debugf(ctx, "k=%s v=%s", k, v)
-		reqData[k] = v
+		//reqData[k] = v
+		ctx = context.WithValue(ctx, k, v)
+
 	}
-	in.ReadMapEnd(ctx)
-	return reqData, err
+	//in.ReadMapEnd(ctx)
+	//return ctx, reqData, err
+	return ctx, err
 }
 
 func (p *ExtProcessor) Process(ctx context.Context, in, out thrift.TProtocol) (bool, thrift.TException) {
@@ -203,7 +210,8 @@ func (p *ExtProcessor) Process(ctx context.Context, in, out thrift.TProtocol) (b
 			return flag, ex
 		}
 		//map
-		reqData, err := p.ReadMetaMap(ctx, in, out)
+		//reqData, err := p.ReadMetaMap(ctx, in, out)
+		ctx, err = p.ReadMetaMap(ctx, in, out)
 		if err != nil {
 			if err.(thrift.TProtocolException).TypeId() == thrift.END_OF_FILE {
 				return false, thrift.NewTTransportException(thrift.END_OF_FILE, "connection closed (EOF)")
@@ -212,9 +220,9 @@ func (p *ExtProcessor) Process(ctx context.Context, in, out thrift.TProtocol) (b
 				return false, thrift.NewTTransportException(thrift.INVALID_DATA, "invalid data")
 			}
 		}
-		for k, v := range reqData {
+		/*for k, v := range reqData {
 			ctx = context.WithValue(ctx, k, v)
-		}
+		}*/
 
 	} else {
 		logger.Debugf(ctx, "use normal thrift proto")
