@@ -189,8 +189,6 @@ func (rps *RpcPoolSelector[T]) ThriftExtCall(ctx context.Context, process func(c
 		nCtx = nCtx.SetReqExtData(nCtx, "request_id", util.NewRequestID())
 	}
 	rid = GetRequestID(nCtx)
-	logger.Debugf(nCtx, "rid: %s", rid)
-	logger.Debugf(nCtx, "rid: %s", nCtx.GetReqExtData("request_id"))
 	err := rps_pool.Gp.ThriftExtCall2(nCtx, process)
 	if rps.Gpconf.Ping != nil && err != nil {
 

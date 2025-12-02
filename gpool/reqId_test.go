@@ -16,8 +16,8 @@ func TestReqId(t *testing.T) {
 	ctx := context.Background()
 	g_conf := &gpool.GPoolConfig[server.ServerTestClient]{
 		Addrs: "127.0.0.1:9090/30000",
-		Cfunc: gpool.CreateThriftFramedConnThriftExt[server.ServerTestClient],
-		//Cfunc: gpool.CreateThriftFramedConn[server.ServerTestClient],
+		//Cfunc: gpool.CreateThriftFramedConnThriftExt[server.ServerTestClient],
+		Cfunc: gpool.CreateThriftFramedConn[server.ServerTestClient],
 		//Cfunc: gpool.CreateThriftBufferConnThriftExt[server.ServerTestClient],
 		//Cfunc: gpool.CreateThriftBufferConn[server.ServerTestClient],
 		Nc: server.NewServerTestClientFactory,
@@ -25,13 +25,14 @@ func TestReqId(t *testing.T) {
 	addPool := gpool.NewRpcPoolSelector[server.ServerTestClient](ctx, g_conf)
 
 	wg := sync.WaitGroup{}
-	for i := 0; i < 3; i++ {
+	for i := 0; i < 2; i++ {
+		ctx = context.WithValue(ctx, "trace_id", uuid.New().String())
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			for i := 0; i < 50; i++ {
-				process := func(ctx context.Context, client interface{}) (string, error) {
-					//process := func(client interface{}) (string, error) {
+				//process := func(ctx context.Context, client interface{}) (string, error) {
+				process := func(client interface{}) (string, error) {
 					c := client.(*server.ServerTestClient)
 					r, err := c.Add(ctx, 1, 1)
 					if err != nil {
@@ -41,10 +42,9 @@ func TestReqId(t *testing.T) {
 					return "add", err
 				}
 
-				ctx = context.WithValue(ctx, "trace_id", uuid.New().String())
-				ctx = gpool.NewExtContext(ctx)
-				addPool.ThriftExtCall(ctx, process)
-				//addPool.ThriftCall(ctx, process)
+				//ctx = gpool.NewExtContext(ctx)
+				//addPool.ThriftExtCall(ctx, process)
+				addPool.ThriftCall(ctx, process)
 
 			}
 
@@ -107,6 +107,7 @@ func TestGetConnTimeOut(t *testing.T) {
 	for i := 0; i < 1; i++ {
 		wg.Add(1)
 		go func() {
+			ctx = context.WithValue(ctx, "trace_id", uuid.New().String())
 			defer wg.Done()
 			for i := 0; i < 1; i++ {
 				process := func(ctx context.Context, client interface{}) (string, error) {
@@ -119,9 +120,7 @@ func TestGetConnTimeOut(t *testing.T) {
 					logger.Debugf(ctx, "r: %d", r)
 					return "add", err
 				}
-				ctx = context.WithValue(ctx, "trace_id", uuid.New().String())
 				nCtx := gpool.NewExtContext(ctx)
-				//ctx = nCtx.SetReqExtData(nCtx, "trace_id", uuid.New().String())
 				addPool.ThriftExtCall(nCtx, process)
 
 			}
@@ -132,6 +131,7 @@ func TestGetConnTimeOut(t *testing.T) {
 	for i := 0; i < 2; i++ {
 		wg.Add(1)
 		go func() {
+			ctx = context.WithValue(ctx, "trace_id", uuid.New().String())
 			defer wg.Done()
 			for i := 0; i < 1; i++ {
 				process := func(ctx context.Context, client interface{}) (string, error) {
@@ -143,10 +143,7 @@ func TestGetConnTimeOut(t *testing.T) {
 					logger.Debugf(ctx, "r: %d", r)
 					return "add", err
 				}
-				ctx = context.WithValue(ctx, "trace_id", uuid.New().String())
 				nCtx := gpool.NewExtContext(ctx)
-				//nCtx = nCtx.SetReqExtData(nCtx, "111", "111")
-				//nCtx = nCtx.SetReqExtData(nCtx, "222", "222")
 				addPool.ThriftExtCall(nCtx, process)
 			}
 

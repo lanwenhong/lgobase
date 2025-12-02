@@ -107,7 +107,7 @@ func (gp *Gpool[T]) GpoolInit2(addr string, port int, timeout int, gp_conf *GPoo
 	gp.TimeOut = timeout
 	gp.Cfunc = gp_conf.Cfunc
 	gp.Nc = gp_conf.Nc
-	gp.WaitNotify = make(chan struct{})
+	gp.WaitNotify = make(chan struct{}, gp.MaxIdleConns)
 	gp.PurgeNotify = make(chan struct{}, 1)
 	gp.Gpconf = gp_conf
 
@@ -222,11 +222,12 @@ func (gp *Gpool[T]) getConnFromWait(ctx context.Context) (*PoolConn[T], error) {
 			flen := gp.FreeList.Len()
 			if gp.FreeList.Len()+gp.UseList.Len() >= gp.MaxConns && flen <= 0 {
 				logger.Debugf(ctx, "wait again")
-				gp.Waits += 1
+				//gp.Waits += 1
 				//gp.Waits.Add(1)
 				timeout = (time.Duration(gp.TimeOut) * time.Millisecond) - time.Duration(time.Since(start).Milliseconds())
 				continue
 			}
+			gp.Waits -= 1
 			if gp.FreeList.Len()+gp.UseList.Len() < gp.MaxConns {
 				if gp.FreeList.Len() > 0 {
 					return gp.getConnFromFreeList(ctx)
@@ -335,13 +336,16 @@ func (pc *PoolConn[T]) put(ctx context.Context) error {
 	}
 	logger.Debugf(ctx, "after put flist len %d ulist len %d", pc.gp.FreeList.Len(), pc.gp.UseList.Len())
 	if pc.gp.Waits > 0 {
-		//if pc.gp.Waits.Load() > 0 {
 		logger.Debugf(ctx, "notify waits: %d", pc.gp.Waits)
-		pc.gp.Waits -= 1
-		//pc.gp.Waits.Add(-1)
+		//pc.gp.Waits -= 1
 		logger.Debugf(ctx, "notified waits: %d", pc.gp.Waits)
 		pc.gp.mutex.Unlock()
-		pc.gp.WaitNotify <- struct{}{}
+		select {
+		case pc.gp.WaitNotify <- struct{}{}:
+			logger.Debugf(ctx, "notify waits: %d", pc.gp.Waits)
+		default:
+			logger.Debugf(ctx, "ch full do nothing")
+		}
 	} else {
 		pc.gp.mutex.Unlock()
 	}
