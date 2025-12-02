@@ -14,16 +14,16 @@ func TestReqId(t *testing.T) {
 	ctx := context.Background()
 	g_conf := &gpool.GPoolConfig[server.ServerTestClient]{
 		Addrs: "127.0.0.1:9090/30000",
-		//Cfunc: gpool.CreateThriftFramedConnThriftExt[server.ServerTestClient],
+		Cfunc: gpool.CreateThriftFramedConnThriftExt[server.ServerTestClient],
 		//Cfunc: gpool.CreateThriftFramedConn[server.ServerTestClient],
-		Cfunc: gpool.CreateThriftBufferConnThriftExt[server.ServerTestClient],
+		//Cfunc: gpool.CreateThriftBufferConnThriftExt[server.ServerTestClient],
 		//Cfunc: gpool.CreateThriftBufferConn[server.ServerTestClient],
 		Nc: server.NewServerTestClientFactory,
 	}
 	addPool := gpool.NewRpcPoolSelector[server.ServerTestClient](ctx, g_conf)
 
 	wg := sync.WaitGroup{}
-	for i := 0; i < 4; i++ {
+	for i := 0; i < 2; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
