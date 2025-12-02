@@ -4,7 +4,9 @@ import (
 	"context"
 	"sync"
 	"testing"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/lanwenhong/lgobase/gpool"
 	"github.com/lanwenhong/lgobase/gpool/gen-go/server"
 	"github.com/lanwenhong/lgobase/logger"
@@ -38,6 +40,8 @@ func TestReqId(t *testing.T) {
 					logger.Debugf(ctx, "r: %d", r)
 					return "add", err
 				}
+
+				ctx = context.WithValue(ctx, "trace_id", uuid.New().String())
 				ctx = gpool.NewExtContext(ctx)
 				addPool.ThriftExtCall(ctx, process)
 				//addPool.ThriftCall(ctx, process)
@@ -86,4 +90,68 @@ func TestPostStru(t *testing.T) {
 	}
 	wg.Wait()
 
+}
+
+func TestGetConnTimeOut(t *testing.T) {
+	ctx := context.Background()
+	g_conf := &gpool.GPoolConfig[server.ServerTestClient]{
+		Addrs:        "127.0.0.1:9090/3000",
+		MaxConns:     1,
+		MaxIdleConns: 1,
+		Cfunc:        gpool.CreateThriftFramedConnThriftExt[server.ServerTestClient],
+		Nc:           server.NewServerTestClientFactory,
+	}
+	addPool := gpool.NewRpcPoolSelector[server.ServerTestClient](ctx, g_conf)
+
+	wg := sync.WaitGroup{}
+	for i := 0; i < 1; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := 0; i < 1; i++ {
+				process := func(ctx context.Context, client interface{}) (string, error) {
+					time.Sleep(5 * time.Second)
+					c := client.(*server.ServerTestClient)
+					r, err := c.Add(ctx, 1, 1)
+					if err != nil {
+						logger.Warnf(ctx, "err: %s", err.Error())
+					}
+					logger.Debugf(ctx, "r: %d", r)
+					return "add", err
+				}
+				ctx = context.WithValue(ctx, "trace_id", uuid.New().String())
+				nCtx := gpool.NewExtContext(ctx)
+				//ctx = nCtx.SetReqExtData(nCtx, "trace_id", uuid.New().String())
+				addPool.ThriftExtCall(nCtx, process)
+
+			}
+
+		}()
+	}
+	time.Sleep(1 * time.Second)
+	for i := 0; i < 2; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := 0; i < 1; i++ {
+				process := func(ctx context.Context, client interface{}) (string, error) {
+					c := client.(*server.ServerTestClient)
+					r, err := c.Add(ctx, 1, 1)
+					if err != nil {
+						logger.Warnf(ctx, "err: %s", err.Error())
+					}
+					logger.Debugf(ctx, "r: %d", r)
+					return "add", err
+				}
+				ctx = context.WithValue(ctx, "trace_id", uuid.New().String())
+				nCtx := gpool.NewExtContext(ctx)
+				//nCtx = nCtx.SetReqExtData(nCtx, "111", "111")
+				//nCtx = nCtx.SetReqExtData(nCtx, "222", "222")
+				addPool.ThriftExtCall(nCtx, process)
+			}
+
+		}()
+	}
+
+	wg.Wait()
 }
