@@ -17,7 +17,7 @@ func TestReqId(t *testing.T) {
 
 	myconf := &logger.Glogconf{
 		RotateMethod: logger.ROTATE_FILE_DAILY,
-		Stdout:       true,
+		Stdout:       false,
 		Colorful:     true,
 		Loglevel:     logger.DEBUG,
 	}
@@ -37,7 +37,7 @@ func TestReqId(t *testing.T) {
 	addPool := gpool.NewRpcPoolSelector[server.ServerTestClient](ctx, g_conf)
 
 	wg := sync.WaitGroup{}
-	for i := 0; i < 2; i++ {
+	for i := 0; i < 10; i++ {
 		ctx = context.WithValue(ctx, "trace_id", uuid.New().String())
 		wg.Add(1)
 		go func() {

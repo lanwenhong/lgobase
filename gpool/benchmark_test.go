@@ -121,10 +121,11 @@ func BenchmarkThriftExt(b *testing.B) {
 	addPool := gpool.NewRpcPoolSelector[server.ServerTestClient](ctx, g_conf)
 
 	b.ResetTimer()
+	//nCtx := gpool.NewExtContext(ctx)
 	for n := 0; n < b.N; n++ {
 		ctx = context.WithValue(ctx, "trace_id", uuid.New().String())
-		//process := func(ctx context.Context, client interface{}) (string, error) {
-		process := func(client interface{}) (string, error) {
+		process := func(ctx context.Context, client interface{}) (string, error) {
+			//process := func(client interface{}) (string, error) {
 			c := client.(*server.ServerTestClient)
 			r, err := c.Add(ctx, 1, 1)
 			if err != nil {
@@ -133,10 +134,10 @@ func BenchmarkThriftExt(b *testing.B) {
 			logger.Debugf(ctx, "r: %d", r)
 			return "add", err
 		}
-
-		//ctx = gpool.NewExtContext(ctx)
-		//addPool.ThriftExtCall(ctx, process)
-		addPool.ThriftCall(ctx, process)
+		//nCtx = nCtx.SetReqExtData(ctx, "request_id", uuid.New().String())
+		ctx = gpool.NewExtContext(ctx)
+		addPool.ThriftExtCall(ctx, process)
+		//addPool.ThriftCall(ctx, process)
 	}
 
 }
