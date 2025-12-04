@@ -44,7 +44,7 @@ func main() {
 
 	myconf := &logger.Glogconf{
 		RotateMethod: logger.ROTATE_FILE_DAILY,
-		Stdout:       true,
+		Stdout:       false,
 		Colorful:     true,
 		Loglevel:     logger.INFO,
 	}
