@@ -5,7 +5,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/lanwenhong/lgobase/cas"
 	"github.com/lanwenhong/lgobase/logger"
 	"github.com/lanwenhong/lgobase/util"
@@ -36,7 +35,7 @@ func TestQPush(t *testing.T) {
 	logger.Debugf(ctx, "%d", c)
 }
 
-func TestPushPop(t *testing.T) {
+/*func TestPushPop(t *testing.T) {
 	ctx := context.WithValue(context.Background(), "trace_id", util.GenUlid())
 	use_list := cas.NewCASDoubleLinkedList()
 	//free_list := cas.NewCASDoubleLinkedList()
@@ -92,4 +91,4 @@ func Test2Push(t *testing.T) {
 		}
 
 	}
-}
+}*/

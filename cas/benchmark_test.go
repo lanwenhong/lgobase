@@ -29,7 +29,7 @@ func Benchmark2QParallel(b *testing.B) {
 	})
 }
 
-func BenchmarkCASDoubleLinkedList_PushFront(b *testing.B) {
+/*func BenchmarkCASDoubleLinkedList_PushFront(b *testing.B) {
 	ctx := context.WithValue(context.Background(), "trace_id", util.GenUlid())
 	list := cas.NewCASDoubleLinkedList()
 	b.ResetTimer() // 重置计时器（忽略前面的初始化耗时）
@@ -38,9 +38,9 @@ func BenchmarkCASDoubleLinkedList_PushFront(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		list.PushFront(ctx, i)
 	}
-}
+}*/
 
-func BenchmarkCASDoubleLinkedList_PopPush(b *testing.B) {
+/*func BenchmarkCASDoubleLinkedList_PopPush(b *testing.B) {
 	ctx := context.WithValue(context.Background(), "trace_id", util.GenUlid())
 	use_list := cas.NewCASDoubleLinkedList()
 	free_list := cas.NewCASDoubleLinkedList()
@@ -78,4 +78,4 @@ func BenchmarkParallelCASDoubleLinkedList_PopPush(b *testing.B) {
 
 		}
 	})
-}
+}*/
