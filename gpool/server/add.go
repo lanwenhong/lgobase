@@ -42,6 +42,14 @@ func main() {
 		panic(err)
 	}
 
+	myconf := &logger.Glogconf{
+		RotateMethod: logger.ROTATE_FILE_DAILY,
+		Stdout:       true,
+		Colorful:     true,
+		Loglevel:     logger.INFO,
+	}
+	logger.Newglog("./", "add.log", "add.log.err", myconf)
+
 	// 2. 创建 Framed 传输工厂（核心：服务端需与客户端一致使用帧模式）
 	transportFactory := thrift.NewTFramedTransportFactory(thrift.NewTTransportFactory())
 	//transportFactory := thrift.NewTBufferedTransportFactory(8192)

@@ -58,25 +58,25 @@ func NewExtContext(ctx context.Context) *ExtContext {
 }
 
 func (ec *ExtContext) SetReqExtData(ctx context.Context, k, v string) *ExtContext {
-	//ec.ReqExtData[k] = v
-	newValues := make(map[string]string)
-	//logger.Debugf(ctx, "ReqExtData: %v", ec.ReqExtData)
-	for k, v := range ec.ReqExtData {
-		if k != "trace_id" {
+	//newValues := make(map[string]string)
+	/*for k, v := range ec.ReqExtData {
+		/*if k != "trace_id" {
 			newValues[k] = v
 		}
 		logger.Debugf(ctx, "k: %s v: %s", k, v)
 		ctx = context.WithValue(ctx, k, v)
-	}
+	}*/
 	//logger.Debugf(ctx, "k: %s v: %s", k, v)
 	//logger.Debugf(ctx, "newValues: %v", newValues)
-	newValues[k] = v
+	//newValues[k] = v
+	ec.ReqExtData[k] = v
 	ctx = context.WithValue(ctx, k, v)
 	//id := ctx.Value("trace_id").(string)
 	//logger.Debugf(ctx, id)
 	return &ExtContext{
-		Context:    ctx,
-		ReqExtData: newValues,
+		Context: ctx,
+		//ReqExtData: newValues,
+		ReqExtData: ec.ReqExtData,
 	}
 }
 

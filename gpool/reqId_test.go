@@ -14,6 +14,15 @@ import (
 
 func TestReqId(t *testing.T) {
 	ctx := context.Background()
+
+	myconf := &logger.Glogconf{
+		RotateMethod: logger.ROTATE_FILE_DAILY,
+		Stdout:       true,
+		Colorful:     true,
+		Loglevel:     logger.DEBUG,
+	}
+	logger.Newglog("./", "test.log", "test.log.err", myconf)
+
 	g_conf := &gpool.GPoolConfig[server.ServerTestClient]{
 		Addrs: "127.0.0.1:9090/30000",
 		Cfunc: gpool.CreateThriftFramedConnThriftExt[server.ServerTestClient],
@@ -21,6 +30,9 @@ func TestReqId(t *testing.T) {
 		//Cfunc: gpool.CreateThriftBufferConnThriftExt[server.ServerTestClient],
 		//Cfunc: gpool.CreateThriftBufferConn[server.ServerTestClient],
 		Nc: server.NewServerTestClientFactory,
+
+		MaxConns:     1000,
+		MaxIdleConns: 500,
 	}
 	addPool := gpool.NewRpcPoolSelector[server.ServerTestClient](ctx, g_conf)
 

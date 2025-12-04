@@ -111,6 +111,8 @@ func (gp *Gpool[T]) GpoolInit2(addr string, port int, timeout int, gp_conf *GPoo
 	gp.PurgeNotify = make(chan struct{}, 1)
 	gp.Gpconf = gp_conf
 
+	ctx := context.Background()
+	gp.CreateIdleConn(ctx)
 	go func() {
 		ctx := context.WithValue(context.Background(), "trace_id", util.GenXid())
 		for {
@@ -133,9 +135,10 @@ func (gp *Gpool[T]) GpoolInit2(addr string, port int, timeout int, gp_conf *GPoo
 
 func (gp *Gpool[T]) CreateIdleConn(ctx context.Context) {
 	for i := 0; i < gp.MaxIdleConns; i++ {
-		c, err := gp.getConnFromFreeList(ctx)
+		pc, err := gp.getConnFromNew(ctx)
 		if err == nil {
-			c.Close(ctx)
+			//c.Close(ctx)
+			pc.e = gp.FreeList.PushBack(pc)
 		}
 
 	}
@@ -162,7 +165,8 @@ func (gp *Gpool[T]) getConnFromFreeList(ctx context.Context) (*PoolConn[T], erro
 		logger.Infof(ctx, "func=reopen|pc=%p|ctime=%d|connNow=%d|MaxConnLife=%d", pc, pc.Ctime, connNow, gp.MaxConnLife)
 		pc.Gc.Close()
 		gp.FreeList.Remove(e)
-		connNew, err := gp.getConnFromNew(ctx)
+		//connNew, err := gp.getConnFromNew(ctx)
+		connNew, err := gp.getConnFromNew2UseList(ctx)
 		return connNew, err
 	}
 	gp.FreeList.Remove(e)
@@ -187,16 +191,29 @@ func (gp *Gpool[T]) getConnFromNew(ctx context.Context) (*PoolConn[T], error) {
 				pc.Gc.(*TConn[T]).NewThClient(gp.Nc)
 			}
 		}
-		pc.e = gp.UseList.PushBack(pc)
+		//pc.e = gp.UseList.PushBack(pc)
 	} else {
 		logger.Warnf(ctx, "new conn %s", err.Error())
 		pc = nil
 	}
-	logger.Debugf(ctx, "after get flist len %d ulist len %d", gp.FreeList.Len(), gp.UseList.Len())
 	if pc != nil {
 		logger.Infof(ctx, "func=getConnFromNew|pc=%p|ctime=%d|usedTime=0", pc, pc.Ctime)
 	}
 	return pc, err
+}
+
+func (gp *Gpool[T]) getConnFromNew2UseList(ctx context.Context) (*PoolConn[T], error) {
+	gp.mutex.Unlock()
+	pc, err := gp.getConnFromNew(ctx)
+	if pc != nil {
+		gp.mutex.Lock()
+		pc.e = gp.UseList.PushBack(pc)
+		return pc, err
+	}
+	gp.mutex.Lock()
+	logger.Debugf(ctx, "after create flist len %d ulist len %d", gp.FreeList.Len(), gp.UseList.Len())
+	return pc, err
+
 }
 
 func (gp *Gpool[T]) getConnFromWait(ctx context.Context) (*PoolConn[T], error) {
@@ -232,7 +249,8 @@ func (gp *Gpool[T]) getConnFromWait(ctx context.Context) (*PoolConn[T], error) {
 				if gp.FreeList.Len() > 0 {
 					return gp.getConnFromFreeList(ctx)
 				} else {
-					return gp.getConnFromNew(ctx)
+					//return gp.getConnFromNew(ctx)
+					return gp.getConnFromNew2UseList(ctx)
 				}
 			} else {
 				if gp.FreeList.Len() > 0 {
@@ -243,37 +261,6 @@ func (gp *Gpool[T]) getConnFromWait(ctx context.Context) (*PoolConn[T], error) {
 		}
 	}
 }
-
-/*func (gp *Gpool[T]) getConnFromWait(ctx context.Context) (*PoolConn[T], error) {
-	gp.Waits += 1
-	for {
-		gp.mutex.Unlock()
-		logger.Debugf(ctx, "--------------------wait")
-		<-gp.WaitNotify
-		logger.Debugf(ctx, "--------------------try lock")
-		gp.mutex.Lock()
-		logger.Debugf(ctx, "--------------------locked")
-		//gp.Waits -= 1
-		logger.Debugf(ctx, "pool  flist %d ulist %d", gp.FreeList.Len(), gp.UseList.Len())
-		flen := gp.FreeList.Len()
-		if gp.FreeList.Len()+gp.UseList.Len() >= gp.MaxConns && flen <= 0 {
-			logger.Debugf(ctx, "wait again")
-			gp.Waits += 1
-			continue
-		}
-		if gp.FreeList.Len()+gp.UseList.Len() < gp.MaxConns {
-			if gp.FreeList.Len() > 0 {
-				return gp.getConnFromFreeList(ctx)
-			} else {
-				return gp.getConnFromNew(ctx)
-			}
-		} else {
-			if gp.FreeList.Len() > 0 {
-				return gp.getConnFromFreeList(ctx)
-			}
-		}
-	}
-}*/
 
 func (gp *Gpool[T]) Get(ctx context.Context) (*PoolConn[T], error) {
 	logger.Debugf(ctx, "pool full flist %d ulist %d", gp.FreeList.Len(), gp.UseList.Len())
@@ -286,7 +273,8 @@ func (gp *Gpool[T]) Get(ctx context.Context) (*PoolConn[T], error) {
 			return gp.getConnFromFreeList(ctx)
 		} else {
 			logger.Debugf(ctx, "get conn from new")
-			return gp.getConnFromNew(ctx)
+			//return gp.getConnFromNew(ctx)
+			return gp.getConnFromNew2UseList(ctx)
 		}
 	} else {
 		logger.Debugf(ctx, "pool full flist %d ulist %d", gp.FreeList.Len(), gp.UseList.Len())
