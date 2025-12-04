@@ -228,10 +228,10 @@ func (p *ExtProcessor) ReadMetaMap(ctx context.Context, in, out thrift.TProtocol
 }
 
 func (p *ExtProcessor) Process(ctx context.Context, in, out thrift.TProtocol) (bool, thrift.TException) {
-	//preBuf := make([]byte, 2)
+	preBuf := make([]byte, 2)
 	starttime := time.Now()
-	//_, err := io.ReadFull(in.Transport(), preBuf)
-	magic, preBuf, _, err := p.ReadMagic(ctx, in, out)
+	_, err := io.ReadFull(in.Transport(), preBuf)
+	//magic, preBuf, _, err := p.ReadMagic(ctx, in, out)
 	logger.Infof(ctx, "func=Process|time=%v", time.Since(starttime))
 	if err != nil {
 		if err.(thrift.TProtocolException).TypeId() == thrift.END_OF_FILE {
@@ -242,9 +242,9 @@ func (p *ExtProcessor) Process(ctx context.Context, in, out thrift.TProtocol) (b
 		}
 	}
 	//magic
-	//magic := binary.BigEndian.Uint16(preBuf)
-	//if magic == uint16(THRIFT_EXT_META_MAGIC) {
-	if magic == THRIFT_EXT_META_MAGIC {
+	magic := binary.BigEndian.Uint16(preBuf)
+	if magic == uint16(THRIFT_EXT_META_MAGIC) {
+		//if magic == THRIFT_EXT_META_MAGIC {
 		logger.Debugf(ctx, "use extend thrift proto")
 		//ver
 		_, flag, ex := p.ReadMetaVer(ctx, in, out)
