@@ -12,6 +12,63 @@ import (
 	"github.com/lanwenhong/lgobase/logger"
 )
 
+func TestAdd1(t *testing.T) {
+	ctx := context.Background()
+
+	myconf := &logger.Glogconf{
+		RotateMethod: logger.ROTATE_FILE_DAILY,
+		Stdout:       false,
+		Colorful:     true,
+		Loglevel:     logger.INFO,
+	}
+	logger.Newglog("./", "test.log", "test.log.err", myconf)
+
+	g_conf := &gpool.GPoolConfig[server.ServerTestClient]{
+		Addrs: "127.0.0.1:9090/30000",
+		//Cfunc: gpool.CreateThriftFramedConnThriftExt[server.ServerTestClient],
+		Cfunc: gpool.CreateThriftFramedConn[server.ServerTestClient],
+		//Cfunc: gpool.CreateThriftBufferConnThriftExt[server.ServerTestClient],
+		//Cfunc: gpool.CreateThriftBufferConn[server.ServerTestClient],
+		Nc: server.NewServerTestClientFactory,
+
+		MaxConns:     1000,
+		MaxIdleConns: 500,
+	}
+	addPool := gpool.NewRpcPoolSelector[server.ServerTestClient](ctx, g_conf)
+
+	wg := sync.WaitGroup{}
+	for i := 0; i < 100; i++ {
+		ctx = context.WithValue(ctx, "trace_id", uuid.New().String())
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := 0; i < 500; i++ {
+				//process := func(ctx context.Context, client interface{}) (string, error) {
+				process := func(client interface{}) (string, error) {
+					c := client.(*server.ServerTestClient)
+					magic := int16(0x7FFF)
+					ver := int16(1)
+					ext := make(map[string]string)
+					ext["request_id"] = gpool.GenerateRequestID()
+					r, err := c.Add1(ctx, magic, ver, ext, 1, 1)
+					if err != nil {
+						logger.Warnf(ctx, "err: %s", err.Error())
+					}
+					logger.Debugf(ctx, "r: %d", r)
+					return "add", err
+				}
+
+				//ctx = gpool.NewExtContext(ctx)
+				//addPool.ThriftExtCall(ctx, process)
+				addPool.ThriftCall(ctx, process)
+
+			}
+
+		}()
+	}
+	wg.Wait()
+}
+
 func TestReqId(t *testing.T) {
 	ctx := context.Background()
 
@@ -65,7 +122,7 @@ func TestReqId(t *testing.T) {
 	wg.Wait()
 }
 
-func TestPostStru(t *testing.T) {
+/*func TestPostStru(t *testing.T) {
 	ctx := context.Background()
 	g_conf := &gpool.GPoolConfig[server.ServerTestClient]{
 		Addrs: "127.0.0.1:9090/30000",
@@ -102,7 +159,7 @@ func TestPostStru(t *testing.T) {
 	}
 	wg.Wait()
 
-}
+}*/
 
 func TestGetConnTimeOut(t *testing.T) {
 	ctx := context.Background()

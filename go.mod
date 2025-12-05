@@ -3,7 +3,7 @@ module github.com/lanwenhong/lgobase
 go 1.24.4
 
 require (
-	github.com/apache/thrift v0.16.0
+	github.com/apache/thrift v0.22.0
 	github.com/chilts/sid v0.0.0-20190607042430-660e94789ec9
 	github.com/garyburd/redigo v1.6.3
 	github.com/go-sql-driver/mysql v1.7.1
