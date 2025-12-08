@@ -1,0 +1,42 @@
+# 1. 生成根 CA 私钥（ca.key，权限设为 600，严禁泄露）
+openssl genrsa -out ca.key 4096
+chmod 600 ca.key
+
+# 2. 生成自签名根 CA 证书（ca.crt，有效期 10 年，带 SAN + CA 权限）
+openssl req -x509 -new -nodes -key ca.key -days 3650 -out ca.crt -config ca.cnf
+
+openssl x509 -in ca.crt -text -noout | grep -E "Version|CA:|Subject Alternative Name|Key Usage"
+
+
+
+# 1. 生成服务器私钥（server.key，权限 600，妥善保管）
+openssl genrsa -out server.key 2048
+chmod 600 server.key
+
+# 2. 生成服务器 CSR（包含 SAN 和扩展字段，用于提交给根 CA 签名）
+openssl req -new -key server.key -out server.csr -config server.cnf
+
+openssl req -in server.csr -text -noout | grep -A 5 "Subject Alternative Name"
+
+
+
+
+# 1. 生成序列号文件（初始值随意，如 01，后续签名自动递增）
+echo 01 > ca.srl
+
+# 2. 创建证书数据库文件（空文件即可）
+touch ca.db
+
+
+用根 CA 签名服务器 CSR，生成服务器证书
+openssl ca -in server.csr -out server.crt -config ca-sign.cnf -batch
+
+openssl x509 -in server.crt -text -noout | grep -E "Version|Subject Alternative Name|CA:|Issuer|serverAuth"
+
+
+
+
+# 用根 CA 验证服务器证书是否合法
+openssl verify -CAfile ca.crt server.crt
+
+

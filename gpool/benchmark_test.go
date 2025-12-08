@@ -4,11 +4,12 @@ import (
 	"context"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/lanwenhong/lgobase/gpool"
 	"github.com/lanwenhong/lgobase/gpool/gen-go/echo"
+	"github.com/lanwenhong/lgobase/gpool/gen-go/server"
+	"github.com/lanwenhong/lgobase/logger"
 )
 
 func NewRequestID() string {
@@ -28,30 +29,7 @@ func (e *EchoServer) Echo(ctx context.Context, req *echo.EchoReq) (*echo.EchoRes
 	return res, nil
 }
 
-func BenchmarkBufferClient(b *testing.B) {
-	/*go func() {
-		transport, err := thrift.NewTServerSocket(":9898")
-		if err != nil {
-			b.Fatal(err.Error())
-		}
-		handler := &EchoServer{}
-		processor := echo.NewEchoProcessor(handler)
-		transportFactory := thrift.NewTBufferedTransportFactory(8192)
-		protocolFactory := thrift.NewTBinaryProtocolFactoryDefault()
-		server := thrift.NewTSimpleServer4(
-			processor,
-			transport,
-			transportFactory,
-			protocolFactory,
-		)
-		if err = server.Serve(); err != nil {
-			b.Fatal(err.Error())
-		}
-
-	}()
-	time.Sleep(3 * time.Second)
-	b.ResetTimer()*/
-
+/*func BenchmarkBufferClient(b *testing.B) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -74,9 +52,9 @@ func BenchmarkBufferClient(b *testing.B) {
 		}
 		b.Log("rpc get: ", ret.Msg)
 	}
-}
+}*/
 
-func BenchmarkBufferClient2(b *testing.B) {
+/*func BenchmarkBufferClient2(b *testing.B) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -101,9 +79,9 @@ func BenchmarkBufferClient2(b *testing.B) {
 			b.Log("rpc get: ", ret)
 		}
 	})
-}
+}*/
 
-func Benchmark3BufferClient(b *testing.B) {
+/*func Benchmark3BufferClient(b *testing.B) {
 	ctx := context.WithValue(context.Background(), "trace_id", NewRequestID())
 
 	gp := &gpool.Gpool[echo.EchoClient]{}
@@ -117,4 +95,49 @@ func Benchmark3BufferClient(b *testing.B) {
 		}
 		b.Log("rpc get: ", ret.(*echo.EchoRes).Msg)
 	}
+}*/
+
+func BenchmarkThriftExt(b *testing.B) {
+	ctx := context.Background()
+
+	myconf := &logger.Glogconf{
+		RotateMethod: logger.ROTATE_FILE_DAILY,
+		Stdout:       false,
+		Colorful:     true,
+		Loglevel:     logger.INFO,
+	}
+	logger.Newglog("./", "test.log", "test.log.err", myconf)
+
+	g_conf := &gpool.GPoolConfig[server.ServerTestClient]{
+		Addrs: "127.0.0.1:9090/30000",
+		//Cfunc: gpool.CreateThriftFramedConnThriftExt[server.ServerTestClient],
+		Cfunc: gpool.CreateThriftFramedConn[server.ServerTestClient],
+		//Cfunc: gpool.CreateThriftBufferConnThriftExt[server.ServerTestClient],
+		//Cfunc: gpool.CreateThriftBufferConn[server.ServerTestClient],
+		MaxConns:     1000,
+		MaxIdleConns: 500,
+		Nc:           server.NewServerTestClientFactory,
+	}
+	addPool := gpool.NewRpcPoolSelector[server.ServerTestClient](ctx, g_conf)
+
+	b.ResetTimer()
+	//nCtx := gpool.NewExtContext(ctx)
+	for n := 0; n < b.N; n++ {
+		ctx = context.WithValue(ctx, "trace_id", uuid.New().String())
+		process := func(ctx context.Context, client interface{}) (string, error) {
+			//process := func(client interface{}) (string, error) {
+			c := client.(*server.ServerTestClient)
+			r, err := c.Add(ctx, 1, 1)
+			if err != nil {
+				logger.Warnf(ctx, "err: %s", err.Error())
+			}
+			logger.Debugf(ctx, "r: %d", r)
+			return "add", err
+		}
+		//nCtx = nCtx.SetReqExtData(ctx, "request_id", uuid.New().String())
+		ctx = gpool.NewExtContext(ctx)
+		addPool.ThriftExtCall(ctx, process)
+		//addPool.ThriftCall(ctx, process)
+	}
+
 }

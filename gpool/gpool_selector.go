@@ -12,6 +12,7 @@ import (
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/lanwenhong/lgobase/logger"
 	"github.com/lanwenhong/lgobase/selector"
+	"github.com/lanwenhong/lgobase/util"
 )
 
 type PingSvr func(client interface{}) (string, error)
@@ -38,6 +39,18 @@ type RpcPoolSelector[T any] struct {
 	selector.Selector
 	NotValid chan *RpcSvr[T]
 	Gpconf   *GPoolConfig[T]
+}
+
+func NewRpcPoolSelector[T any](ctx context.Context, conf *GPoolConfig[T]) *RpcPoolSelector[T] {
+	if conf.MaxConns == 0 {
+		conf.MaxConns = 200
+	}
+	if conf.MaxIdleConns == 0 {
+		conf.MaxIdleConns = 100
+	}
+	rpcPool := &RpcPoolSelector[T]{}
+	rpcPool.RpcPoolInit(ctx, conf)
+	return rpcPool
 }
 
 func (rps *RpcPoolSelector[T]) RoundRobin(ctx context.Context) interface{} {
@@ -161,3 +174,60 @@ func (rps *RpcPoolSelector[T]) ThriftCall(ctx context.Context, process func(clie
 	}
 	return err
 }
+
+func (rps *RpcPoolSelector[T]) ThriftExtCall(ctx context.Context, process func(ctx context.Context, client interface{}) (string, error)) error {
+	isvr := rps.RoundRobin(ctx)
+	if isvr == nil {
+		logger.Warnf(ctx, "no server select")
+		return errors.New("no server")
+	}
+	rps_pool := isvr.(*RpcSvr[T])
+	logger.Debugf(ctx, "select adds: %s port %d", rps_pool.GetAddr(), rps_pool.GetPort())
+	nCtx := ctx.(*ExtContext)
+	rid := nCtx.GetReqExtData("reqest_id")
+	if rid == "" {
+		nCtx = nCtx.SetReqExtData(nCtx, "request_id", util.NewRequestID())
+	}
+	rid = GetRequestID(nCtx)
+	err := rps_pool.Gp.ThriftExtCall2(nCtx, process)
+	if rps.Gpconf.Ping != nil && err != nil {
+
+		switch err.(type) {
+		case thrift.TTransportException, thrift.TProtocolException:
+			logger.Warnf(ctx, "%s:%d down", rps_pool.GetAddr(), rps_pool.GetPort())
+			rps_pool.SetStat(selector.SVR_NOTVALID)
+			rps.NotValid <- rps_pool
+		default:
+			logger.Warnf(ctx, "rpc: %s", err.Error())
+		}
+	}
+	return err
+
+}
+
+/*func (rps *RpcPoolSelector[T]) ThriftCallWithReqId(ctx context.Context, rid string, process func(ctx context.Context, client interface{}) (string, error)) error {
+	isvr := rps.RoundRobin(ctx)
+	if isvr == nil {
+		logger.Warnf(ctx, "no server select")
+		return errors.New("no server")
+	}
+	rps_pool := isvr.(*RpcSvr[T])
+	logger.Debugf(ctx, "select adds: %s port %d", rps_pool.GetAddr(), rps_pool.GetPort())
+	if rid == "" {
+		rid = util.NewRequestID()
+	}
+	nCtx := WithRequestID(ctx, rid)
+	err := rps_pool.Gp.ThriftCall2WithReqId(nCtx, process)
+	if rps.Gpconf.Ping != nil && err != nil {
+
+		switch err.(type) {
+		case thrift.TTransportException, thrift.TProtocolException:
+			logger.Warnf(ctx, "%s:%d down", rps_pool.GetAddr(), rps_pool.GetPort())
+			rps_pool.SetStat(selector.SVR_NOTVALID)
+			rps.NotValid <- rps_pool
+		default:
+			logger.Warnf(ctx, "rpc: %s", err.Error())
+		}
+	}
+	return err
+}*/
