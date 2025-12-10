@@ -69,7 +69,7 @@ func (gp *Gpool[T]) GpoolInit(addr string, port int, timeout int,
 	gp.Cfunc = cfunc
 	gp.Nc = clfunc
 	gp.WaitNotify = make(chan struct{}, maxidleconns)
-	gp.PurgeNotify = make(chan struct{}, 1)
+	gp.PurgeNotify = make(chan struct{}, maxidleconns)
 
 	ctx := context.Background()
 	gp.CreateIdleConn(ctx)
