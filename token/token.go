@@ -12,23 +12,65 @@ import (
 	"github.com/lanwenhong/lgobase/util"
 )
 
+const (
+	TOKEN_HEADER_MAGIC = uint16(0xEFFF)
+)
+
 /*
 |version(4byte)|mac(8byte)|flag_uc(1byte)|uid(4byte or 8byte)|opuid(2byte)|expire(4byte)|deadline(4byte or 8byte)|udid(21byte)
 */
 type Token struct {
 	//header
-	Ver    uint32 //第32bit位标记（uid64或32）第31bit位标记（deadline 64或32） 第25bit-第30bit（idc标记）2byte-3byte(随机数）1byte（version）
-	Mac    uint64 //8字节校验mac
-	Idc    uint8  //idc机房标记， 最高支持0-31
-	FlagUC string //1byte区分存储的是uid还是customer_id
+	Magic  uint16 `json:"-"`
+	Ver    uint32 `json:"-"` //第32bit位标记（uid64或32）第31bit位标记（deadline 64或32） 第25bit-第30bit（idc标记）2byte-3byte(随机数）1byte（version）
+	Mac    uint64 `json:"-"` //8字节校验mac
+	Idc    uint8  `json:"-"` //idc机房标记， 最高支持0-31
+	FlagUC string `json:"-"` //1byte区分存储的是uid还是customer_id
 
 	//body
-	Uid      uint64 //8字节Uid
-	OpUid    uint16 //2字节opuid
-	Expire   uint32 //4byte过期时间
-	Deadline uint64 //过期时间戳
-	Udid     string //21byte
-	Tkey     string //机密key
+	Uid       uint64 `json:"userid"` //8字节Uid
+	OpUid     uint16 `json:"opuid"`  //2字节opuid
+	Expire    uint32 `json:"-"`      //4byte过期时间
+	Deadline  uint64 `json:"-"`      //过期时间戳
+	Udid      string `json:"udid"`   //21byte
+	Tkey      string `json:"-"`      //机密key
+	CustomeId uint64 `json:"customer_id"`
+}
+
+func (tk *Token) PackReplace(ctx context.Context, src string) string {
+	b := []byte(src)
+	n := 0
+	for i, _ := range b {
+		switch b[i] {
+		case '+':
+			b[i] = '-'
+		case '/':
+			b[i] = '_'
+		case '=':
+			b[i] = 0x00
+			n++
+		}
+	}
+	return string(b[:len(b)-n])
+}
+
+func (k *Token) UnpackReplace(ctx context.Context, src string) string {
+	b := []byte(src)
+	for i, _ := range b {
+		switch b[i] {
+		case '-':
+			b[i] = '+'
+		case '_':
+			b[i] = '/'
+		}
+	}
+	if len(b)%4 != 0 {
+		padding := 4 - len(b)%4
+		for i := 0; i < padding; i++ {
+			b = append(b, "="...)
+		}
+	}
+	return string(b)
 }
 
 func (tk *Token) xor8Bytes(ctx context.Context, a, b []byte) ([]byte, error) {
@@ -92,14 +134,18 @@ func (tk *Token) TkMac(ctx context.Context, data []byte, randk []byte, iv []byte
 }
 
 func (tk *Token) UnPack(ctx context.Context, bdata string) error {
+	bdata = tk.UnpackReplace(ctx, bdata)
 	iv := []byte("llss-------token")
 	data, err := base64.StdEncoding.DecodeString(bdata)
 	if err != nil {
-		logger.Debugf(ctx, "err: %s", err.Error())
+		logger.Warnf(ctx, "err: %s", err.Error())
 		return err
 	}
 	//parse version
-	b_ver := data[0:4]
+	b_magic := data[0:2]
+	tk.Magic = binary.LittleEndian.Uint16(b_magic)
+	logger.Debugf(ctx, "magic: %d", tk.Magic)
+	b_ver := data[2:6]
 	ver := binary.LittleEndian.Uint32(b_ver)
 	logger.Debugf(ctx, "ver: %d", ver)
 	uidBit := ver>>31 | 0x00
@@ -113,7 +159,8 @@ func (tk *Token) UnPack(ctx context.Context, bdata string) error {
 	binary.LittleEndian.PutUint16(randB, rt16)
 	logger.Debugf(ctx, "randB: %v", randB)
 
-	mac := data[4:12]
+	//mac := data[4:12]
+	mac := data[6:14]
 	logger.Debugf(ctx, "mac: %v", mac)
 
 	//randk
@@ -132,10 +179,12 @@ func (tk *Token) UnPack(ctx context.Context, bdata string) error {
 	randk = append(randk, k2...)
 	logger.Debugf(ctx, "randk: %v", randk)
 
-	tkBody := data[12:]
+	//tkBody := data[12:]
+	tkBody := data[14:]
 	logger.Debugf(ctx, "tkBody: %v", tkBody)
 	tkSrc, err := aescbc.AESDecryptCBCWithNoBase64(ctx, tkBody, randk, iv)
 	if err != nil {
+		logger.Warnf(ctx, "err: %s", err.Error())
 		return err
 	}
 	logger.Debugf(ctx, "tkSrc: %v", tkSrc)
@@ -152,10 +201,15 @@ func (tk *Token) UnPack(ctx context.Context, bdata string) error {
 		logger.Warnf(ctx, "mac error")
 		return errors.New("mac error")
 	}
-	//unpack flag_uc
+	//unpack idc
 	start := 0
 	end := 0
-	tk.FlagUC = string(tkSrc[0])
+	tk.Idc = tkSrc[start]
+	start += 1
+	end += 1
+	logger.Debugf(ctx, "idc:  %d", tk.Idc)
+	//unpack flag_uc
+	tk.FlagUC = string(tkSrc[start])
 	start += 1
 	end += 1
 	logger.Debugf(ctx, "flag_uc: %s", tk.FlagUC)
@@ -228,12 +282,17 @@ func (tk *Token) UnPack(ctx context.Context, bdata string) error {
 }
 
 func (tk *Token) Pack(ctx context.Context) (string, error) {
-	tkSrc := []byte{}
-	tkEnc := []byte{}
+	//tkSrc := []byte{}
+	//tkEnc := []byte{}
+	tkSrc := make([]byte, 0, 1024)
+	tkEnc := make([]byte, 0, 1024)
 	iv := []byte("llss-------token")
 	//header pack
-
 	//body pack
+	//pack idc
+	bIdc := []byte{tk.Idc}
+	//binary.LittleEndian.PutUint8(bIdc, tk.Idc)
+	tkSrc = append(tkSrc, bIdc...)
 	//pack flag_uc
 	uc := []byte(tk.FlagUC)
 	logger.Debugf(ctx, "uc: %v", uc)
@@ -286,9 +345,13 @@ func (tk *Token) Pack(ctx context.Context) (string, error) {
 	//gen mackey
 	randB := tk.generateRandom2Bytes(ctx)
 	logger.Debugf(ctx, "randB: %v", randB)
-	randB = []byte{0x39, 0x39}
+	//randB = []byte{0x39, 0x39}
 
 	//pack header
+	//pack magic
+	bMagic := make([]byte, 2)
+	binary.LittleEndian.PutUint16(bMagic, TOKEN_HEADER_MAGIC)
+	tkEnc = append(tkEnc, bMagic...)
 	//pack version
 	if tk.Uid > 0xFFFFFFFF {
 		uidBit := uint32(0x01)
@@ -332,8 +395,9 @@ func (tk *Token) Pack(ctx context.Context) (string, error) {
 	logger.Debugf(ctx, "tkBody: %v", tkBody)
 	tkEnc = append(tkEnc, tkBody...)
 	ciphertextBase64 := base64.StdEncoding.EncodeToString(tkEnc)
-
 	logger.Debugf(ctx, "ciphertextBase64: %s", ciphertextBase64)
-	return ciphertextBase64, nil
+	token := tk.PackReplace(ctx, ciphertextBase64)
+	logger.Debugf(ctx, "token: %s", token)
+	return token, nil
 
 }
