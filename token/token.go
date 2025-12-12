@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	TOKEN_HEADER_MAGIC = uint16(0xEFFF)
+	TOKEN_HEADER_MAGIC = uint32(0xEFFFFFFF)
 )
 
 /*
@@ -21,7 +21,7 @@ const (
 */
 type Token struct {
 	//header
-	Magic  uint16 `json:"-"`
+	Magic  uint32 `json:"-"`
 	Ver    uint32 `json:"-"` //第32bit位标记（uid64或32）第31bit位标记（deadline 64或32） 第25bit-第30bit（idc标记）2byte-3byte(随机数）1byte（version）
 	Mac    uint64 `json:"-"` //8字节校验mac
 	Idc    uint8  `json:"-"` //idc机房标记， 最高支持0-31
@@ -135,17 +135,19 @@ func (tk *Token) TkMac(ctx context.Context, data []byte, randk []byte, iv []byte
 
 func (tk *Token) UnPack(ctx context.Context, bdata string) error {
 	bdata = tk.UnpackReplace(ctx, bdata)
-	iv := []byte("llss-------token")
+	//iv := []byte("llss-------token")
+	//iv := make([]byte, 0, 16)
+	iv := []byte{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}
 	data, err := base64.StdEncoding.DecodeString(bdata)
 	if err != nil {
 		logger.Warnf(ctx, "err: %s", err.Error())
 		return err
 	}
 	//parse version
-	b_magic := data[0:2]
-	tk.Magic = binary.LittleEndian.Uint16(b_magic)
+	b_magic := data[0:4]
+	tk.Magic = binary.LittleEndian.Uint32(b_magic)
 	logger.Debugf(ctx, "magic: %d", tk.Magic)
-	b_ver := data[2:6]
+	b_ver := data[4:8]
 	ver := binary.LittleEndian.Uint32(b_ver)
 	logger.Debugf(ctx, "ver: %d", ver)
 	uidBit := ver>>31 | 0x00
@@ -160,11 +162,17 @@ func (tk *Token) UnPack(ctx context.Context, bdata string) error {
 	logger.Debugf(ctx, "randB: %v", randB)
 
 	//mac := data[4:12]
-	mac := data[6:14]
+	mac := data[8:16]
 	logger.Debugf(ctx, "mac: %v", mac)
 
 	//randk
 	aescbc := util.AesCbc{}
+	/*iv = append(iv, randB...)
+	for i := 0; i < 14; i++ {
+		iv = append(iv, 0xFF)
+	}*/
+	iv[0] = randB[0]
+	iv[1] = randB[1]
 	gkey, err := aescbc.AESEncryptCBC(ctx, randB, []byte(tk.Tkey), iv)
 	if err != nil {
 		logger.Warnf(ctx, "err: %v", err)
@@ -180,7 +188,7 @@ func (tk *Token) UnPack(ctx context.Context, bdata string) error {
 	logger.Debugf(ctx, "randk: %v", randk)
 
 	//tkBody := data[12:]
-	tkBody := data[14:]
+	tkBody := data[16:]
 	logger.Debugf(ctx, "tkBody: %v", tkBody)
 	tkSrc, err := aescbc.AESDecryptCBCWithNoBase64(ctx, tkBody, randk, iv)
 	if err != nil {
@@ -286,7 +294,9 @@ func (tk *Token) Pack(ctx context.Context) (string, error) {
 	//tkEnc := []byte{}
 	tkSrc := make([]byte, 0, 1024)
 	tkEnc := make([]byte, 0, 1024)
-	iv := []byte("llss-------token")
+	//iv := []byte("llss-------token")
+	//iv := make([]byte, 0, 16)
+	iv := []byte{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}
 	//header pack
 	//body pack
 	//pack idc
@@ -344,13 +354,13 @@ func (tk *Token) Pack(ctx context.Context) (string, error) {
 
 	//gen mackey
 	randB := tk.generateRandom2Bytes(ctx)
-	logger.Debugf(ctx, "randB: %v", randB)
+	logger.Debugf(ctx, "randB: %v len: %d", randB, len(randB))
 	//randB = []byte{0x39, 0x39}
 
 	//pack header
 	//pack magic
-	bMagic := make([]byte, 2)
-	binary.LittleEndian.PutUint16(bMagic, TOKEN_HEADER_MAGIC)
+	bMagic := make([]byte, 4)
+	binary.LittleEndian.PutUint32(bMagic, TOKEN_HEADER_MAGIC)
 	tkEnc = append(tkEnc, bMagic...)
 	//pack version
 	if tk.Uid > 0xFFFFFFFF {
@@ -371,6 +381,12 @@ func (tk *Token) Pack(ctx context.Context) (string, error) {
 	tkEnc = append(tkEnc, b_ver...)
 
 	aescbc := util.AesCbc{}
+	/*iv = append(iv, randB...)
+	for i := 0; i < 14; i++ {
+		iv = append(iv, 0xFF)
+	}*/
+	iv[0] = randB[0]
+	iv[1] = randB[1]
 	gkey, err := aescbc.AESEncryptCBC(ctx, randB, []byte(tk.Tkey), iv)
 	if err != nil {
 		logger.Warnf(ctx, "err: %v", err)

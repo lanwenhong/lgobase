@@ -26,8 +26,8 @@ func TestTokenPack(t *testing.T) {
 }
 
 func TestTokenUnPack(t *testing.T) {
-	//bdata := "_-8Bv3MATgug4-mcVb9CvHsuhVd0ti4kIq-eZCzZgZ4yPkIky9O0IhmtY6pqnA"
-	bdata := "CgAAAN+GTvV4QPdOsGRa5NhGx5vDXcwWqpYuc+PNHbkhMYKJ"
+	//bdata := "____7wFCigBmgqBijZpsRTZZGAFEl5ew4A5tAoeoNrKO8UyoFHEWEHTcfMHXJciN"
+	bdata := "____7wHv9AA_g1FizA_i5S9-HJc02Qe4efAwSO2LUpO-uplzI3dB7VubFgnSW2TU"
 	ctx := context.Background()
 	tk := &token.Token{
 		Tkey: "IypMcRkPXkbeNDRl6Km43boHr98udp7o",
