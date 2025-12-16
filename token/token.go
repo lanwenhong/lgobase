@@ -1,6 +1,7 @@
 package token
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/binary"
@@ -13,7 +14,7 @@ import (
 )
 
 const (
-	TOKEN_HEADER_MAGIC = uint32(0xEFFFFFFF)
+	TOKEN_HEADER_MAGIC = uint32(0xEF3F2F30)
 )
 
 /*
@@ -28,13 +29,14 @@ type Token struct {
 	FlagUC string `json:"-"` //1byte区分存储的是uid还是customer_id
 
 	//body
-	Uid       uint64 `json:"userid"` //8字节Uid
-	OpUid     uint16 `json:"opuid"`  //2字节opuid
-	Expire    uint32 `json:"-"`      //4byte过期时间
-	Deadline  uint64 `json:"-"`      //过期时间戳
-	Udid      string `json:"udid"`   //21byte
-	Tkey      string `json:"-"`      //机密key
-	CustomeId uint64 `json:"customer_id"`
+	Uid       uint64 `json:"userid,omitempty"` //8字节Uid
+	OpUid     uint16 `json:"opuid,omitempty"`  //2字节opuid
+	Expire    uint32 `json:"-"`                //4byte过期时间
+	Deadline  uint64 `json:"-"`                //过期时间戳
+	Udid      string `json:"udid,omitempty"`   //21byte
+	Tkey      string `json:"-"`                //机密key
+	Del       int    `json:"__del__,omitempty"`
+	CustomeId uint64 `json:"customer_id,omitempty"`
 }
 
 func (tk *Token) PackReplace(ctx context.Context, src string) string {
@@ -134,6 +136,7 @@ func (tk *Token) TkMac(ctx context.Context, data []byte, randk []byte, iv []byte
 }
 
 func (tk *Token) UnPack(ctx context.Context, bdata string) error {
+	var macBuf bytes.Buffer
 	bdata = tk.UnpackReplace(ctx, bdata)
 	//iv := []byte("llss-------token")
 	//iv := make([]byte, 0, 16)
@@ -143,10 +146,19 @@ func (tk *Token) UnPack(ctx context.Context, bdata string) error {
 		logger.Warnf(ctx, "err: %s", err.Error())
 		return err
 	}
+
+	if len(data) < 18 {
+		return errors.New("token format len error")
+	}
+
 	//parse version
 	b_magic := data[0:4]
 	tk.Magic = binary.LittleEndian.Uint32(b_magic)
 	logger.Debugf(ctx, "magic: %d", tk.Magic)
+	if tk.Magic != TOKEN_HEADER_MAGIC {
+		return tk.UnPackOld(ctx, bdata)
+	}
+
 	b_ver := data[4:8]
 	ver := binary.LittleEndian.Uint32(b_ver)
 	logger.Debugf(ctx, "ver: %d", ver)
@@ -196,8 +208,10 @@ func (tk *Token) UnPack(ctx context.Context, bdata string) error {
 		return err
 	}
 	logger.Debugf(ctx, "tkSrc: %v", tkSrc)
-
-	in_mac, _ := tk.TkMac(ctx, tkSrc, randk, iv)
+	macBuf.Write(b_ver)
+	macBuf.Write(tkSrc)
+	//in_mac, _ := tk.TkMac(ctx, tkSrc, randk, iv)
+	in_mac, _ := tk.TkMac(ctx, macBuf.Bytes(), randk, iv)
 	logger.Debugf(ctx, "mac: %v in_mac: %v", mac, in_mac)
 
 	int_mac := binary.LittleEndian.Uint64(mac)
@@ -294,6 +308,8 @@ func (tk *Token) Pack(ctx context.Context) (string, error) {
 	//tkEnc := []byte{}
 	tkSrc := make([]byte, 0, 1024)
 	tkEnc := make([]byte, 0, 1024)
+	randk := make([]byte, 0, 128)
+	var macBuf bytes.Buffer
 	//iv := []byte("llss-------token")
 	//iv := make([]byte, 0, 16)
 	iv := []byte{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}
@@ -394,7 +410,6 @@ func (tk *Token) Pack(ctx context.Context) (string, error) {
 	}
 	logger.Debugf(ctx, "gkey: %s", gkey)
 
-	randk := []byte{}
 	k1 := []byte(gkey)
 	k2 := []byte(gkey[0:8])
 	randk = append(randk, k1...)
@@ -402,7 +417,10 @@ func (tk *Token) Pack(ctx context.Context) (string, error) {
 
 	logger.Debugf(ctx, "randk: %v", randk)
 	logger.Debugf(ctx, "tkSrc: %v", tkSrc)
-	mac, _ := tk.TkMac(ctx, tkSrc, randk, iv)
+	macBuf.Write(b_ver)
+	macBuf.Write(tkSrc)
+	//mac, _ := tk.TkMac(ctx, tkSrc, randk, iv)
+	mac, _ := tk.TkMac(ctx, macBuf.Bytes(), randk, iv)
 	logger.Debugf(ctx, "mac: %v", mac)
 	tkEnc = append(tkEnc, mac...)
 

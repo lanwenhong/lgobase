@@ -36,14 +36,14 @@ func (sh *SvrHandler) Add1(ctx context.Context, magic int16, ver int16, ext map[
 
 }
 
-/*func (sh *SvrHandler) PostUser(ctx context.Context, req *server.GetUserRequest) (int32, error) {
+func (sh *SvrHandler) PostUser(ctx context.Context, req *server.GetUserRequest) (int32, error) {
 	rid := gpool.GetRequestID(ctx)
 	logger.Debugf(ctx, "rid: %s", rid)
 	//logger.Debugf(ctx, "Rp: %p rquestID: %s rid: %s", sh.Rp, sh.Rp.RequestID, rid)
 	//logger.Debugf(ctx, "Rp: %p rquestID: %s", sh.Rp, rid)
 	logger.Debugf(ctx, "req: %v", req)
 	return 0, nil
-}*/
+}
 
 func main() {
 	ctx := context.WithValue(context.Background(), "trace_id", util.GenXid())

@@ -394,7 +394,7 @@ func (cp *Cparse) parseMapWithCtx(ctx context.Context, v reflect.Value, tv refle
 	if ktype != reflect.String {
 		return errors.New("map key must string")
 	}
-	se, k, is, kvs, err := cp.parseMapTag(tv)
+	se, k, is, kvs, err := cp.parseMapTagWithCtx(ctx, tv)
 	if err != nil {
 		return err
 	}

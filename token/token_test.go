@@ -2,6 +2,7 @@ package token
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/lanwenhong/lgobase/logger"
@@ -9,6 +10,7 @@ import (
 )
 
 func TestTokenPack(t *testing.T) {
+	ctx := context.Background()
 	tk := &token.Token{
 		Ver:    1,
 		Idc:    2,
@@ -21,13 +23,16 @@ func TestTokenPack(t *testing.T) {
 		Udid:     "0",
 		Tkey:     "IypMcRkPXkbeNDRl6Km43boHr98udp7o",
 	}
-	ctx := context.Background()
+
+	bytes, _ := json.Marshal(tk)
+	logger.Debugf(ctx, "c: %s", string(bytes))
 	tk.Pack(ctx)
 }
 
 func TestTokenUnPack(t *testing.T) {
 	//bdata := "____7wFCigBmgqBijZpsRTZZGAFEl5ew4A5tAoeoNrKO8UyoFHEWEHTcfMHXJciN"
-	bdata := "____7wHv9AA_g1FizA_i5S9-HJc02Qe4efAwSO2LUpO-uplzI3dB7VubFgnSW2TU"
+	//bdata := "____7wHv9AA_g1FizA_i5S9-HJc02Qe4efAwSO2LUpO-uplzI3dB7VubFgnSW2TU"
+	bdata := "MC8_7wGjMQAECuy0LQG1hQiPvrMdpKeGc38c_j3DRSYnJjxZ_gJNGQ9X5J-zsUuC"
 	ctx := context.Background()
 	tk := &token.Token{
 		Tkey: "IypMcRkPXkbeNDRl6Km43boHr98udp7o",

@@ -6,7 +6,7 @@ import (
 	"encoding/binary"
 	"io"
 	"time"
-	
+
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/google/uuid"
 	"github.com/lanwenhong/lgobase/logger"
@@ -177,7 +177,7 @@ func (p *ExtProcessor) ReadMagic(ctx context.Context, in, out thrift.TProtocol) 
 		}
 	}
 	binary.Write(buf, binary.BigEndian, uint16(magic))
-	
+
 	return magic, buf.Bytes(), true, nil
 }
 
@@ -220,7 +220,7 @@ func (p *ExtProcessor) ReadMetaMap(ctx context.Context, in, out thrift.TProtocol
 		logger.Debugf(ctx, "k=%s v=%s", k, v)
 		//reqData[k] = v
 		ctx = context.WithValue(ctx, k, v)
-		
+
 	}
 	//in.ReadMapEnd(ctx)
 	//return ctx, reqData, err
@@ -229,10 +229,10 @@ func (p *ExtProcessor) ReadMetaMap(ctx context.Context, in, out thrift.TProtocol
 
 func (p *ExtProcessor) Process(ctx context.Context, in, out thrift.TProtocol) (bool, thrift.TException) {
 	preBuf := make([]byte, 2)
-	starttime := time.Now()
+	//starttime := time.Now()
 	_, err := io.ReadFull(in.Transport(), preBuf)
 	//magic, preBuf, _, err := p.ReadMagic(ctx, in, out)
-	logger.Infof(ctx, "func=Process|time=%v", time.Since(starttime))
+	//logger.Infof(ctx, "func=Process|time=%v", time.Since(starttime))
 	if err != nil {
 		if err.(thrift.TProtocolException).TypeId() == thrift.END_OF_FILE {
 			return false, thrift.NewTTransportException(thrift.END_OF_FILE, "connection closed (EOF)")
@@ -265,7 +265,7 @@ func (p *ExtProcessor) Process(ctx context.Context, in, out thrift.TProtocol) (b
 		/*for k, v := range reqData {
 			ctx = context.WithValue(ctx, k, v)
 		}*/
-		
+
 	} else {
 		logger.Debugf(ctx, "use normal thrift proto")
 		multiReader := io.MultiReader(bytes.NewReader(preBuf), in.Transport())
