@@ -16,10 +16,11 @@ type SvrHandler struct {
 }
 
 func (sh *SvrHandler) Add(ctx context.Context, a int32, b int32) (int32, error) {
-	rid := gpool.GetRequestID(ctx)
-	logger.Debugf(ctx, "rid: %s", rid)
+	//rid := gpool.GetRequestID(ctx)
+	//logger.Debugf(ctx, "rid: %s", rid)
 	//logger.Debugf(ctx, "Rp: %p rquestID: %s rid: %s", sh.Rp, sh.Rp.RequestID, rid)
 	//logger.Debugf(ctx, "Rp: %p rquestID: %s", sh.Rp, rid)
+	//ctx = context.WithValue(ctx, "trace_id", util.NewRequestID())
 	c := a + b
 	logger.Debugf(ctx, "c: %d", c)
 	return c, nil
@@ -55,9 +56,9 @@ func main() {
 
 	myconf := &logger.Glogconf{
 		RotateMethod: logger.ROTATE_FILE_DAILY,
-		Stdout:       false,
+		Stdout:       true,
 		Colorful:     true,
-		Loglevel:     logger.INFO,
+		Loglevel:     logger.DEBUG,
 	}
 	logger.Newglog("./", "add.log", "add.log.err", myconf)
 

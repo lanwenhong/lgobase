@@ -10,12 +10,12 @@ import (
 )
 
 func TestConsumer(t *testing.T) {
-	ctx := context.Background()
+	ctx := context.WithValue(context.Background(), "trace_id", util.NewRequestID())
 	wp := workpool.NewWorkPool(3)
 	wp.Run(ctx)
 
 	for i := 0; i < 10; i++ {
-		ctx := context.WithValue(ctx, "trace_id", util.NewRequestID())
+		ctx := context.WithValue(ctx, "request_id", util.NewRequestID())
 		task, err := wp.AddTask(ctx, 1, func(ctx context.Context, req any) (any, error) {
 			a := req.(int)
 			a += 1

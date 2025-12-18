@@ -288,18 +288,30 @@ func catchError() {
 }
 
 func pDebugWithGid(ctx context.Context, depth int, fmtstr string, v ...interface{}) {
+	var builder strings.Builder
 	trace_id := ""
 	if m := ctx.Value("trace_id"); m != nil {
 		if value, ok := m.(string); ok {
-			trace_id = value
+			//trace_id = value
+			builder.WriteString("trace_id ")
+			builder.WriteString(value)
+			builder.WriteString(" ")
 		}
 	}
-
+	if m := ctx.Value("request_id"); m != nil {
+		if value, ok := m.(string); ok {
+			//trace_id = value
+			builder.WriteString("req_id ")
+			builder.WriteString(value)
+		}
+	}
+	trace_id = builder.String()
 	p_fmt := ""
 	values := []interface{}{}
 	if trace_id != "" {
 		//p_fmt = Red + "trace_id-%s [DEBUG] " + fmtstr + Reset
-		p_fmt = "trace_id-%s [DEBUG] " + fmtstr
+		//p_fmt = "trace_id %s [DEBUG] " + fmtstr
+		p_fmt = "%s [DEBUG] " + fmtstr
 		values = append(values, trace_id)
 	} else {
 		p_fmt = "[DEBUG] " + fmtstr
@@ -311,15 +323,6 @@ func pDebugWithGid(ctx context.Context, depth int, fmtstr string, v ...interface
 
 	if Gfilelog != nil && Gfilelog.LogObj != nil {
 		Gfilelog.fileCheck()
-		//Gfilelog.LogObj.mu.RLock()
-		//defer Gfilelog.LogObj.mu.RUnlock()
-		/*if Gfilelog.Logconf.Stdout && Gfilelog.Logconf.Colorful && Gfilelog.Logconf.Loglevel <= INFO {
-			//Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf(Green+"trace_id-%s [DEBUG] "+fmtstr+Reset, append([]interface{}{trace_id}, v...)...))
-			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf(p_fmt, append(values, v...)...))
-		} else if Gfilelog.Logconf.Loglevel <= DEBUG {
-			//Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf("trace_id-%s [DEBUG] "+fmtstr, append([]interface{}{trace_id}, v...)...))
-			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf(p_fmt, append(values, v...)...))
-		}*/
 		if Gfilelog.Logconf.Loglevel <= DEBUG {
 			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf(p_fmt, append(values, v...)...))
 		}
@@ -328,16 +331,35 @@ func pDebugWithGid(ctx context.Context, depth int, fmtstr string, v ...interface
 }
 
 func pDebug(ctx context.Context, depth int, v ...interface{}) {
-	trace_id := ""
+	/*trace_id := ""
 	if m := ctx.Value("trace_id"); m != nil {
 		if value, ok := m.(string); ok {
 			trace_id = value
 		}
+	}*/
+	var builder strings.Builder
+	trace_id := ""
+	if m := ctx.Value("trace_id"); m != nil {
+		if value, ok := m.(string); ok {
+			//trace_id = value
+			builder.WriteString("trace_id ")
+			builder.WriteString(value)
+			builder.WriteString(" ")
+		}
 	}
+	if m := ctx.Value("request_id"); m != nil {
+		if value, ok := m.(string); ok {
+			//trace_id = value
+			builder.WriteString("req_id ")
+			builder.WriteString(value)
+		}
+	}
+	trace_id = builder.String()
 
 	prefix := ""
 	if trace_id != "" {
-		prefix = fmt.Sprintf("trace_id-%s [DEBUG]", trace_id)
+		//prefix = fmt.Sprintf("trace_id %s [DEBUG]", trace_id)
+		prefix = fmt.Sprintf("%s [DEBUG]", trace_id)
 	} else {
 		prefix = fmt.Sprintf("%s", "[DEBUG]")
 	}
@@ -368,18 +390,37 @@ func Debugf(ctx context.Context, fmtstr string, v ...interface{}) {
 }
 
 func pInfoWithGid(ctx context.Context, depth int, fmtstr string, v ...interface{}) {
-	trace_id := ""
+	/*trace_id := ""
 	if m := ctx.Value("trace_id"); m != nil {
 		if value, ok := m.(string); ok {
 			trace_id = value
 		}
+	}*/
+
+	var builder strings.Builder
+	trace_id := ""
+	if m := ctx.Value("trace_id"); m != nil {
+		if value, ok := m.(string); ok {
+			//trace_id = value
+			builder.WriteString("trace_id ")
+			builder.WriteString(value)
+			builder.WriteString(" ")
+		}
 	}
+	if m := ctx.Value("request_id"); m != nil {
+		if value, ok := m.(string); ok {
+			//trace_id = value
+			builder.WriteString("req_id ")
+			builder.WriteString(value)
+		}
+	}
+	trace_id = builder.String()
 
 	p_fmt := ""
 	values := []interface{}{}
 	if trace_id != "" {
-		//p_fmt = Red + "trace_id-%s [INFO] " + fmtstr + Reset
-		p_fmt = "trace_id-%s [INFO] " + fmtstr
+		//p_fmt = "trace_id %s [INFO] " + fmtstr
+		p_fmt = "%s [INFO] " + fmtstr
 		values = append(values, trace_id)
 	} else {
 		p_fmt = "[INFO] " + fmtstr
@@ -390,15 +431,6 @@ func pInfoWithGid(ctx context.Context, depth int, fmtstr string, v ...interface{
 	}
 	if Gfilelog != nil && Gfilelog.LogObj != nil {
 		Gfilelog.fileCheck()
-		//Gfilelog.LogObj.mu.RLock()
-		//defer Gfilelog.LogObj.mu.RUnlock()
-		/*if Gfilelog.Logconf.Stdout && Gfilelog.Logconf.Colorful && Gfilelog.Logconf.Loglevel <= INFO {
-			//Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf(Green+"trace_id-%s [INFO] "+fmtstr+Reset, append([]interface{}{trace_id}, v...)...))
-			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf(p_fmt, append(values, v...)...))
-		} else if Gfilelog.Logconf.Loglevel <= INFO {
-			//Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf("trace_id-%s [INFO] "+fmtstr, append([]interface{}{trace_id}, v...)...))
-			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf(p_fmt, append(values, v...)...))
-		}*/
 		if Gfilelog.Logconf.Loglevel <= INFO {
 			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf(p_fmt, append(values, v...)...))
 		}
@@ -406,16 +438,37 @@ func pInfoWithGid(ctx context.Context, depth int, fmtstr string, v ...interface{
 }
 
 func pInfo(ctx context.Context, depth int, v ...interface{}) {
-	trace_id := ""
+	/*trace_id := ""
 	if m := ctx.Value("trace_id"); m != nil {
 		if value, ok := m.(string); ok {
 			trace_id = value
 		}
+	}*/
+
+	var builder strings.Builder
+	trace_id := ""
+	if m := ctx.Value("trace_id"); m != nil {
+		if value, ok := m.(string); ok {
+			//trace_id = value
+			builder.WriteString("trace_id ")
+			builder.WriteString(value)
+			builder.WriteString(" ")
+		}
 	}
+	if m := ctx.Value("request_id"); m != nil {
+		if value, ok := m.(string); ok {
+			//trace_id = value
+			builder.WriteString("req_id ")
+			builder.WriteString(value)
+		}
+	}
+	trace_id = builder.String()
+
 	//prefix := fmt.Sprintf("trace_id-%s [INFO]", trace_id)
 	prefix := ""
 	if trace_id != "" {
-		prefix = fmt.Sprintf("trace_id-%s [INFO]", trace_id)
+		//prefix = fmt.Sprintf("trace_id %s [INFO]", trace_id)
+		prefix = fmt.Sprintf("%s [INFO]", trace_id)
 	} else {
 		prefix = fmt.Sprintf("%s", "[INFO]")
 	}
@@ -445,18 +498,37 @@ func Infof(ctx context.Context, fmtstr string, v ...interface{}) {
 }
 
 func pWarnWithGid(ctx context.Context, depth int, fmtstr string, v ...interface{}) {
-	trace_id := ""
+	/*trace_id := ""
 	if m := ctx.Value("trace_id"); m != nil {
 		if value, ok := m.(string); ok {
 			trace_id = value
 		}
+	}*/
+	var builder strings.Builder
+	trace_id := ""
+	if m := ctx.Value("trace_id"); m != nil {
+		if value, ok := m.(string); ok {
+			//trace_id = value
+			builder.WriteString("trace_id ")
+			builder.WriteString(value)
+			builder.WriteString(" ")
+		}
 	}
+	if m := ctx.Value("request_id"); m != nil {
+		if value, ok := m.(string); ok {
+			//trace_id = value
+			builder.WriteString("req_id ")
+			builder.WriteString(value)
+		}
+	}
+	trace_id = builder.String()
 
 	p_fmt := ""
 	values := []interface{}{}
 	if trace_id != "" {
 		// p_fmt = Red + "trace_id-%s [WARN] " + fmtstr + Reset
-		p_fmt = "trace_id-%s [WARN] " + fmtstr
+		//p_fmt = "trace_id %s [WARN] " + fmtstr
+		p_fmt = "%s [WARN] " + fmtstr
 		values = append(values, trace_id)
 	} else {
 		p_fmt = "[WARN] " + fmtstr
@@ -468,20 +540,6 @@ func pWarnWithGid(ctx context.Context, depth int, fmtstr string, v ...interface{
 
 	if Gfilelog != nil && Gfilelog.LogObj != nil {
 		Gfilelog.fileCheck()
-		//Gfilelog.LogObj.mu.RLock()
-		//defer Gfilelog.LogObj.mu.RUnlock()
-		/*if Gfilelog.Logconf.Stdout && Gfilelog.Logconf.Colorful && Gfilelog.Logconf.Loglevel <= WARN {
-			//Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf(Yellow+"trace_id-%s [WARN] "+fmtstr+Reset, append([]interface{}{trace_id}, v...)...))
-			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf(p_fmt, append(values, v...)...))
-		} else if Gfilelog.Logconf.Stdout && Gfilelog.Logconf.Loglevel <= WARN {
-			//Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf("trace_id-%s [WARN] "+fmtstr, append([]interface{}{trace_id}, v...)...))
-			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf(p_fmt, append(values, v...)...))
-		} else if Gfilelog.Logconf.Loglevel <= WARN {
-			//Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf("trace_id-%s [WARN] "+fmtstr, append([]interface{}{trace_id}, v...)...))
-			//Gfilelog.LogObj.lg_err.Output(depth, fmt.Sprintf("trace_id-%s [WARN] "+fmtstr, append([]interface{}{trace_id}, v...)...))
-			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf(p_fmt, append(values, v...)...))
-			Gfilelog.LogObj.lg_err.Output(depth, fmt.Sprintf(p_fmt, append(values, v...)...))
-		}*/
 		if Gfilelog.Logconf.Loglevel <= WARN {
 			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf(p_fmt, append(values, v...)...))
 			if !Gfilelog.Logconf.Stdout {
@@ -492,16 +550,37 @@ func pWarnWithGid(ctx context.Context, depth int, fmtstr string, v ...interface{
 }
 
 func pWarn(ctx context.Context, depth int, v ...interface{}) {
-	trace_id := ""
+	/*trace_id := ""
 	if m := ctx.Value("trace_id"); m != nil {
 		if value, ok := m.(string); ok {
 			trace_id = value
 		}
+	}*/
+
+	var builder strings.Builder
+	trace_id := ""
+	if m := ctx.Value("trace_id"); m != nil {
+		if value, ok := m.(string); ok {
+			//trace_id = value
+			builder.WriteString("trace_id ")
+			builder.WriteString(value)
+			builder.WriteString(" ")
+		}
 	}
+	if m := ctx.Value("request_id"); m != nil {
+		if value, ok := m.(string); ok {
+			//trace_id = value
+			builder.WriteString("req_id ")
+			builder.WriteString(value)
+		}
+	}
+	trace_id = builder.String()
+
 	//prefix := fmt.Sprintf("trace_id-%s [WARN]", trace_id)
 	prefix := ""
 	if trace_id != "" {
-		prefix = fmt.Sprintf("trace_id-%s [WARN]", trace_id)
+		//prefix = fmt.Sprintf("trace_id %s [WARN]", trace_id)
+		prefix = fmt.Sprintf("%s [WARN]", trace_id)
 	} else {
 		prefix = fmt.Sprintf("%s", "[WARN]")
 	}
@@ -533,16 +612,37 @@ func Warnf(ctx context.Context, fmtstr string, v ...interface{}) {
 }
 
 func pErrorWithGid(ctx context.Context, depth int, fmtstr string, v ...interface{}) {
-	trace_id := ""
+	/*trace_id := ""
 	if m := ctx.Value("trace_id"); m != nil {
 		if value, ok := m.(string); ok {
 			trace_id = value
 		}
+	}*/
+
+	var builder strings.Builder
+	trace_id := ""
+	if m := ctx.Value("trace_id"); m != nil {
+		if value, ok := m.(string); ok {
+			//trace_id = value
+			builder.WriteString("trace_id ")
+			builder.WriteString(value)
+			builder.WriteString(" ")
+		}
 	}
+	if m := ctx.Value("request_id"); m != nil {
+		if value, ok := m.(string); ok {
+			//trace_id = value
+			builder.WriteString("req_id ")
+			builder.WriteString(value)
+		}
+	}
+	trace_id = builder.String()
+
 	p_fmt := ""
 	values := []interface{}{}
 	if trace_id != "" {
-		p_fmt = "trace_id-%s [ERROR] " + fmtstr
+		//p_fmt = "trace_id %s [ERROR] " + fmtstr
+		p_fmt = "%s [ERROR] " + fmtstr
 		values = append(values, trace_id)
 	} else {
 		p_fmt = "[ERROR] " + fmtstr
@@ -554,20 +654,6 @@ func pErrorWithGid(ctx context.Context, depth int, fmtstr string, v ...interface
 
 	if Gfilelog != nil && Gfilelog.LogObj != nil {
 		Gfilelog.fileCheck()
-		//Gfilelog.LogObj.mu.RLock()
-		//defer Gfilelog.LogObj.mu.RUnlock()
-		/*if Gfilelog.Logconf.Stdout && Gfilelog.Logconf.Colorful && Gfilelog.Logconf.Loglevel <= WARN {
-			//Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf(Red+"trace_id-%s [ERROR] "+fmtstr+Reset, append([]interface{}{trace_id}, v...)...))
-			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf(p_fmt, append(values, v...)...))
-		} else if Gfilelog.Logconf.Stdout && Gfilelog.Logconf.Loglevel <= WARN {
-			//Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf("trace_id-%s [ERROR] "+fmtstr, append([]interface{}{trace_id}, v...)...))
-			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf(p_fmt, append(values, v...)...))
-		} else if Gfilelog.Logconf.Loglevel <= WARN {
-			//Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf("trace_id-%s [ERROR] "+fmtstr, append([]interface{}{trace_id}, v...)...))
-			//Gfilelog.LogObj.lg_err.Output(depth, fmt.Sprintf("trace_id-%s [ERROR] "+fmtstr, append([]interface{}{trace_id}, v...)...))
-			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf(p_fmt, append(values, v...)...))
-			Gfilelog.LogObj.lg_err.Output(depth, fmt.Sprintf(p_fmt, append(values, v...)...))
-		}*/
 		if Gfilelog.Logconf.Loglevel <= ERROR {
 			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf(p_fmt, append(values, v...)...))
 			if !Gfilelog.Logconf.Stdout {
@@ -578,16 +664,36 @@ func pErrorWithGid(ctx context.Context, depth int, fmtstr string, v ...interface
 }
 
 func pError(ctx context.Context, depth int, v ...interface{}) {
-	trace_id := ""
+	/*trace_id := ""
 	if m := ctx.Value("trace_id"); m != nil {
 		if value, ok := m.(string); ok {
 			trace_id = value
 		}
+	}*/
+	var builder strings.Builder
+	trace_id := ""
+	if m := ctx.Value("trace_id"); m != nil {
+		if value, ok := m.(string); ok {
+			//trace_id = value
+			builder.WriteString("trace_id ")
+			builder.WriteString(value)
+			builder.WriteString(" ")
+		}
 	}
+	if m := ctx.Value("request_id"); m != nil {
+		if value, ok := m.(string); ok {
+			//trace_id = value
+			builder.WriteString("req_id ")
+			builder.WriteString(value)
+		}
+	}
+	trace_id = builder.String()
+
 	//prefix := fmt.Sprintf("trace_id-%s [ERROR]", trace_id)
 	prefix := ""
 	if trace_id != "" {
-		prefix = fmt.Sprintf("trace_id-%s [ERROR]", trace_id)
+		//prefix = fmt.Sprintf("trace_id %s [ERROR]", trace_id)
+		prefix = fmt.Sprintf("%s [ERROR]", trace_id)
 	} else {
 		prefix = fmt.Sprintf("%s", "[ERROR]")
 	}

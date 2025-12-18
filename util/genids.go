@@ -52,7 +52,8 @@ func Genid(ctx context.Context, conn *gorm.DB) (uint64, error) {
 }
 
 func NewRequestID() string {
-	return strings.Replace(uuid.New().String(), "-", "", -1)
+	s := strings.Replace(uuid.New().String(), "-", "", -1)
+	return s[16:]
 }
 
 func GenXid() string {
