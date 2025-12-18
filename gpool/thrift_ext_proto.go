@@ -204,7 +204,6 @@ func (p *ExtProcessor) ReadMetaMap(ctx context.Context, in, out thrift.TProtocol
 		return ctx, err
 	}
 	logger.Debugf(ctx, "size: %d", size)
-	req_id := ""
 	for i := 0; i < size; i++ {
 		k, err := in.ReadString(ctx)
 		if err != nil {
@@ -222,15 +221,7 @@ func (p *ExtProcessor) ReadMetaMap(ctx context.Context, in, out thrift.TProtocol
 		//reqData[k] = v
 		ctx = context.WithValue(ctx, k, v)
 
-		if k == "request_id" {
-			req_id = v
-		}
 	}
-	if req_id == "" {
-		ctx = context.WithValue(ctx, "request_id", util.NewRequestID())
-	}
-	//in.ReadMapEnd(ctx)
-	//return ctx, reqData, err
 	return ctx, err
 }
 
