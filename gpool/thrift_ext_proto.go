@@ -5,11 +5,11 @@ import (
 	"context"
 	"encoding/binary"
 	"io"
-	"time"
 
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/google/uuid"
 	"github.com/lanwenhong/lgobase/logger"
+	"github.com/lanwenhong/lgobase/util"
 )
 
 const (
@@ -123,7 +123,7 @@ func (p *ThriftExtProtocolClient) GetProtocol(transport thrift.TTransport) thrif
 }
 
 func (p *ThriftExtProtocolClient) WriteMessageBegin(ctx context.Context, name string, typeId thrift.TMessageType, seqId int32) error {
-	starttime := time.Now()
+	//starttime := time.Now()
 	//magic
 	err := p.WriteI16(ctx, THRIFT_EXT_META_MAGIC)
 	if err != nil {
@@ -154,7 +154,7 @@ func (p *ThriftExtProtocolClient) WriteMessageBegin(ctx context.Context, name st
 		}
 	}
 	p.WriteMapEnd(ctx)
-	logger.Infof(ctx, "func=WriteMessageBegin|time=%v", time.Since(starttime))
+	//logger.Infof(ctx, "func=WriteMessageBegin|time=%v", time.Since(starttime))
 	return p.TProtocol.WriteMessageBegin(ctx, name, typeId, seqId)
 }
 
@@ -204,6 +204,7 @@ func (p *ExtProcessor) ReadMetaMap(ctx context.Context, in, out thrift.TProtocol
 		return ctx, err
 	}
 	logger.Debugf(ctx, "size: %d", size)
+	req_id := ""
 	for i := 0; i < size; i++ {
 		k, err := in.ReadString(ctx)
 		if err != nil {
@@ -221,6 +222,12 @@ func (p *ExtProcessor) ReadMetaMap(ctx context.Context, in, out thrift.TProtocol
 		//reqData[k] = v
 		ctx = context.WithValue(ctx, k, v)
 
+		if k == "request_id" {
+			req_id = v
+		}
+	}
+	if req_id == "" {
+		ctx = context.WithValue(ctx, "request_id", util.NewRequestID())
 	}
 	//in.ReadMapEnd(ctx)
 	//return ctx, reqData, err
@@ -271,6 +278,7 @@ func (p *ExtProcessor) Process(ctx context.Context, in, out thrift.TProtocol) (b
 		multiReader := io.MultiReader(bytes.NewReader(preBuf), in.Transport())
 		newTransport := thrift.NewStreamTransportR(multiReader)
 		in = p.Pro.GetProtocol(newTransport)
+		ctx = context.WithValue(ctx, "request_id", util.NewRequestID())
 	}
 	//b, t := p.Processor.Process(newCtx, in, out)
 	b, t := p.Processor.Process(ctx, in, out)

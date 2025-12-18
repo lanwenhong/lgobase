@@ -15,7 +15,7 @@ import (
 
 func TestAdd1(t *testing.T) {
 	ctx := context.Background()
-
+	ctx = context.WithValue(ctx, "trace_id", util.NewRequestID())
 	myconf := &logger.Glogconf{
 		RotateMethod: logger.ROTATE_FILE_DAILY,
 		Stdout:       true,
@@ -23,7 +23,7 @@ func TestAdd1(t *testing.T) {
 		Loglevel:     logger.DEBUG,
 	}
 	logger.Newglog("./", "test.log", "test.log.err", myconf)
-	logger.Debugf(ctx, "run")
+	//logger.Debugf(ctx, "run")
 
 	g_conf := &gpool.GPoolConfig[server.ServerTestClient]{
 		Addrs: "127.0.0.1:9090/30000",
@@ -39,10 +39,10 @@ func TestAdd1(t *testing.T) {
 	addPool := gpool.NewRpcPoolSelector[server.ServerTestClient](ctx, g_conf)
 
 	wg := sync.WaitGroup{}
-	for i := 0; i < 1; i++ {
-		ctx = context.WithValue(ctx, "trace_id", util.NewRequestID())
+	for i := 0; i < 2; i++ {
 		wg.Add(1)
 		go func() {
+			ctx := context.WithValue(ctx, "trace_id", util.NewRequestID())
 			defer wg.Done()
 			for i := 0; i < 1; i++ {
 				process := func(ctx context.Context, client interface{}) (string, error) {
