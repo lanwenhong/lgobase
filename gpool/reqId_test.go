@@ -61,8 +61,9 @@ func TestAdd1(t *testing.T) {
 					return "add", err
 				}
 
-				ctx = gpool.NewExtContext(ctx)
-				addPool.ThriftExtCall(ctx, process)
+				nctx := gpool.NewExtContext(ctx)
+				nctx = nctx.SetReqExtData(nctx, "request_id", util.NewRequestID())
+				addPool.ThriftExtCall(nctx, process)
 				//addPool.ThriftCall(ctx, process)
 
 			}
