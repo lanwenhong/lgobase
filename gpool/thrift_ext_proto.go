@@ -59,24 +59,10 @@ func NewExtContext(ctx context.Context) *ExtContext {
 }
 
 func (ec *ExtContext) SetReqExtData(ctx context.Context, k, v string) *ExtContext {
-	//newValues := make(map[string]string)
-	/*for k, v := range ec.ReqExtData {
-		/*if k != "trace_id" {
-			newValues[k] = v
-		}
-		logger.Debugf(ctx, "k: %s v: %s", k, v)
-		ctx = context.WithValue(ctx, k, v)
-	}*/
-	//logger.Debugf(ctx, "k: %s v: %s", k, v)
-	//logger.Debugf(ctx, "newValues: %v", newValues)
-	//newValues[k] = v
 	ec.ReqExtData[k] = v
 	ctx = context.WithValue(ctx, k, v)
-	//id := ctx.Value("trace_id").(string)
-	//logger.Debugf(ctx, id)
 	return &ExtContext{
-		Context: ctx,
-		//ReqExtData: newValues,
+		Context:    ctx,
 		ReqExtData: ec.ReqExtData,
 	}
 }
@@ -87,23 +73,6 @@ func (ec *ExtContext) GetReqExtData(k string) string {
 	}
 	return ""
 }
-
-/*func NewRequestIDProtocolClient(baseFactory thrift.TProtocolFactory) *RequestIDProtocolClient {
-	return &RequestIDProtocolClient{
-		baseFactory: baseFactory,
-	}
-}
-
-func NewRequestIDProtocolNewClient(proto thrift.TProtocol) *RequestIDProtocolClient {
-	return &RequestIDProtocolClient{
-		TProtocol: proto,
-	}
-}
-
-func (p *RequestIDProtocolClient) GetProtocol(transport thrift.TTransport) thrift.TProtocol {
-	baseProto := p.baseFactory.GetProtocol(transport)
-	return NewRequestIDProtocolNewClient(baseProto)
-}*/
 
 func NewThriftExtProtocolClient(baseFactory thrift.TProtocolFactory) *ThriftExtProtocolClient {
 	return &ThriftExtProtocolClient{
