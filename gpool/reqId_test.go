@@ -27,8 +27,8 @@ func TestAdd1(t *testing.T) {
 
 	g_conf := &gpool.GPoolConfig[server.ServerTestClient]{
 		Addrs: "127.0.0.1:9090/30000",
-		//Cfunc: gpool.CreateThriftFramedConnThriftExt[server.ServerTestClient],
-		Cfunc: gpool.CreateThriftFramedConn[server.ServerTestClient],
+		Cfunc: gpool.CreateThriftFramedConnThriftExt[server.ServerTestClient],
+		//Cfunc: gpool.CreateThriftFramedConn[server.ServerTestClient],
 		//Cfunc: gpool.CreateThriftBufferConnThriftExt[server.ServerTestClient],
 		//Cfunc: gpool.CreateThriftBufferConn[server.ServerTestClient],
 		Nc: server.NewServerTestClientFactory,
@@ -42,7 +42,10 @@ func TestAdd1(t *testing.T) {
 	for i := 0; i < 2; i++ {
 		wg.Add(1)
 		go func() {
-			ctx := context.WithValue(ctx, "trace_id", util.NewRequestID())
+			//ctx := context.WithValue(ctx, "trace_id", util.NewRequestID())
+			request_id := util.NewRequestID()
+			logger.Debugf(ctx, "req_id: %s", request_id)
+			ctx := context.WithValue(ctx, "request_id", request_id)
 			defer wg.Done()
 			for i := 0; i < 1; i++ {
 				process := func(ctx context.Context, client interface{}) (string, error) {
@@ -62,7 +65,7 @@ func TestAdd1(t *testing.T) {
 				}
 
 				nctx := gpool.NewExtContext(ctx)
-				nctx = nctx.SetReqExtData(nctx, "request_id", util.NewRequestID())
+				//nctx = nctx.SetReqExtData(nctx, "request_id", util.NewRequestID())
 				addPool.ThriftExtCall(nctx, process)
 				//addPool.ThriftCall(ctx, process)
 

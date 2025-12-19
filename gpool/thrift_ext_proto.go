@@ -71,6 +71,9 @@ func (ec *ExtContext) GetReqExtData(k string) string {
 	if v, ok := ec.ReqExtData[k]; ok {
 		return v
 	}
+	if m := ec.Value(k); m != nil {
+		return m.(string)
+	}
 	return ""
 }
 
