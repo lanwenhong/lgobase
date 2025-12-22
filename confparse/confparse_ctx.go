@@ -39,7 +39,8 @@ func CpaseNew(fname string) *Cparse {
 	return cp
 }*/
 
-func (cp *Cparse) parseSectionWithCtx(ctx context.Context, cfg *config.Gconf, sectionName string) (map[string]string, error) {
+// func (cp *Cparse) parseSectionWithCtx(ctx context.Context, cfg *config.Gconf, sectionName string) (map[string]string, error) {
+func (cp *Cparse) parseSectionWithCtx(ctx context.Context, cfg *config.Gconf, sectionName string) (map[string][]string, error) {
 	return cfg.GetSection(sectionName)
 }
 
@@ -115,13 +116,15 @@ func (cp *Cparse) getDatafromIniWithCtx(ctx context.Context, section string, key
 		if err != nil {
 			return "", err
 		}
+		//word, ok := item[key]
 		word, ok := item[key]
 		if !ok {
 			fmt_e := fmt.Sprintf("section %s key %s not exist", section, key)
 			logger.Warnf(ctx, fmt_e)
 			return "", errors.New(fmt_e)
 		}
-		return word, nil
+		//return word, nil
+		return word[0], nil
 	}
 	fmt_e := fmt.Sprintf("section %s not exist", section)
 	return "", errors.New(fmt_e)
@@ -530,7 +533,8 @@ func (cp *Cparse) CparseGoWithCtx(ctx context.Context, stru interface{}, cfg *co
 			return err
 		}
 		sv := cmap[k]
-		err = one_func(stru, sv)
+		//err = one_func(stru, sv)
+		err = one_func(ctx, stru, sv)
 		if err != nil {
 			return err
 		}

@@ -13,7 +13,7 @@ import (
 	"github.com/lanwenhong/lgobase/logger"
 )
 
-type UserSelfFunc func(interface{}, string) error
+type UserSelfFunc func(context.Context, interface{}, []string) error
 
 const (
 	CP_TAG_POS        = "confpos"
@@ -28,6 +28,7 @@ const (
 )
 
 type Cparse struct {
+	ctx      context.Context
 	Filename string
 	Funcs    map[string]UserSelfFunc
 }
@@ -36,15 +37,23 @@ func CpaseNew(fname string) *Cparse {
 	cp := new(Cparse)
 	cp.Filename = fname
 	cp.Funcs = make(map[string]UserSelfFunc)
+	cp.ctx = context.Background()
 	return cp
 }
 
-func (cp *Cparse) parseSection(cfg *config.Gconf, sectionName string) (map[string]string, error) {
+func (cp *Cparse) WithCtx(ctx context.Context) *Cparse {
+	nCp := *cp
+	nCp.ctx = ctx
+	return &nCp
+}
+
+// func (cp *Cparse) parseSection(cfg *config.Gconf, sectionName string) (map[string]string, error) {
+func (cp *Cparse) parseSection(cfg *config.Gconf, sectionName string) (map[string][]string, error) {
 	return cfg.GetSection(sectionName)
 }
 
 func (cp *Cparse) parseBaseTag(v reflect.StructField) (string, string, error) {
-	ctx := context.Background()
+	ctx := cp.ctx
 	cpos := v.Tag.Get(CP_TAG_POS)
 	if cpos == "" {
 		fmt_e := fmt.Sprintf("tag: %s not exist", CP_TAG_POS)
@@ -58,7 +67,7 @@ func (cp *Cparse) parseBaseTag(v reflect.StructField) (string, string, error) {
 }
 
 func (cp *Cparse) parseMapTag(v reflect.StructField) (string, string, string, string, error) {
-	ctx := context.Background()
+	ctx := cp.ctx
 	cpos := v.Tag.Get(CP_TAG_POS)
 	if cpos == "" {
 		fmt_e := fmt.Sprintf("tag: %s not exist", CP_TAG_POS)
@@ -89,9 +98,9 @@ func (cp *Cparse) parseMapTag(v reflect.StructField) (string, string, string, st
 }
 
 func (cp *Cparse) parseSliceTag(v reflect.StructField) (string, string, string, error) {
+	ctx := cp.ctx
 	cpos := v.Tag.Get(CP_TAG_POS)
 
-	ctx := context.Background()
 	if cpos == "" {
 		fmt_e := fmt.Sprintf("tag: %s not exist", CP_TAG_POS)
 		logger.Warnf(ctx, "err: %s", fmt_e)
@@ -114,7 +123,7 @@ func (cp *Cparse) parseSliceTag(v reflect.StructField) (string, string, string, 
 }
 
 func (cp *Cparse) getDatafromIni(section string, key string, cfg *config.Gconf) (string, error) {
-	ctx := context.Background()
+	ctx := cp.ctx
 	if cfg.HasSection(section) {
 		item, err := cp.parseSection(cfg, section)
 		if err != nil {
@@ -126,7 +135,8 @@ func (cp *Cparse) getDatafromIni(section string, key string, cfg *config.Gconf) 
 			logger.Warnf(ctx, fmt_e)
 			return "", errors.New(fmt_e)
 		}
-		return word, nil
+		//return word, nil
+		return word[0], nil
 	}
 	fmt_e := fmt.Sprintf("section %s not exist", section)
 	return "", errors.New(fmt_e)
@@ -142,12 +152,12 @@ func (cp *Cparse) setInt(v reflect.Value, x string) error {
 }
 
 func (cp *Cparse) parseInt(v reflect.Value, tv reflect.StructField, cfg *config.Gconf) error {
+	ctx := cp.ctx
 	section, key, err := cp.parseBaseTag(tv)
 	if err != nil {
 		return err
 	}
 	//fmt.Printf("section: %s key: %s\n", section, key)
-	ctx := context.Background()
 	logger.Debugf(ctx, "section: %s key: %s", section, key)
 
 	word, err := cp.getDatafromIni(section, key, cfg)
@@ -167,11 +177,11 @@ func (cp *Cparse) setUint(v reflect.Value, x string) error {
 }
 
 func (cp *Cparse) parseUint(v reflect.Value, tv reflect.StructField, cfg *config.Gconf) error {
+	ctx := cp.ctx
 	section, key, err := cp.parseBaseTag(tv)
 	if err != nil {
 		return err
 	}
-	ctx := context.Background()
 	logger.Debugf(ctx, "section: %s key: %s", section, key)
 	//fmt.Printf("section: %s key: %s\n", section, key)
 	word, err := cp.getDatafromIni(section, key, cfg)
@@ -191,11 +201,11 @@ func (cp *Cparse) setFloat(v reflect.Value, x string) error {
 }
 
 func (cp *Cparse) parseFloat(v reflect.Value, tv reflect.StructField, cfg *config.Gconf) error {
+	ctx := cp.ctx
 	section, key, err := cp.parseBaseTag(tv)
 	if err != nil {
 		return err
 	}
-	ctx := context.Background()
 	logger.Debugf(ctx, "section: %s key: %s", section, key)
 
 	//fmt.Printf("section: %s key: %s\n", section, key)
@@ -207,12 +217,12 @@ func (cp *Cparse) parseFloat(v reflect.Value, tv reflect.StructField, cfg *confi
 }
 
 func (cp *Cparse) parseDuration(v reflect.Value, tv reflect.StructField, cfg *config.Gconf) error {
+	ctx := cp.ctx
 	section, key, err := cp.parseBaseTag(tv)
 	if err != nil {
 		return err
 	}
 	//fmt.Printf("section: %s key: %s\n", section, key)
-	ctx := context.Background()
 	logger.Debugf(ctx, "section: %s key: %s", section, key)
 
 	word, err := cp.getDatafromIni(section, key, cfg)
@@ -236,13 +246,13 @@ func (cp *Cparse) setString(v reflect.Value, x string) error {
 }
 
 func (cp *Cparse) parseString(v reflect.Value, tv reflect.StructField, cfg *config.Gconf) error {
+	ctx := cp.ctx
 	section, key, err := cp.parseBaseTag(tv)
 	if err != nil {
 		return err
 	}
 	//fmt.Printf("section: %s key: %s\n", section, key)
 
-	ctx := context.Background()
 	logger.Debugf(ctx, "section: %s key: %s", section, key)
 
 	word, err := cp.getDatafromIni(section, key, cfg)
@@ -262,12 +272,12 @@ func (cp *Cparse) setBool(v reflect.Value, x string) error {
 }
 
 func (cp *Cparse) parseBool(v reflect.Value, tv reflect.StructField, cfg *config.Gconf) error {
+	ctx := cp.ctx
 	section, key, err := cp.parseBaseTag(tv)
 	if err != nil {
 		return err
 	}
 	//fmt.Printf("section: %s key: %s\n", section, key)
-	ctx := context.Background()
 	logger.Debugf(ctx, "section: %s key: %s", section, key)
 
 	word, err := cp.getDatafromIni(section, key, cfg)
@@ -397,6 +407,7 @@ func (cp *Cparse) fillSlice(v reflect.Value, sv string) (reflect.Value, error) {
 }
 
 func (cp *Cparse) parseMap(v reflect.Value, tv reflect.StructField, cfg *config.Gconf) error {
+	ctx := cp.ctx
 	ktype := v.Type().Key().Kind()
 	//vtype := v.Type().Elem().Kind()
 
@@ -410,7 +421,6 @@ func (cp *Cparse) parseMap(v reflect.Value, tv reflect.StructField, cfg *config.
 	if err != nil {
 		return err
 	}
-	ctx := context.Background()
 	//logger.Debufg(ctx, "section: %s key: %s", section, key)
 
 	//fmt.Printf("se: %s k: %s is: %s kvs: %s\n", se, k, is, kvs)
@@ -453,7 +463,7 @@ func (cp *Cparse) parseSlice(v reflect.Value, tv reflect.StructField, cfg *confi
 }
 
 func (cp *Cparse) isUserSelfParse(tv reflect.StructField) (error, bool) {
-	ctx := context.Background()
+	ctx := cp.ctx
 	dtype := tv.Tag.Get(CP_TAG_DTYPE)
 	if dtype == "" {
 		//fmt_e := fmt.Sprintf("tag: %s not exist", CP_TAG_DTYPE)
@@ -544,7 +554,8 @@ func (cp *Cparse) CparseGo(stru interface{}, cfg *config.Gconf) error {
 			return err
 		}
 		sv := cmap[k]
-		err = one_func(stru, sv)
+		//err = one_func(stru, sv)
+		err = one_func(cp.ctx, stru, sv)
 		if err != nil {
 			return err
 		}
