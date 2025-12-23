@@ -14,7 +14,8 @@ import (
 )
 
 type Gconf struct {
-	Gcf         map[string]map[string]string
+	//Gcf         map[string]map[string]string
+	Gcf         map[string]map[string][]string
 	GlineExtend map[string]map[string][]string
 	file        string
 }
@@ -22,7 +23,8 @@ type Gconf struct {
 func NewGconf(filename string) *Gconf {
 	gcf := new(Gconf)
 	gcf.file = filename
-	gcf.Gcf = make(map[string]map[string]string)
+	//gcf.Gcf = make(map[string]map[string]string)
+	gcf.Gcf = make(map[string]map[string][]string)
 	gcf.GlineExtend = make(map[string]map[string][]string)
 	return gcf
 }
@@ -180,7 +182,8 @@ func (gcf *Gconf) GconfParse() error {
 	ireg_ex := regexp.MustCompile(ikey_reg_ex)
 
 	var mkey string
-	var imap map[string]string
+	//var imap map[string]string
+	var imap map[string][]string
 	var line_key string = ""
 	var ex_key string = ""
 	for {
@@ -204,7 +207,8 @@ func (gcf *Gconf) GconfParse() error {
 				mkey = mk
 				//fmt.Printf("mk: %s\n", mkey)
 				logger.Debugf(ctx, "mk: %s", mkey)
-				imap = make(map[string]string)
+				//imap = make(map[string]string)
+				imap = make(map[string][]string)
 				gcf.Gcf[mkey] = imap
 			}
 		} else if ireg.MatchString(sline) {
@@ -226,7 +230,8 @@ func (gcf *Gconf) GconfParse() error {
 			}
 			//fmt.Printf("k=%s v=%s\n", k, v)
 			logger.Debugf(ctx, "k=%s v=%s", k, v)
-			imap[k] = v
+			//imap[k] = v
+			imap[k] = append(imap[k], v)
 			line_key = k
 			ex_key = sline
 		} else if ireg_ex.MatchString(sline) {
@@ -251,7 +256,8 @@ func (gcf *Gconf) HasSection(section string) bool {
 	return ok
 }
 
-func (gcf *Gconf) GetSection(section string) (map[string]string, error) {
+// func (gcf *Gconf) GetSection(section string) (map[string]string, error) {
+func (gcf *Gconf) GetSection(section string) (map[string][]string, error) {
 	xs, ok := gcf.Gcf[section]
 	if ok {
 		return xs, nil

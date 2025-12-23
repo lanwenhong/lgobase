@@ -2,12 +2,15 @@ package token
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
+	"github.com/lanwenhong/lgobase/logger"
 	"github.com/lanwenhong/lgobase/token"
 )
 
 func TestTokenPack(t *testing.T) {
+	ctx := context.Background()
 	tk := &token.Token{
 		Ver:    1,
 		Idc:    2,
@@ -16,32 +19,64 @@ func TestTokenPack(t *testing.T) {
 		Uid:      1,
 		OpUid:    10,
 		Expire:   100000,
-		Deadline: 0xFFFFFFFFF,
+		Deadline: 0xFF,
 		Udid:     "0",
 		Tkey:     "IypMcRkPXkbeNDRl6Km43boHr98udp7o",
 	}
-	ctx := context.Background()
+
+	bytes, _ := json.Marshal(tk)
+	logger.Debugf(ctx, "c: %s", string(bytes))
 	tk.Pack(ctx)
 }
 
 func TestTokenUnPack(t *testing.T) {
-	//bdata := "AW6NAAWV4ZpxruynLHNVV2iLKqIp5rTNGSXGBY51/dxlz85Gb7Mgx70s268="
-	//bdata := "AVsRwJSB9I2GKcTBeuLL150bvavuYz9aGzJ5au+d4WAvxRAuZQ1P7IEviv8ed111OzynGDZqd9ByLBV6"
-	//bdata := "AZaJQNaOxZYFNJUJCd3q9CYLdq/fUy9iIz/jprdpz35C0L18qWCZF2WUWoIiW4ervbEiactfhtmPg7wj"
-	//bdata := "AQdJQHreidu9Ha2NANAEjoiQ5Zx6Do1VNY1IEfN96vCILdcDr9l0uNizrP4vQJOIZaCMvWmeSATifD9J"
-	//bdata := "ASfgQIcyjzNROQyauMfIW3Kcxto/9UdoI6XKQBNc284NUvpUk3b6t6FsebFaW6X8+EYh+v3cx5WFouzL"
-	//bdata := "AdCmQBX4FObetnGSbR/AizgTMwJ459Rt5qVCkKObUpdIfHnEHSldufJFErPRxLD1K5yth8ybXQ9jXHjg"
-	//bdata := "AThpQClJQs2NlgX2iWBm6TNaC3OgKSQkvswOhconUaNDru8dfCdWB/MC0WfUYrWNKHvt77EDjTA+l/B8"
-	//bdata := "AUFXQE5NCkwNCB/YIRyRJjpKYFdvUZtqN0J/jwj+nz5I4dlCSgP/82VohPc="
-	//bdata := "AQ9wQKN0/3ARAOghH/do1hkJmhq8g5emCAlyOzHxqocBLgFD2Etm78mpq30="
-	//bdata := "AXfIQKcRKN0O/DVZbbuYuxqpy4HKqrBmFFX+2FrFlZTDHkbokDJvS4FmBjw="
-	//bdata := "AfhiQMOhM1rLsVE6x8UEUP0wWLUEZDcKNoEJj/fLdVuACxIJlPFsT0uJtKg="
-	//bdata := "ARq6QEKJHR7RhrWP43dEA4lvPTmh/lkdWOmItrwlAywupATphLO5wfSPhnU="
-	//bdata := "ATk5QHFB5KxGkMY/L98SJ7/AFBx+3/xfjeCqG5FsTJtTH55hV4VGpQ3/k3k="
-	bdata := "ATk5QHFB5KxGkMY/FW724io7CYH4UTJE9PLRkW5zV8q6AzCXku/PIiz5ujY="
+	//bdata := "____7wFCigBmgqBijZpsRTZZGAFEl5ew4A5tAoeoNrKO8UyoFHEWEHTcfMHXJciN"
+	//bdata := "____7wHv9AA_g1FizA_i5S9-HJc02Qe4efAwSO2LUpO-uplzI3dB7VubFgnSW2TU"
+	bdata := "MC8_7wGjMQAECuy0LQG1hQiPvrMdpKeGc38c_j3DRSYnJjxZ_gJNGQ9X5J-zsUuC"
 	ctx := context.Background()
 	tk := &token.Token{
 		Tkey: "IypMcRkPXkbeNDRl6Km43boHr98udp7o",
 	}
-	tk.UnPack(ctx, bdata)
+	err := tk.UnPack(ctx, bdata)
+	if err != nil {
+		logger.Warnf(ctx, "err: %s", err.Error())
+		t.Fatal(err)
+	}
+	logger.Debugf(ctx, "tk: %v", tk)
+}
+
+func TestTokenReplace(t *testing.T) {
+	ctx := context.Background()
+	//a := "/+8B45pAJipAlhkEdKqdZVS2kcUx5ziMGExEoA/VPtAzqz9iYflFRhf9mvhMQw=="
+	a := "/+8BDk4AcIFWE44elu94L52nGmLSjYHP2xnWu9dcW8Ngp1K1msVLQRK7wK26Fw=="
+	tk := &token.Token{
+		Tkey: "IypMcRkPXkbeNDRl6Km43boHr98udp7o",
+	}
+	b := tk.PackReplace(ctx, a)
+
+	logger.Debugf(ctx, "b: %s len: %d", b, len(b))
+
+	a = tk.UnpackReplace(ctx, b)
+	logger.Debugf(ctx, "a: %s len: %d", a, len(a))
+}
+
+func TestUnpackReplace(t *testing.T) {
+	ctx := context.Background()
+	a := "CgAAAN-GTvV4QPdOsGRa5NhGx5vDXcwWqpYuc-PNHbkhMYKJ"
+	tk := &token.Token{
+		Tkey: "IypMcRkPXkbeNDRl6Km43boHr98udp7o",
+	}
+
+	b := tk.UnpackReplace(ctx, a)
+	logger.Debugf(ctx, "b: %s", b)
+}
+
+func TestUnpackOld(t *testing.T) {
+	ctx := context.Background()
+	a := "CgAAAN-GTvV4QPdOsGRa5NhGx5vDXcwWqpYuc-PNHbkhMYKJ"
+	tk := &token.Token{
+		Tkey: "IypMcRkPXkbeNDRl6Km43boHr98udp7o",
+	}
+	tk.UnPackOld(ctx, a)
+
 }

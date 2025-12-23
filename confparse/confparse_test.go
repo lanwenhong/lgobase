@@ -1,57 +1,60 @@
 package confparse
 
 import (
-	"fmt"
-	"io"
-	"os"
+	"context"
+	"strconv"
 	"testing"
-	"time"
-	
+
+	"github.com/lanwenhong/lgobase/confparse"
 	"github.com/lanwenhong/lgobase/gconfig"
+	"github.com/lanwenhong/lgobase/logger"
 )
 
-func writeTestIni(fileName string) {
-	// 创建一个模拟的文件内容
-	fileContent := `
-[test]
-cache=1h2s
-cnt=1
-name=test
-`
-	// 将读取器模拟为文件
-	f, _ := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
-	_, _ = f.Write([]byte(fileContent))
-	_, _ = f.Seek(0, io.SeekStart)
+type PaySever struct {
+	Rule    string `confpos:"seciont1:pay_server:0"`
+	Salence int    `confpos:"seciont1:pay_server:1"`
 }
 
-func TestGconfParse(t *testing.T) {
-	type confTest struct {
-		Cache time.Duration `confpos:"test:cache" dtype:"base"`
-		Cnt   int           `confpos:"test:cnt" dtype:"base"`
-		Name  string        `confpos:"test:name" dtype:"base"`
+type TestConf struct {
+	TestA      int      `confpos:"section2:a" dtype:"base"`
+	TestB      int      `confpos:"section2:b" dtype:"base"`
+	TestC      int      `confpos:"section2:b" dtype:"complex"`
+	Dayu       PaySever `confpos:"section1:pay_server" dtype:"complex"`
+	BackRouter PaySever `confpos:"section2:pay_server" dtype:"complex"`
+	Cfg        *gconfig.Gconf
+}
+
+func TestLoadConf(t *testing.T) {
+	ctx := context.Background()
+	filename := "test_rule.ini"
+	cfg := gconfig.NewGconf(filename)
+	err := cfg.GconfParse()
+	if err != nil {
+		t.Fatal(err)
 	}
-	
-	mockFileName := "/tmp/lgobase_test_mock.ini"
-	writeTestIni(mockFileName)
-	conf := &confTest{}
-	cfg := gconfig.NewGconf(mockFileName)
-	if err := cfg.GconfParse(); err != nil {
-		t.Error(err)
+	cp := confparse.CpaseNew(filename)
+	cp.Funcs["seciont3:c"] = func(ctx context.Context, stru interface{}, s []string) error {
+		tConf := stru.(*TestConf)
+		x, _ := strconv.ParseInt(s[0], 10, 64)
+		tConf.TestC = int(x)
+		logger.Debugf(ctx, "cfg: %v", cfg)
+		return nil
 	}
-	if err := CpaseNew("").CparseGo(conf, cfg); err != nil {
-		t.Error(err)
+
+	tConf := &TestConf{
+		Cfg: cfg,
 	}
-	
-	fmt.Println(conf)
-	if conf.Cache != time.Hour*1+time.Second*2 {
-		t.Error("duration parse error")
+	//err = cp.CparseGoWithCtx(ctx, tConf, cfg)
+	err = cp.WithCtx(ctx).CparseGo(tConf, cfg)
+	//err = cp.CparseGo(tConf, cfg)
+
+	if err != nil {
+		t.Fatal(err)
 	}
-	
-	if conf.Cnt != 1 {
-		t.Error("int parse error")
-	}
-	
-	if conf.Name != "test" {
-		t.Error("string parse error")
-	}
+	logger.Debugf(ctx, "conf: %v", tConf)
+	dayuconf, _ := confparse.ParseExt(ctx, "section1", "pay_server", 0, cfg)
+	logger.Debugf(ctx, "dayuconf: %v", dayuconf)
+	/*logger.Debugf(ctx, "payserver0: %v", tConf.Cfg.Gcf["section1"]["pay_server"][0])
+	k := "pay_server = " + tConf.Cfg.Gcf["section1"]["pay_server"][0]
+	logger.Debugf(ctx, "payserver0 conf: %v", tConf.Cfg.GlineExtend["pay_server"][k])*/
 }

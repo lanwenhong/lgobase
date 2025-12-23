@@ -69,7 +69,7 @@ func (gp *Gpool[T]) GpoolInit(addr string, port int, timeout int,
 	gp.Cfunc = cfunc
 	gp.Nc = clfunc
 	gp.WaitNotify = make(chan struct{}, maxidleconns)
-	gp.PurgeNotify = make(chan struct{}, 1)
+	gp.PurgeNotify = make(chan struct{}, maxidleconns)
 
 	ctx := context.Background()
 	gp.CreateIdleConn(ctx)
@@ -94,7 +94,7 @@ func (gp *Gpool[T]) GpoolInit(addr string, port int, timeout int,
 	}()
 }
 
-func (gp *Gpool[T]) GpoolInit2(addr string, port int, timeout int, gp_conf *GPoolConfig[T]) {
+func (gp *Gpool[T]) GpoolInit2(ctx context.Context, addr string, port int, timeout int, gp_conf *GPoolConfig[T]) {
 	gp.FreeList = list.New()
 	gp.UseList = list.New()
 	gp.PurgeQueue = cas.CreateCasQueue()
@@ -111,7 +111,6 @@ func (gp *Gpool[T]) GpoolInit2(addr string, port int, timeout int, gp_conf *GPoo
 	gp.PurgeNotify = make(chan struct{}, 1)
 	gp.Gpconf = gp_conf
 
-	ctx := context.Background()
 	gp.CreateIdleConn(ctx)
 	go func() {
 		ctx := context.WithValue(context.Background(), "trace_id", util.GenXid())
@@ -464,11 +463,11 @@ func (gp *Gpool[T]) ThriftExtCall2(ctx context.Context, process func(ctx context
 		if rpc_err != nil {
 			errStr = rpc_err.Error()
 		}
-		nCtx := ctx.(*ExtContext)
-		rid := nCtx.GetReqExtData("request_id")
+		//nCtx := ctx.(*ExtContext)
+		//rid := nCtx.GetReqExtData("request_id")
 		address := gp.Addr
-		logger.Infof(ctx, "func=ThriftCall2|method=%v|addr=%s:%d|request_id=%s|time=%v|err=%s",
-			rpc_name, address, gp.TimeOut, rid, time.Since(starttime), errStr)
+		logger.Infof(ctx, "func=ThriftCall2|method=%v|addr=%s:%d|time=%v|err=%s",
+			rpc_name, address, gp.TimeOut, time.Since(starttime), errStr)
 	}()
 
 	pc, err := gp.Get(ctx)

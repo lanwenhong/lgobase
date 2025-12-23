@@ -5,11 +5,11 @@ import (
 	"context"
 	"encoding/binary"
 	"io"
-	"time"
-	
+
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/google/uuid"
 	"github.com/lanwenhong/lgobase/logger"
+	"github.com/lanwenhong/lgobase/util"
 )
 
 const (
@@ -59,24 +59,10 @@ func NewExtContext(ctx context.Context) *ExtContext {
 }
 
 func (ec *ExtContext) SetReqExtData(ctx context.Context, k, v string) *ExtContext {
-	//newValues := make(map[string]string)
-	/*for k, v := range ec.ReqExtData {
-		/*if k != "trace_id" {
-			newValues[k] = v
-		}
-		logger.Debugf(ctx, "k: %s v: %s", k, v)
-		ctx = context.WithValue(ctx, k, v)
-	}*/
-	//logger.Debugf(ctx, "k: %s v: %s", k, v)
-	//logger.Debugf(ctx, "newValues: %v", newValues)
-	//newValues[k] = v
 	ec.ReqExtData[k] = v
 	ctx = context.WithValue(ctx, k, v)
-	//id := ctx.Value("trace_id").(string)
-	//logger.Debugf(ctx, id)
 	return &ExtContext{
-		Context: ctx,
-		//ReqExtData: newValues,
+		Context:    ctx,
 		ReqExtData: ec.ReqExtData,
 	}
 }
@@ -85,25 +71,11 @@ func (ec *ExtContext) GetReqExtData(k string) string {
 	if v, ok := ec.ReqExtData[k]; ok {
 		return v
 	}
+	if m := ec.Value(k); m != nil {
+		return m.(string)
+	}
 	return ""
 }
-
-/*func NewRequestIDProtocolClient(baseFactory thrift.TProtocolFactory) *RequestIDProtocolClient {
-	return &RequestIDProtocolClient{
-		baseFactory: baseFactory,
-	}
-}
-
-func NewRequestIDProtocolNewClient(proto thrift.TProtocol) *RequestIDProtocolClient {
-	return &RequestIDProtocolClient{
-		TProtocol: proto,
-	}
-}
-
-func (p *RequestIDProtocolClient) GetProtocol(transport thrift.TTransport) thrift.TProtocol {
-	baseProto := p.baseFactory.GetProtocol(transport)
-	return NewRequestIDProtocolNewClient(baseProto)
-}*/
 
 func NewThriftExtProtocolClient(baseFactory thrift.TProtocolFactory) *ThriftExtProtocolClient {
 	return &ThriftExtProtocolClient{
@@ -123,7 +95,7 @@ func (p *ThriftExtProtocolClient) GetProtocol(transport thrift.TTransport) thrif
 }
 
 func (p *ThriftExtProtocolClient) WriteMessageBegin(ctx context.Context, name string, typeId thrift.TMessageType, seqId int32) error {
-	starttime := time.Now()
+	//starttime := time.Now()
 	//magic
 	err := p.WriteI16(ctx, THRIFT_EXT_META_MAGIC)
 	if err != nil {
@@ -154,7 +126,7 @@ func (p *ThriftExtProtocolClient) WriteMessageBegin(ctx context.Context, name st
 		}
 	}
 	p.WriteMapEnd(ctx)
-	logger.Infof(ctx, "func=WriteMessageBegin|time=%v", time.Since(starttime))
+	//logger.Infof(ctx, "func=WriteMessageBegin|time=%v", time.Since(starttime))
 	return p.TProtocol.WriteMessageBegin(ctx, name, typeId, seqId)
 }
 
@@ -177,7 +149,7 @@ func (p *ExtProcessor) ReadMagic(ctx context.Context, in, out thrift.TProtocol) 
 		}
 	}
 	binary.Write(buf, binary.BigEndian, uint16(magic))
-	
+
 	return magic, buf.Bytes(), true, nil
 }
 
@@ -220,19 +192,17 @@ func (p *ExtProcessor) ReadMetaMap(ctx context.Context, in, out thrift.TProtocol
 		logger.Debugf(ctx, "k=%s v=%s", k, v)
 		//reqData[k] = v
 		ctx = context.WithValue(ctx, k, v)
-		
+
 	}
-	//in.ReadMapEnd(ctx)
-	//return ctx, reqData, err
 	return ctx, err
 }
 
 func (p *ExtProcessor) Process(ctx context.Context, in, out thrift.TProtocol) (bool, thrift.TException) {
 	preBuf := make([]byte, 2)
-	starttime := time.Now()
+	//starttime := time.Now()
 	_, err := io.ReadFull(in.Transport(), preBuf)
 	//magic, preBuf, _, err := p.ReadMagic(ctx, in, out)
-	logger.Infof(ctx, "func=Process|time=%v", time.Since(starttime))
+	//logger.Infof(ctx, "func=Process|time=%v", time.Since(starttime))
 	if err != nil {
 		if err.(thrift.TProtocolException).TypeId() == thrift.END_OF_FILE {
 			return false, thrift.NewTTransportException(thrift.END_OF_FILE, "connection closed (EOF)")
@@ -265,12 +235,13 @@ func (p *ExtProcessor) Process(ctx context.Context, in, out thrift.TProtocol) (b
 		/*for k, v := range reqData {
 			ctx = context.WithValue(ctx, k, v)
 		}*/
-		
+
 	} else {
 		logger.Debugf(ctx, "use normal thrift proto")
 		multiReader := io.MultiReader(bytes.NewReader(preBuf), in.Transport())
 		newTransport := thrift.NewStreamTransportR(multiReader)
 		in = p.Pro.GetProtocol(newTransport)
+		ctx = context.WithValue(ctx, "request_id", util.NewRequestID())
 	}
 	//b, t := p.Processor.Process(newCtx, in, out)
 	b, t := p.Processor.Process(ctx, in, out)
