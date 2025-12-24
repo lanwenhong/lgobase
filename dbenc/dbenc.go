@@ -113,5 +113,24 @@ func DbConfNew(ctx context.Context, filename string) *DbConf {
 }
 
 func (dbc *DbConf) DbConfReadGroup(group string) map[string]string {
-	return dbc.Dbconf.Gcf[group]
+	ret := make(map[string]string)
+	if vGroup, ok := dbc.Dbconf.Gcf[group]; ok {
+		//ret[group] = v[0]
+		for k, v := range vGroup {
+			ret[k] = v[0]
+		}
+	}
+	//return dbc.Dbconf.Gcf[group]
+	return ret
+}
+
+func (dbc *DbConf) DbConfReadGroupWithCtx(ctx context.Context, group string) map[string]string {
+	ret := make(map[string]string)
+	if vGroup, ok := dbc.Dbconf.Gcf[group]; ok {
+		//ret[group] = v[0]
+		for k, v := range vGroup {
+			ret[k] = v[0]
+		}
+	}
+	return ret
 }
