@@ -5,6 +5,7 @@ import (
 	"errors"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/lanwenhong/lgobase/cas"
 	"github.com/lanwenhong/lgobase/logger"
@@ -66,7 +67,11 @@ func (wp *WorkPool) AddTask(ctx context.Context, req any, process Process) (*Tas
 	}
 	logger.Debugf(ctx, "add task")
 	wp.TaskQ.PushBack(ctx, task)
-	wp.Notify <- struct{}{}
+	select {
+	case wp.Notify <- struct{}{}:
+	default:
+		logger.Debugf(ctx, "work pool busy")
+	}
 	atomic.AddInt32(&wp.parallel, 1)
 	logger.Debugf(ctx, "after push parallel: %d", atomic.LoadInt32(&wp.parallel))
 	return task, nil
@@ -79,6 +84,7 @@ func (wp *WorkPool) do(ctx context.Context) {
 			logger.Debugf(ctx, "get nil from queue")
 			break
 		}
+		starttime := time.Now()
 		atomic.AddInt32(&wp.parallel, -1)
 		task := t.(*Task)
 		ctx = context.WithValue(ctx, "request_id", task.TaskId)
@@ -91,6 +97,7 @@ func (wp *WorkPool) do(ctx context.Context) {
 		logger.Debugf(ctx, "task ret: %v", task.Ret)
 		task.Wait <- struct{}{}
 		close(task.Wait)
+		logger.Infof(ctx, "func=process_do|time=%v", time.Since(starttime))
 	}
 }
 
@@ -101,7 +108,7 @@ func (wp *WorkPool) Run(ctx context.Context) {
 		wp.Wg.Add(1)
 		go func(ctx context.Context) {
 			ctx = context.WithValue(ctx, "trace_id", util.NewRequestID())
-			//ctx = context.Background()
+			logger.Debugf(ctx, "process run")
 			defer wp.Wg.Done()
 			for {
 				select {
