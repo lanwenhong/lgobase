@@ -29,12 +29,12 @@ type Token struct {
 	FlagUC string `json:"-"` //1byte区分存储的是uid还是customer_id
 
 	//body
-	Uid       uint64 `json:"userid,omitempty"`     //8字节Uid
-	OpUid     uint16 `json:"opuid,omitempty"`      //2字节opuid
-	Expire    uint32 `json:"__expire__,omitempty"` //4byte过期时间
-	Deadline  uint64 `json:"-"`                    //过期时间戳
-	Udid      string `json:"udid,omitempty"`       //21byte
-	Tkey      string `json:"-"`                    //机密key
+	Uid       uint64 `json:"userid,omitempty"`   //8字节Uid
+	OpUid     uint16 `json:"opuid,omitempty"`    //2字节opuid
+	Expire    uint32 `json:"__expi__,omitempty"` //4byte过期时间
+	Deadline  uint64 `json:"-"`                  //过期时间戳
+	Udid      string `json:"udid,omitempty"`     //21byte
+	Tkey      string `json:"-"`                  //机密key
 	Del       int    `json:"__del__,omitempty"`
 	CustomeId uint64 `json:"customer_id,omitempty"`
 }
