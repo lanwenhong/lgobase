@@ -32,7 +32,8 @@ func TestTokenPack(t *testing.T) {
 func TestTokenUnPack(t *testing.T) {
 	//bdata := "____7wFCigBmgqBijZpsRTZZGAFEl5ew4A5tAoeoNrKO8UyoFHEWEHTcfMHXJciN"
 	//bdata := "____7wHv9AA_g1FizA_i5S9-HJc02Qe4efAwSO2LUpO-uplzI3dB7VubFgnSW2TU"
-	bdata := "MC8_7wGjMQAECuy0LQG1hQiPvrMdpKeGc38c_j3DRSYnJjxZ_gJNGQ9X5J-zsUuC"
+	//bdata := "MC8_7wGjMQAECuy0LQG1hQiPvrMdpKeGc38c_j3DRSYnJjxZ_gJNGQ9X5J-zsUuC"
+	bdata := "MC8_7wAJ6gAPYR2BiP869Bqb3SWv8eeWNbocq3OfU624ckkEiO7a3WMztqXu-1C-"
 	ctx := context.Background()
 	tk := &token.Token{
 		Tkey: "IypMcRkPXkbeNDRl6Km43boHr98udp7o",
@@ -73,7 +74,8 @@ func TestUnpackReplace(t *testing.T) {
 
 func TestUnpackOld(t *testing.T) {
 	ctx := context.Background()
-	a := "CgAAAN-GTvV4QPdOsGRa5NhGx5vDXcwWqpYuc-PNHbkhMYKJ"
+	//a := "CgAAAN-GTvV4QPdOsGRa5NhGx5vDXcwWqpYuc-PNHbkhMYKJ"
+	a := "CgAAAFtcGXQcKlXIBlQuqCe7Fn98bPN45iixZoWh5lNiqt6U"
 	tk := &token.Token{
 		Tkey: "IypMcRkPXkbeNDRl6Km43boHr98udp7o",
 	}

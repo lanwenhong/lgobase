@@ -55,6 +55,10 @@ func NewExtContext(ctx context.Context) *ExtContext {
 		Context: ctx,
 	}
 	nCtx.ReqExtData = make(map[string]string)
+
+	if rid, ok := ctx.Value("request_id").(string); ok {
+		nCtx.ReqExtData["request_id"] = rid
+	}
 	return nCtx
 }
 
