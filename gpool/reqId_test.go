@@ -27,9 +27,9 @@ func TestAdd1(t *testing.T) {
 
 	g_conf := &gpool.GPoolConfig[server.ServerTestClient]{
 		Addrs: "127.0.0.1:9090/30000",
-		Cfunc: gpool.CreateThriftFramedConnThriftExt[server.ServerTestClient],
+		//Cfunc: gpool.CreateThriftFramedConnThriftExt[server.ServerTestClient],
 		//Cfunc: gpool.CreateThriftFramedConn[server.ServerTestClient],
-		//Cfunc: gpool.CreateThriftBufferConnThriftExt[server.ServerTestClient],
+		Cfunc: gpool.CreateThriftBufferConnThriftExt[server.ServerTestClient],
 		//Cfunc: gpool.CreateThriftBufferConn[server.ServerTestClient],
 		Nc:           server.NewServerTestClientFactory,
 		MaxConnLife:  5,

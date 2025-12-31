@@ -63,8 +63,8 @@ func main() {
 	logger.Newglog("./", "add.log", "add.log.err", myconf)
 
 	// 2. 创建 Framed 传输工厂（核心：服务端需与客户端一致使用帧模式）
-	transportFactory := thrift.NewTFramedTransportFactory(thrift.NewTTransportFactory())
-	//transportFactory := thrift.NewTBufferedTransportFactory(8192)
+	//transportFactory := thrift.NewTFramedTransportFactory(thrift.NewTTransportFactory())
+	transportFactory := thrift.NewTBufferedTransportFactory(8192)
 
 	// 3. 创建底层协议工厂（如二进制协议）
 	rawProtoFactory := thrift.NewTBinaryProtocolFactoryDefault()
