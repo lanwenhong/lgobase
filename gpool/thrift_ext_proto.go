@@ -13,7 +13,8 @@ import (
 )
 
 const (
-	THRIFT_EXT_META_MAGIC   = int16(0x7FFF)
+	//THRIFT_EXT_META_MAGIC   = int16(0x7FFF)
+	THRIFT_EXT_META_MAGIC   = int32(0x7FFFFFFF)
 	THRIFT_EXT_META_VERSION = int16(1)
 )
 
@@ -101,7 +102,8 @@ func (p *ThriftExtProtocolClient) GetProtocol(transport thrift.TTransport) thrif
 func (p *ThriftExtProtocolClient) WriteMessageBegin(ctx context.Context, name string, typeId thrift.TMessageType, seqId int32) error {
 	//starttime := time.Now()
 	//magic
-	err := p.WriteI16(ctx, THRIFT_EXT_META_MAGIC)
+	//err := p.WriteI16(ctx, THRIFT_EXT_META_MAGIC)
+	err := p.WriteI32(ctx, THRIFT_EXT_META_MAGIC)
 	if err != nil {
 		logger.Warnf(ctx, "write magic err: %v", err)
 		return err
@@ -202,7 +204,8 @@ func (p *ExtProcessor) ReadMetaMap(ctx context.Context, in, out thrift.TProtocol
 }
 
 func (p *ExtProcessor) Process(ctx context.Context, in, out thrift.TProtocol) (bool, thrift.TException) {
-	preBuf := make([]byte, 2)
+	//preBuf := make([]byte, 2)
+	preBuf := make([]byte, 4)
 	//starttime := time.Now()
 	_, err := io.ReadFull(in.Transport(), preBuf)
 	//magic, preBuf, _, err := p.ReadMagic(ctx, in, out)
@@ -216,8 +219,10 @@ func (p *ExtProcessor) Process(ctx context.Context, in, out thrift.TProtocol) (b
 		}
 	}
 	//magic
-	magic := binary.BigEndian.Uint16(preBuf)
-	if magic == uint16(THRIFT_EXT_META_MAGIC) {
+	//magic := binary.BigEndian.Uint16(preBuf)
+	magic := binary.BigEndian.Uint32(preBuf)
+	//if magic == uint16(THRIFT_EXT_META_MAGIC) {
+	if magic == uint32(THRIFT_EXT_META_MAGIC) {
 		//if magic == THRIFT_EXT_META_MAGIC {
 		logger.Debugf(ctx, "use extend thrift proto")
 		//ver
