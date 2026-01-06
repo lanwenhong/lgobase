@@ -107,7 +107,7 @@ func (wp *WorkPool) Run(ctx context.Context) {
 	for i := 0; i < int(wp.PoolSize); i++ {
 		wp.Wg.Add(1)
 		go func(ctx context.Context) {
-			ctx = context.WithValue(ctx, "trace_id", util.NewRequestID())
+			ctx = context.WithValue(ctx, "trace_id", util.util.NewProcessID())
 			logger.Debugf(ctx, "process run")
 			defer wp.Wg.Done()
 			for {

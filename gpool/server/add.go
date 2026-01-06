@@ -47,7 +47,7 @@ func (sh *SvrHandler) PostUser(ctx context.Context, req *server.GetUserRequest) 
 }
 
 func main() {
-	ctx := context.WithValue(context.Background(), "trace_id", util.GenXid())
+	ctx := context.WithValue(context.Background(), "trace_id", util.NewProcessID())
 	// 1. 创建服务端监听 socket
 	serverSocket, err := thrift.NewTServerSocket("localhost:9090")
 	if err != nil {
