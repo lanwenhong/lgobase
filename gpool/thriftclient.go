@@ -23,6 +23,7 @@ type TConn[T any] struct {
 	Port     int
 	TimeOut  int
 	Protocol int
+	TSock    *thrift.TSocket
 	Tft      thrift.TTransport
 	Tbt      *thrift.TBufferedTransport
 	Tbp      thrift.TProtocolFactory
@@ -48,11 +49,13 @@ func (tc *TConn[T]) Init(addr string, port int, timeout int) error {
 		//transport, _ := thrift.NewTSocketTimeout(addr, time.Duration(tc.TimeOut)*time.Second, time.Duration(tc.TimeOut)*time.Second)
 		transport, _ := thrift.NewTSocketTimeout(addr, time.Duration(tc.TimeOut)*time.Millisecond, time.Duration(tc.TimeOut)*time.Millisecond)
 		tc.Tft, _ = transportFactory.GetTransport(transport)
+		tc.TSock = transport
 	} else if tc.Protocol == TH_PRO_BUFFER {
 		addr := fmt.Sprintf("%s:%d", tc.Addr, tc.Port)
 		socket, _ := thrift.NewTSocketTimeout(addr, time.Duration(tc.TimeOut)*time.Millisecond, time.Duration(tc.TimeOut)*time.Millisecond)
 		tc.Tbt = thrift.NewTBufferedTransport(socket, 8192)
 		tc.Tbp = thrift.NewTBinaryProtocolFactoryDefault()
+		tc.TSock = socket
 	}
 	return nil
 }
@@ -68,11 +71,13 @@ func (tc *TConn[T]) InitThriftExt(addr string, port int, timeout int) error {
 		addr := fmt.Sprintf("%s:%d", tc.Addr, tc.Port)
 		transport, _ := thrift.NewTSocketTimeout(addr, time.Duration(tc.TimeOut)*time.Millisecond, time.Duration(tc.TimeOut)*time.Millisecond)
 		tc.Tft, _ = transportFactory.GetTransport(transport)
+		tc.TSock = transport
 	} else if tc.Protocol == TH_PRO_BUFFER {
 		addr := fmt.Sprintf("%s:%d", tc.Addr, tc.Port)
 		socket, _ := thrift.NewTSocketTimeout(addr, time.Duration(tc.TimeOut)*time.Millisecond, time.Duration(tc.TimeOut)*time.Millisecond)
 		tc.Tbt = thrift.NewTBufferedTransport(socket, 8192)
 		tc.Tbp = thrift.NewTBinaryProtocolFactoryDefault()
+		tc.TSock = socket
 	}
 	tc.Tbp = NewThriftExtProtocolClient(tc.Tbp)
 	return nil
@@ -93,6 +98,11 @@ func (tc *TConn[T]) Open() error {
 		return err
 	}
 	return errors.New("not support")
+}
+
+func (tc *TConn[T]) SetTimeOut(ctx context.Context, timeout time.Duration) {
+	logger.Debugf(ctx, "socket: %v", tc.TSock)
+	tc.TSock.SetSocketTimeout(timeout)
 }
 
 func (tc *TConn[T]) NewThClient(nc NewThriftClient[T]) {

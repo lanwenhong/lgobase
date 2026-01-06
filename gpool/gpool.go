@@ -21,6 +21,7 @@ type Conn[T any] interface {
 	Close() error
 	IsOpen() bool
 	GetThrfitClient() *T
+	SetTimeOut(ctx context.Context, timeout time.Duration)
 }
 
 type CreateConn[T any] func(context.Context, string, int, int) (Conn[T], error)
@@ -453,6 +454,55 @@ func (gp *Gpool[T]) ThriftCall2(ctx context.Context, process func(client interfa
 	return nil
 }
 
+func (gp *Gpool[T]) ThriftWithTimeOutCall2(ctx context.Context, timeout time.Duration, process func(client interface{}) (string, error)) error {
+	var rpc_err error
+	var rpc_name string = ""
+
+	starttime := time.Now()
+	defer func() {
+		errStr := ""
+		if rpc_err != nil {
+			errStr = rpc_err.Error()
+		}
+		address := gp.Addr
+		logger.Infof(ctx, "func=ThriftCall2|method=%v|addr=%s:%d|time=%v|err=%s",
+			rpc_name, address, gp.TimeOut, time.Since(starttime), errStr)
+	}()
+
+	pc, err := gp.Get(ctx)
+	if pc != nil {
+		defer pc.Close(ctx)
+	}
+	if err != nil {
+		logger.Warnf(ctx, "get conn err: %s", err.Error())
+		return err
+	}
+	pc.Gc.SetTimeOut(ctx, timeout)
+	client := pc.Gc.GetThrfitClient()
+	rpc_name, err = process(client)
+	pc.Gc.SetTimeOut(ctx, time.Duration(gp.TimeOut)*time.Millisecond)
+	if err != nil {
+		rpc_err = err
+		logger.Warnf(ctx, "rpc ret %s", err.Error())
+		switch err.(type) {
+		case thrift.TTransportException:
+			tte := err.(thrift.TTransportException)
+			e_type_id := tte.TypeId()
+			logger.Warnf(ctx, "e id: %d", e_type_id)
+			pc.Gc.Close()
+		case thrift.TProtocolException:
+			tpe := err.(thrift.TProtocolException)
+			e_type_id := tpe.TypeId()
+			logger.Warnf(ctx, "e id: %d", e_type_id)
+			pc.Gc.Close()
+		default:
+			logger.Warnf(ctx, "e: %v", err)
+		}
+		return err
+	}
+	return nil
+}
+
 func (gp *Gpool[T]) ThriftExtCall2(ctx context.Context, process func(ctx context.Context, client interface{}) (string, error)) error {
 	var rpc_err error
 	var rpc_name string = ""
@@ -481,6 +531,58 @@ func (gp *Gpool[T]) ThriftExtCall2(ctx context.Context, process func(ctx context
 	}
 	client := pc.Gc.GetThrfitClient()
 	rpc_name, err = process(ctx, client)
+	if err != nil {
+		rpc_err = err
+		logger.Warnf(ctx, "rpc ret %s", err.Error())
+		switch err.(type) {
+		case thrift.TTransportException:
+			tte := err.(thrift.TTransportException)
+			e_type_id := tte.TypeId()
+			logger.Warnf(ctx, "e id: %d", e_type_id)
+			pc.Gc.Close()
+		case thrift.TProtocolException:
+			tpe := err.(thrift.TProtocolException)
+			e_type_id := tpe.TypeId()
+			logger.Warnf(ctx, "e id: %d", e_type_id)
+			pc.Gc.Close()
+		default:
+			logger.Warnf(ctx, "e: %v", err)
+		}
+		return err
+	}
+	return nil
+}
+
+func (gp *Gpool[T]) ThriftWithTimeOutExtCall2(ctx context.Context, timeout time.Duration, process func(ctx context.Context, client interface{}) (string, error)) error {
+	var rpc_err error
+	var rpc_name string = ""
+
+	starttime := time.Now()
+	defer func() {
+		errStr := ""
+		if rpc_err != nil {
+			errStr = rpc_err.Error()
+		}
+		//nCtx := ctx.(*ExtContext)
+		//rid := nCtx.GetReqExtData("request_id")
+		address := gp.Addr
+		logger.Infof(ctx, "func=ThriftCall2|method=%v|addr=%s:%d|time=%v|err=%s",
+			rpc_name, address, gp.TimeOut, time.Since(starttime), errStr)
+	}()
+
+	pc, err := gp.Get(ctx)
+	if pc != nil {
+		defer pc.Close(ctx)
+	}
+	if err != nil {
+		logger.Warnf(ctx, "get conn err: %s", err.Error())
+		rpc_err = err
+		return err
+	}
+	pc.Gc.SetTimeOut(ctx, timeout)
+	client := pc.Gc.GetThrfitClient()
+	rpc_name, err = process(ctx, client)
+	pc.Gc.SetTimeOut(ctx, time.Duration(gp.TimeOut)*time.Millisecond)
 	if err != nil {
 		rpc_err = err
 		logger.Warnf(ctx, "rpc ret %s", err.Error())
