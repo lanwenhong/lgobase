@@ -292,46 +292,24 @@ func getIdsInLog(ctx context.Context) string {
 	trace_id := ""
 	if m := ctx.Value("trace_id"); m != nil {
 		if value, ok := m.(string); ok {
-			trace_id = value
-			builder.WriteString("t_id ")
 			builder.WriteString(value)
+			builder.WriteString(" ")
 		}
+	} else {
+		builder.WriteString("- ")
 	}
 	if m := ctx.Value("request_id"); m != nil {
 		if value, ok := m.(string); ok {
-			//trace_id = value
-			if trace_id != "" {
-				builder.WriteString(" ")
-			}
-			builder.WriteString("r_id ")
 			builder.WriteString(value)
 		}
+	} else {
+		builder.WriteString("-")
 	}
 	trace_id = builder.String()
 	return trace_id
 }
 
 func pDebugWithGid(ctx context.Context, depth int, fmtstr string, v ...interface{}) {
-	/*var builder strings.Builder
-	trace_id := ""
-	if m := ctx.Value("trace_id"); m != nil {
-		if value, ok := m.(string); ok {
-			trace_id = value
-			builder.WriteString("trace_id ")
-			builder.WriteString(value)
-		}
-	}
-	if m := ctx.Value("request_id"); m != nil {
-		if value, ok := m.(string); ok {
-			//trace_id = value
-			if trace_id != "" {
-				builder.WriteString(" ")
-			}
-			builder.WriteString("req_id ")
-			builder.WriteString(value)
-		}
-	}
-	trace_id = builder.String()*/
 	trace_id := getIdsInLog(ctx)
 	p_fmt := ""
 	values := []interface{}{}
@@ -358,32 +336,7 @@ func pDebugWithGid(ctx context.Context, depth int, fmtstr string, v ...interface
 }
 
 func pDebug(ctx context.Context, depth int, v ...interface{}) {
-	/*trace_id := ""
-	if m := ctx.Value("trace_id"); m != nil {
-		if value, ok := m.(string); ok {
-			trace_id = value
-		}
-	}*/
-	/*var builder strings.Builder
-	trace_id := ""
-	if m := ctx.Value("trace_id"); m != nil {
-		if value, ok := m.(string); ok {
-			//trace_id = value
-			builder.WriteString("trace_id ")
-			builder.WriteString(value)
-			builder.WriteString(" ")
-		}
-	}
-	if m := ctx.Value("request_id"); m != nil {
-		if value, ok := m.(string); ok {
-			//trace_id = value
-			builder.WriteString("req_id ")
-			builder.WriteString(value)
-		}
-	}
-	trace_id = builder.String()*/
 	trace_id := getIdsInLog(ctx)
-
 	prefix := ""
 	if trace_id != "" {
 		//prefix = fmt.Sprintf("trace_id %s [DEBUG]", trace_id)
@@ -418,33 +371,7 @@ func Debugf(ctx context.Context, fmtstr string, v ...interface{}) {
 }
 
 func pInfoWithGid(ctx context.Context, depth int, fmtstr string, v ...interface{}) {
-	/*trace_id := ""
-	if m := ctx.Value("trace_id"); m != nil {
-		if value, ok := m.(string); ok {
-			trace_id = value
-		}
-	}*/
-
-	/*var builder strings.Builder
-	trace_id := ""
-	if m := ctx.Value("trace_id"); m != nil {
-		if value, ok := m.(string); ok {
-			//trace_id = value
-			builder.WriteString("trace_id ")
-			builder.WriteString(value)
-			builder.WriteString(" ")
-		}
-	}
-	if m := ctx.Value("request_id"); m != nil {
-		if value, ok := m.(string); ok {
-			//trace_id = value
-			builder.WriteString("req_id ")
-			builder.WriteString(value)
-		}
-	}
-	trace_id = builder.String()*/
 	trace_id := getIdsInLog(ctx)
-
 	p_fmt := ""
 	values := []interface{}{}
 	if trace_id != "" {
@@ -467,33 +394,7 @@ func pInfoWithGid(ctx context.Context, depth int, fmtstr string, v ...interface{
 }
 
 func pInfo(ctx context.Context, depth int, v ...interface{}) {
-	/*trace_id := ""
-	if m := ctx.Value("trace_id"); m != nil {
-		if value, ok := m.(string); ok {
-			trace_id = value
-		}
-	}*/
-
-	/*var builder strings.Builder
-	trace_id := ""
-	if m := ctx.Value("trace_id"); m != nil {
-		if value, ok := m.(string); ok {
-			//trace_id = value
-			builder.WriteString("trace_id ")
-			builder.WriteString(value)
-			builder.WriteString(" ")
-		}
-	}
-	if m := ctx.Value("request_id"); m != nil {
-		if value, ok := m.(string); ok {
-			//trace_id = value
-			builder.WriteString("req_id ")
-			builder.WriteString(value)
-		}
-	}
-	trace_id = builder.String()*/
 	trace_id := getIdsInLog(ctx)
-
 	//prefix := fmt.Sprintf("trace_id-%s [INFO]", trace_id)
 	prefix := ""
 	if trace_id != "" {
@@ -528,32 +429,7 @@ func Infof(ctx context.Context, fmtstr string, v ...interface{}) {
 }
 
 func pWarnWithGid(ctx context.Context, depth int, fmtstr string, v ...interface{}) {
-	/*trace_id := ""
-	if m := ctx.Value("trace_id"); m != nil {
-		if value, ok := m.(string); ok {
-			trace_id = value
-		}
-	}*/
-	/*var builder strings.Builder
-	trace_id := ""
-	if m := ctx.Value("trace_id"); m != nil {
-		if value, ok := m.(string); ok {
-			//trace_id = value
-			builder.WriteString("trace_id ")
-			builder.WriteString(value)
-			builder.WriteString(" ")
-		}
-	}
-	if m := ctx.Value("request_id"); m != nil {
-		if value, ok := m.(string); ok {
-			//trace_id = value
-			builder.WriteString("req_id ")
-			builder.WriteString(value)
-		}
-	}
-	trace_id = builder.String()*/
 	trace_id := getIdsInLog(ctx)
-
 	p_fmt := ""
 	values := []interface{}{}
 	if trace_id != "" {
@@ -581,33 +457,7 @@ func pWarnWithGid(ctx context.Context, depth int, fmtstr string, v ...interface{
 }
 
 func pWarn(ctx context.Context, depth int, v ...interface{}) {
-	/*trace_id := ""
-	if m := ctx.Value("trace_id"); m != nil {
-		if value, ok := m.(string); ok {
-			trace_id = value
-		}
-	}*/
-
-	/*var builder strings.Builder
-	trace_id := ""
-	if m := ctx.Value("trace_id"); m != nil {
-		if value, ok := m.(string); ok {
-			//trace_id = value
-			builder.WriteString("trace_id ")
-			builder.WriteString(value)
-			builder.WriteString(" ")
-		}
-	}
-	if m := ctx.Value("request_id"); m != nil {
-		if value, ok := m.(string); ok {
-			//trace_id = value
-			builder.WriteString("req_id ")
-			builder.WriteString(value)
-		}
-	}
-	trace_id = builder.String()*/
 	trace_id := getIdsInLog(ctx)
-
 	//prefix := fmt.Sprintf("trace_id-%s [WARN]", trace_id)
 	prefix := ""
 	if trace_id != "" {
@@ -644,33 +494,7 @@ func Warnf(ctx context.Context, fmtstr string, v ...interface{}) {
 }
 
 func pErrorWithGid(ctx context.Context, depth int, fmtstr string, v ...interface{}) {
-	/*trace_id := ""
-	if m := ctx.Value("trace_id"); m != nil {
-		if value, ok := m.(string); ok {
-			trace_id = value
-		}
-	}*/
-
-	/*var builder strings.Builder
-	trace_id := ""
-	if m := ctx.Value("trace_id"); m != nil {
-		if value, ok := m.(string); ok {
-			//trace_id = value
-			builder.WriteString("trace_id ")
-			builder.WriteString(value)
-			builder.WriteString(" ")
-		}
-	}
-	if m := ctx.Value("request_id"); m != nil {
-		if value, ok := m.(string); ok {
-			//trace_id = value
-			builder.WriteString("req_id ")
-			builder.WriteString(value)
-		}
-	}
-	trace_id = builder.String()*/
 	trace_id := getIdsInLog(ctx)
-
 	p_fmt := ""
 	values := []interface{}{}
 	if trace_id != "" {
@@ -697,32 +521,7 @@ func pErrorWithGid(ctx context.Context, depth int, fmtstr string, v ...interface
 }
 
 func pError(ctx context.Context, depth int, v ...interface{}) {
-	/*trace_id := ""
-	if m := ctx.Value("trace_id"); m != nil {
-		if value, ok := m.(string); ok {
-			trace_id = value
-		}
-	}*/
-	/*var builder strings.Builder
-	trace_id := ""
-	if m := ctx.Value("trace_id"); m != nil {
-		if value, ok := m.(string); ok {
-			//trace_id = value
-			builder.WriteString("trace_id ")
-			builder.WriteString(value)
-			builder.WriteString(" ")
-		}
-	}
-	if m := ctx.Value("request_id"); m != nil {
-		if value, ok := m.(string); ok {
-			//trace_id = value
-			builder.WriteString("req_id ")
-			builder.WriteString(value)
-		}
-	}
-	trace_id = builder.String()*/
 	trace_id := getIdsInLog(ctx)
-
 	//prefix := fmt.Sprintf("trace_id-%s [ERROR]", trace_id)
 	prefix := ""
 	if trace_id != "" {

@@ -56,6 +56,11 @@ func NewRequestID() string {
 	return s[16:]
 }
 
+func NewProcessID() string {
+	s := strings.Replace(uuid.New().String(), "-", "", -1)
+	return s[len(s)-8:]
+}
+
 func GenXid() string {
 	id := xid.New()
 	sid := fmt.Sprintf("%s", id)

@@ -15,7 +15,7 @@ import (
 
 func TestAdd1(t *testing.T) {
 	ctx := context.Background()
-	ctx = context.WithValue(ctx, "trace_id", util.NewRequestID())
+	ctx = context.WithValue(ctx, "trace_id", util.NewProcessID())
 	myconf := &logger.Glogconf{
 		RotateMethod: logger.ROTATE_FILE_DAILY,
 		Stdout:       true,
@@ -43,9 +43,10 @@ func TestAdd1(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			//ctx := context.WithValue(ctx, "trace_id", util.NewRequestID())
-			request_id := util.NewRequestID()
-			logger.Debugf(ctx, "trade_id: %s", request_id)
-			ctx := context.WithValue(ctx, "trace_id", request_id)
+			//request_id := util.NewRequestID()
+			pid := util.NewProcessID()
+			logger.Debugf(ctx, "trade_id: %s", pid)
+			ctx := context.WithValue(ctx, "trace_id", pid)
 			defer wg.Done()
 			for i := 0; i < 10; i++ {
 				process := func(ctx context.Context, client interface{}) (string, error) {
