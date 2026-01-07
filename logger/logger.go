@@ -312,7 +312,8 @@ func getIdsInLog(ctx context.Context) string {
 func pDebugWithGid(ctx context.Context, depth int, fmtstr string, v ...interface{}) {
 	trace_id := getIdsInLog(ctx)
 	p_fmt := ""
-	values := []interface{}{}
+	//values := []interface{}{}
+	values := make([]interface{}, 0, 100)
 	if trace_id != "" {
 		//p_fmt = Red + "trace_id-%s [DEBUG] " + fmtstr + Reset
 		//p_fmt = "trace_id %s [DEBUG] " + fmtstr
@@ -373,7 +374,8 @@ func Debugf(ctx context.Context, fmtstr string, v ...interface{}) {
 func pInfoWithGid(ctx context.Context, depth int, fmtstr string, v ...interface{}) {
 	trace_id := getIdsInLog(ctx)
 	p_fmt := ""
-	values := []interface{}{}
+	//values := []interface{}{}
+	values := make([]interface{}, 0, 100)
 	if trace_id != "" {
 		//p_fmt = "trace_id %s [INFO] " + fmtstr
 		p_fmt = "%s [INFO] " + fmtstr
@@ -431,7 +433,8 @@ func Infof(ctx context.Context, fmtstr string, v ...interface{}) {
 func pWarnWithGid(ctx context.Context, depth int, fmtstr string, v ...interface{}) {
 	trace_id := getIdsInLog(ctx)
 	p_fmt := ""
-	values := []interface{}{}
+	//values := []interface{}{}
+	values := make([]interface{}, 0, 100)
 	if trace_id != "" {
 		// p_fmt = Red + "trace_id-%s [WARN] " + fmtstr + Reset
 		//p_fmt = "trace_id %s [WARN] " + fmtstr
@@ -496,7 +499,8 @@ func Warnf(ctx context.Context, fmtstr string, v ...interface{}) {
 func pErrorWithGid(ctx context.Context, depth int, fmtstr string, v ...interface{}) {
 	trace_id := getIdsInLog(ctx)
 	p_fmt := ""
-	values := []interface{}{}
+	//values := []interface{}{}
+	values := make([]interface{}, 0, 100)
 	if trace_id != "" {
 		//p_fmt = "trace_id %s [ERROR] " + fmtstr
 		p_fmt = "%s [ERROR] " + fmtstr
