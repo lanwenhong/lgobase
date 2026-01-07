@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"time"
 
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/lanwenhong/lgobase/gpool"
@@ -23,6 +24,7 @@ func (sh *SvrHandler) Add(ctx context.Context, a int32, b int32) (int32, error) 
 	//ctx = context.WithValue(ctx, "trace_id", util.NewRequestID())
 	c := a + b
 	logger.Debugf(ctx, "c: %d", c)
+	time.Sleep(2 * time.Second)
 	return c, nil
 }
 

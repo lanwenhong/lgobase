@@ -13,12 +13,19 @@ import (
 )
 
 var (
-	infoStr      = "trace_id-%s [INFO] call_at=%s|"
+	/*infoStr      = "trace_id-%s [INFO] call_at=%s|"
 	warnStr      = "trace_id-%s [WARN] call_at=%s|"
 	errStr       = "trace_id-%s [ERROR] call_at=%s|"
 	traceStr     = "trace_id-%s [INFO] call_at=%s|time=%.3fms|rows=%v|%s"
 	traceWarnStr = "trace_id-%s [WARN] call_at=%s|%s|time=%.3fms|rows=%v|%s"
-	traceErrStr  = "trace_id-%s [ERROR] call_at=%s|%s|time=%.3fms|rows=%v|%s"
+	traceErrStr  = "trace_id-%s [ERROR] call_at=%s|%s|time=%.3fms|rows=%v|%s"*/
+
+	infoStr      = "%s [INFO] call_at=%s|"
+	warnStr      = "%s [WARN] call_at=%s|"
+	errStr       = "%s [ERROR] call_at=%s|"
+	traceStr     = "%s [INFO] call_at=%s|time=%.3fms|rows=%v|%s"
+	traceWarnStr = "%s [WARN] call_at=%s|%s|time=%.3fms|rows=%v|%s"
+	traceErrStr  = "%s [ERROR] call_at=%s|%s|time=%.3fms|rows=%v|%s"
 
 	infoStr_no_trace      = "[INFO] call_at=%s|"
 	warnStr_no_trace      = "[WARN] call_at=%s|"
@@ -47,25 +54,25 @@ func New(glog *Glog, config dlog.Config) dlog.Interface {
 
 	if config.Colorful {
 		//infoStr = dlog.Green + "%s\n" + dlog.Reset + dlog.Green + "[info] " + dlog.Reset
-		infoStr = dlog.Green + "trace_id-%s [INFO] " + "call_at=%s" + "|" + dlog.Reset
+		infoStr = dlog.Green + "%s [INFO] " + "call_at=%s" + "|" + dlog.Reset
 
 		//warnStr = dlog.BlueBold + "%s\n" + dlog.Reset + dlog.Magenta + "[warn] " + dlog.Reset
 		//warnStr = dlog.BlueBold + "%s" + dlog.Reset + dlog.Magenta + " [warn] " + dlog.Reset
-		warnStr = dlog.Yellow + "trace_id-%s [WARN] " + "call_at=%s" + "|" + dlog.Reset
+		warnStr = dlog.Yellow + "%s [WARN] " + "call_at=%s" + "|" + dlog.Reset
 
 		//errStr = dlog.Magenta + "%s\n" + dlog.Reset + dlog.Red + "[error] " + dlog.Reset
-		errStr = dlog.Red + "trace_id-%s [ERROR] " + "call_at=%s" + "|" + dlog.Reset
+		errStr = dlog.Red + "%s [ERROR] " + "call_at=%s" + "|" + dlog.Reset
 
 		//traceStr = dlog.Green + "%s\n" + dlog.Reset + dlog.Yellow + "[%.3fms] " + dlog.BlueBold + "[rows:%v]" + dlog.Reset + " %s"
 		//traceStr = dlog.Green + "call_at=%s" + " [info] " + "time=%.3fms" + "|" + "rows=%v" + "|%s" + dlog.Reset
-		traceStr = dlog.Green + "trace_id-%s [INFO] " + "call_at=%s" + "|" + "time=%.3fms" + "|" + "rows=%v" + "|%s" + dlog.Reset
+		traceStr = dlog.Green + "%s [INFO] " + "call_at=%s" + "|" + "time=%.3fms" + "|" + "rows=%v" + "|%s" + dlog.Reset
 
 		//traceWarnStr = dlog.Yellow + "call_at=%s" + " [warn] " + "%s" + "|" + "time=%.3fms" + "|" + "rows=%v" + "|" + "%s" + dlog.Reset
-		traceWarnStr = dlog.Yellow + "trace_id-%s [WARN] " + "call_at=%s" + "|" + "%s" + "|" + "time=%.3fms" + "|" + "rows=%v" + "|" + "%s" + dlog.Reset
+		traceWarnStr = dlog.Yellow + "%s [WARN] " + "call_at=%s" + "|" + "%s" + "|" + "time=%.3fms" + "|" + "rows=%v" + "|" + "%s" + dlog.Reset
 
 		//traceErrStr = dlog.RedBold + "%s " + dlog.MagentaBold + "%s\n" + dlog.Reset + dlog.Yellow + "[%.3fms] " + dlog.BlueBold + "[rows:%v]" + dlog.Reset + " %s"
 		//traceErrStr = dlog.RedBold + "call_at=%s" + " [error] " + "%s" + "|" + "time=%.3fms" + "|" + "rows=%v" + "|" + "%s" + dlog.Reset
-		traceErrStr = dlog.RedBold + "trace_id-%s [ERROR] " + "call_at=%s" + "|" + "%s" + "|" + "time=%.3fms" + "|" + "rows=%v" + "|" + "%s" + dlog.Reset
+		traceErrStr = dlog.RedBold + "%s [ERROR] " + "call_at=%s" + "|" + "%s" + "|" + "time=%.3fms" + "|" + "rows=%v" + "|" + "%s" + dlog.Reset
 
 		infoStr_no_trace = dlog.Green + "[INFO] " + "call_at=%s" + "|" + dlog.Reset
 
@@ -127,12 +134,13 @@ func (l *MyDBlogger) LogMode(level dlog.LogLevel) dlog.Interface {
 }
 
 func (l MyDBlogger) Info(ctx context.Context, msg string, data ...interface{}) {
-	trace_id := ""
+	/*trace_id := ""
 	if m := ctx.Value("trace_id"); m != nil {
 		if value, ok := m.(string); ok {
 			trace_id = value
 		}
-	}
+	}*/
+	trace_id := getIdsInLog(ctx)
 	cmd := []interface{}{}
 
 	if trace_id != "" {
@@ -166,12 +174,13 @@ func (l MyDBlogger) Info(ctx context.Context, msg string, data ...interface{}) {
 
 func (l MyDBlogger) Warn(ctx context.Context, msg string, data ...interface{}) {
 
-	trace_id := ""
+	/*trace_id := ""
 	if m := ctx.Value("trace_id"); m != nil {
 		if value, ok := m.(string); ok {
 			trace_id = value
 		}
-	}
+	}*/
+	trace_id := getIdsInLog(ctx)
 	cmd := []interface{}{}
 
 	if trace_id != "" {
@@ -203,12 +212,13 @@ func (l MyDBlogger) Warn(ctx context.Context, msg string, data ...interface{}) {
 
 func (l MyDBlogger) Error(ctx context.Context, msg string, data ...interface{}) {
 
-	trace_id := ""
+	/*trace_id := ""
 	if m := ctx.Value("trace_id"); m != nil {
 		if value, ok := m.(string); ok {
 			trace_id = value
 		}
-	}
+	}*/
+	trace_id := getIdsInLog(ctx)
 	cmd := []interface{}{}
 	if trace_id != "" {
 		cmd = append(cmd, trace_id)
@@ -239,12 +249,13 @@ func (l MyDBlogger) Error(ctx context.Context, msg string, data ...interface{}) 
 
 func (l MyDBlogger) Trace(ctx context.Context, begin time.Time, fc func() (string, int64), err error) {
 
-	trace_id := ""
+	/*trace_id := ""
 	if m := ctx.Value("trace_id"); m != nil {
 		if value, ok := m.(string); ok {
 			trace_id = value
 		}
-	}
+	}*/
+	trace_id := getIdsInLog(ctx)
 	//prefix := ""
 	v := []interface{}{}
 	if trace_id == "" {

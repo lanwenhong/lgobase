@@ -39,7 +39,7 @@ func TestAdd1(t *testing.T) {
 	addPool := gpool.NewRpcPoolSelector[server.ServerTestClient](ctx, g_conf)
 
 	wg := sync.WaitGroup{}
-	for i := 0; i < 2; i++ {
+	for i := 0; i < 1; i++ {
 		wg.Add(1)
 		go func() {
 			//ctx := context.WithValue(ctx, "trace_id", util.NewRequestID())
@@ -48,7 +48,7 @@ func TestAdd1(t *testing.T) {
 			logger.Debugf(ctx, "trade_id: %s", pid)
 			ctx := context.WithValue(ctx, "trace_id", pid)
 			defer wg.Done()
-			for i := 0; i < 10; i++ {
+			for i := 0; i < 1; i++ {
 				process := func(ctx context.Context, client interface{}) (string, error) {
 					//process := func(client interface{}) (string, error) {
 					c := client.(*server.ServerTestClient)
@@ -67,9 +67,10 @@ func TestAdd1(t *testing.T) {
 				ctx := context.WithValue(ctx, "request_id", util.NewRequestID())
 				nctx := gpool.NewExtContext(ctx)
 				//nctx = nctx.SetReqExtData(nctx, "request_id", util.NewRequestID())
+				//addPool.ThriftExtCall(nctx, process)
+				addPool.ThriftWithTimeOutExtCall(nctx, 1*time.Second, process)
 				addPool.ThriftExtCall(nctx, process)
 				//addPool.ThriftCall(ctx, process)
-
 			}
 
 		}()

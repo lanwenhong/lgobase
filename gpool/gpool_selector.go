@@ -175,6 +175,30 @@ func (rps *RpcPoolSelector[T]) ThriftCall(ctx context.Context, process func(clie
 	return err
 }
 
+func (rps *RpcPoolSelector[T]) ThriftWithTimeOutCall(ctx context.Context, timeout time.Duration, process func(client interface{}) (string, error)) error {
+	isvr := rps.RoundRobin(ctx)
+	if isvr == nil {
+		logger.Warnf(ctx, "no server select")
+		return errors.New("no server")
+	}
+	rps_pool := isvr.(*RpcSvr[T])
+	logger.Debugf(ctx, "select adds: %s port %d", rps_pool.GetAddr(), rps_pool.GetPort())
+	//return rps_pool.Gp.ThriftCall2(ctx, process)
+	err := rps_pool.Gp.ThriftWithTimeOutCall2(ctx, timeout, process)
+	if rps.Gpconf.Ping != nil && err != nil {
+
+		switch err.(type) {
+		case thrift.TTransportException, thrift.TProtocolException:
+			logger.Warnf(ctx, "%s:%d down", rps_pool.GetAddr(), rps_pool.GetPort())
+			rps_pool.SetStat(selector.SVR_NOTVALID)
+			rps.NotValid <- rps_pool
+		default:
+			logger.Warnf(ctx, "rpc: %s", err.Error())
+		}
+	}
+	return err
+}
+
 func (rps *RpcPoolSelector[T]) ThriftExtCall(ctx context.Context, process func(ctx context.Context, client interface{}) (string, error)) error {
 	var nCtx context.Context
 	if eCtx, ok := ctx.(*ExtContext); ok {
@@ -195,6 +219,41 @@ func (rps *RpcPoolSelector[T]) ThriftExtCall(ctx context.Context, process func(c
 	rps_pool := isvr.(*RpcSvr[T])
 	logger.Debugf(nCtx, "select adds: %s port %d", rps_pool.GetAddr(), rps_pool.GetPort())
 	err := rps_pool.Gp.ThriftExtCall2(nCtx, process)
+	if rps.Gpconf.Ping != nil && err != nil {
+
+		switch err.(type) {
+		case thrift.TTransportException, thrift.TProtocolException:
+			logger.Warnf(nCtx, "%s:%d down", rps_pool.GetAddr(), rps_pool.GetPort())
+			rps_pool.SetStat(selector.SVR_NOTVALID)
+			rps.NotValid <- rps_pool
+		default:
+			logger.Warnf(nCtx, "rpc: %s", err.Error())
+		}
+	}
+	return err
+
+}
+
+func (rps *RpcPoolSelector[T]) ThriftWithTimeOutExtCall(ctx context.Context, timeout time.Duration, process func(ctx context.Context, client interface{}) (string, error)) error {
+	var nCtx context.Context
+	if eCtx, ok := ctx.(*ExtContext); ok {
+		rid := eCtx.GetReqExtData("request_id")
+		if rid == "" {
+			eCtx = eCtx.SetReqExtData(eCtx, "request_id", util.NewRequestID())
+		}
+		nCtx = eCtx
+	} else {
+		logger.Warnf(ctx, "ctx format error")
+		return errors.New("ctx format error")
+	}
+	isvr := rps.RoundRobin(nCtx)
+	if isvr == nil {
+		logger.Warnf(nCtx, "no server select")
+		return errors.New("no server")
+	}
+	rps_pool := isvr.(*RpcSvr[T])
+	logger.Debugf(nCtx, "select adds: %s port %d", rps_pool.GetAddr(), rps_pool.GetPort())
+	err := rps_pool.Gp.ThriftWithTimeOutExtCall2(nCtx, timeout, process)
 	if rps.Gpconf.Ping != nil && err != nil {
 
 		switch err.(type) {
