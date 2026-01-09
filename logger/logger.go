@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -289,6 +290,7 @@ func catchError() {
 
 func getIdsInLog(ctx context.Context) string {
 	var builder strings.Builder
+	builder.Grow(100)
 	trace_id := ""
 	if m := ctx.Value("trace_id"); m != nil {
 		if value, ok := m.(string); ok {
@@ -587,25 +589,40 @@ func (glog *Glog) rename() {
 
 	f := glog.LogObj
 	if glog.Logconf.RotateMethod == ROTATE_FILE_DAILY {
-		fn := f.dir + "/" + f.filename + "." + f.Ldate.Format(DATEFORMAT)
-		fn_err := f.dir + "/" + f.filename_err + "." + f.Ldate.Format(DATEFORMAT)
+		var builder strings.Builder
+		builder.Grow(100)
+
+		//fn := f.dir + "/" + f.filename + "." + f.Ldate.Format(DATEFORMAT)
+		builder.WriteString(f.filename)
+		builder.WriteString(".")
+		builder.WriteString(f.Ldate.Format(DATEFORMAT))
+		fn := filepath.Join(f.dir, builder.String())
+		builder.Reset()
+
+		//fn_err := f.dir + "/" + f.filename_err + "." + f.Ldate.Format(DATEFORMAT)
+		builder.WriteString(f.filename_err)
+		builder.WriteString(".")
+		builder.WriteString(f.Ldate.Format(DATEFORMAT))
+		fn_err := filepath.Join(f.dir, builder.String())
 
 		if !isExist(fn) && !isExist(fn_err) && glog.isMustRename() {
 			if f.logfile != nil && f.logfile_err != nil {
 				f.logfile.Close()
 				f.logfile_err.Close()
 			}
-			err := os.Rename(f.dir+"/"+f.filename, fn)
+			//err := os.Rename(f.dir+"/"+f.filename, fn)
+			err := os.Rename(filepath.Join(f.dir, f.filename), fn)
 			if err != nil {
 				f.lg.Println("rename err", err.Error())
 			}
-			err = os.Rename(f.dir+"/"+f.filename_err, fn_err)
+			//err = os.Rename(f.dir+"/"+f.filename_err, fn_err)
+			err = os.Rename(filepath.Join(f.dir, f.filename_err), fn_err)
 			t, _ := time.Parse(DATEFORMAT, time.Now().Format(DATEFORMAT))
 			f.Ldate = &t
 
-			f.logfile, _ = os.Create(f.dir + "/" + f.filename)
+			f.logfile, _ = os.Create(filepath.Join(f.dir, f.filename))
 			f.lg = log.New(glog.LogObj.logfile, "", log.Ldate|log.Lmicroseconds|log.Lshortfile)
-			f.logfile_err, _ = os.Create(f.dir + "/" + f.filename_err)
+			f.logfile_err, _ = os.Create(filepath.Join(f.dir, f.filename_err))
 			f.lg_err = log.New(glog.LogObj.logfile_err, "", log.Ldate|log.Lmicroseconds|log.Lshortfile)
 		}
 	} else {
@@ -623,11 +640,22 @@ func (glog *Glog) coverNextOne() {
 	if f.logfile != nil {
 		f.logfile.Close()
 	}
-	if isExist(f.dir + "/" + f.filename + "." + strconv.Itoa(int(f._suffix))) {
-		os.Remove(f.dir + "/" + f.filename + "." + strconv.Itoa(int(f._suffix)))
+
+	var builder strings.Builder
+	builder.Grow(100)
+
+	//if isExist(f.dir + "/" + f.filename + "." + strconv.Itoa(int(f._suffix))) {
+	if isExist(filepath.Join(f.dir, builder.String())) {
+		builder.WriteString(f.filename + "." + strconv.Itoa(int(f._suffix)))
+		//os.Remove(f.dir + "/" + f.filename + "." + strconv.Itoa(int(f._suffix)))
+		os.Remove(filepath.Join(f.dir, builder.String()))
+		builder.Reset()
 	}
-	os.Rename(f.dir+"/"+f.filename, f.dir+"/"+f.filename+"."+strconv.Itoa(int(f._suffix)))
-	f.logfile, _ = os.Create(f.dir + "/" + f.filename)
+
+	builder.WriteString(f.filename + "." + strconv.Itoa(int(f._suffix)))
+	//os.Rename(f.dir+"/"+f.filename, f.dir+"/"+f.filename+"."+strconv.Itoa(int(f._suffix)))
+	os.Rename(filepath.Join(f.dir, f.filename), filepath.Join(f.dir, builder.String()))
+	f.logfile, _ = os.Create(filepath.Join(f.dir, f.filename))
 	f.lg = log.New(f.logfile, "", log.Ldate|log.Lmicroseconds|log.Lshortfile)
 }
 

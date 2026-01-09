@@ -257,7 +257,8 @@ func (l MyDBlogger) Trace(ctx context.Context, begin time.Time, fc func() (strin
 	}*/
 	trace_id := getIdsInLog(ctx)
 	//prefix := ""
-	v := []interface{}{}
+	//v := []interface{}{}
+	v := make([]interface{}, 0, 100)
 	if trace_id == "" {
 		l.traceStr = traceStr_no_trace
 		l.traceWarnStr = traceWarnStr_no_trace
