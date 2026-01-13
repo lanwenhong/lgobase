@@ -18,16 +18,17 @@ import (
 type PingSvr func(client interface{}) (string, error)
 
 type GPoolConfig[T any] struct {
-	Addrs        string
-	MaxConns     int
-	MaxIdleConns int
-	MaxConnLife  int64
-	PurgeRate    float64
-	Cfunc        CreateConn[T]
-	Nc           NewThriftClient[T]
-	Ping         PingSvr
-	PingTicker   int64
-	TlsConf      *tls.Config
+	Addrs           string
+	MaxConns        int
+	MaxIdleConns    int
+	MaxConnLife     int64
+	MaxIdleConnLife int64
+	PurgeRate       float64
+	Cfunc           CreateConn[T]
+	Nc              NewThriftClient[T]
+	Ping            PingSvr
+	PingTicker      int64
+	TlsConf         *tls.Config
 }
 
 type RpcSvr[T any] struct {
