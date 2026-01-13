@@ -27,28 +27,30 @@ type Conn[T any] interface {
 type CreateConn[T any] func(context.Context, string, int, int) (Conn[T], error)
 
 type PoolConn[T any] struct {
-	Gc    Conn[T]
-	gp    *Gpool[T]
-	e     *list.Element
-	Ctime int64
+	Gc       Conn[T]
+	gp       *Gpool[T]
+	e        *list.Element
+	Ctime    int64
+	IdleTime int64
 }
 
 type Gpool[T any] struct {
-	FreeList     *list.List
-	UseList      *list.List
-	PurgeQueue   cas.Queue
-	MaxConns     int
-	MaxIdleConns int
-	MaxConnLife  int64
-	PurgeRate    float64
-	hold         int
-	mutex        sync.Mutex
-	Cfunc        CreateConn[T]
-	Nc           NewThriftClient[T]
-	Addr         string
-	Port         int
-	TimeOut      int
-	Waits        uint
+	FreeList        *list.List
+	UseList         *list.List
+	PurgeQueue      cas.Queue
+	MaxConns        int
+	MaxIdleConns    int
+	MaxConnLife     int64
+	MaxIdleConnLife int64
+	PurgeRate       float64
+	hold            int
+	mutex           sync.Mutex
+	Cfunc           CreateConn[T]
+	Nc              NewThriftClient[T]
+	Addr            string
+	Port            int
+	TimeOut         int
+	Waits           uint
 	//Waits       atomic.Int64
 	WaitNotify  chan struct{}
 	PurgeNotify chan struct{}
@@ -64,6 +66,7 @@ func (gp *Gpool[T]) GpoolInit(addr string, port int, timeout int,
 	gp.MaxConns = maxconns
 	gp.MaxIdleConns = maxidleconns
 	gp.MaxConnLife = maxconnlife
+
 	gp.Addr = addr
 	gp.Port = port
 	gp.TimeOut = timeout
@@ -76,7 +79,7 @@ func (gp *Gpool[T]) GpoolInit(addr string, port int, timeout int,
 	gp.CreateIdleConn(ctx)
 
 	go func() {
-		ctx := context.WithValue(context.Background(), "trace_id", util.GenXid())
+		ctx := context.WithValue(context.Background(), "trace_id", util.NewProcessID())
 		for {
 			select {
 			case <-gp.PurgeNotify:
@@ -102,6 +105,7 @@ func (gp *Gpool[T]) GpoolInit2(ctx context.Context, addr string, port int, timeo
 	gp.MaxConns = gp_conf.MaxConns
 	gp.MaxIdleConns = gp_conf.MaxIdleConns
 	gp.MaxConnLife = gp_conf.MaxConnLife
+	gp.MaxIdleConnLife = gp_conf.MaxIdleConnLife
 	gp.PurgeRate = gp_conf.PurgeRate
 	gp.Addr = addr
 	gp.Port = port
@@ -138,6 +142,7 @@ func (gp *Gpool[T]) CreateIdleConn(ctx context.Context) {
 		pc, err := gp.getConnFromNew(ctx)
 		if err == nil {
 			//c.Close(ctx)
+			pc.IdleTime = time.Now().Unix()
 			pc.e = gp.FreeList.PushBack(pc)
 		}
 
@@ -149,20 +154,25 @@ func (gp *Gpool[T]) getConnFromFreeList(ctx context.Context) (*PoolConn[T], erro
 	var reterr error
 	pc := e.Value.(*PoolConn[T])
 	var isMaxConnLife bool = false
+	var isMaxIdleConnLife bool = false
 	connNow := time.Now().Unix()
 	logger.Debugf(ctx, "connNow: %d pc.Ctime: %d MaxConnLife: %d", connNow, pc.Ctime, gp.MaxConnLife)
 	if gp.MaxConnLife > 0 && connNow-pc.Ctime > gp.MaxConnLife {
 		isMaxConnLife = true
 	}
 
-	if !pc.Gc.IsOpen() || isMaxConnLife {
+	if gp.MaxIdleConnLife > 0 && connNow-pc.IdleTime > gp.MaxIdleConnLife {
+		isMaxIdleConnLife = true
+	}
+
+	if !pc.Gc.IsOpen() || isMaxConnLife || isMaxIdleConnLife {
 		//logger.Warnf(ctx, "reopen conn")
 		// reterr = pc.Gc.Open()
 		// if reterr != nil {
 		// 	logger.Warnf(ctx, "open err %s", reterr.Error())
 		// }
 
-		logger.Infof(ctx, "func=reopen|pc=%p|ctime=%d|connNow=%d|MaxConnLife=%d", pc, pc.Ctime, connNow, gp.MaxConnLife)
+		logger.Infof(ctx, "func=reopen|pc=%p|ctime=%d|idle=%d|connNow=%d|MaxConnLife=%d|MaxIdleConnLife=%d", pc, pc.Ctime, pc.IdleTime, connNow, gp.MaxConnLife, gp.MaxIdleConnLife)
 		pc.Gc.Close()
 		gp.FreeList.Remove(e)
 		//connNew, err := gp.getConnFromNew(ctx)
@@ -172,7 +182,8 @@ func (gp *Gpool[T]) getConnFromFreeList(ctx context.Context) (*PoolConn[T], erro
 	gp.FreeList.Remove(e)
 	e.Value.(*PoolConn[T]).e = gp.UseList.PushBack(e.Value)
 	logger.Debugf(ctx, "after get flist len %d ulist len %d", gp.FreeList.Len(), gp.UseList.Len())
-	logger.Infof(ctx, "func=getConnFromFreeList|pc=%p|ctime=%d|usedTime=%d", pc, pc.Ctime, int64(connNow)-int64(pc.Ctime))
+	logger.Infof(ctx, "func=getConnFromFreeList|pc=%p|ctime=%d|idle=%d|usedTime=%d|idleTime=%d",
+		pc, pc.Ctime, pc.IdleTime, int64(connNow)-int64(pc.Ctime), int64(connNow)-int64(pc.IdleTime))
 	//return e.Value.(*PoolConn[T]), reterr
 	return pc, reterr
 }
@@ -294,6 +305,7 @@ func (pc *PoolConn[T]) put(ctx context.Context) error {
 	//defer pc.gp.mutex.Unlock()
 	pc.gp.UseList.Remove(pc.e)
 	pc.gp.FreeList.PushBack(pc)
+	pc.IdleTime = time.Now().Unix()
 	flen := pc.gp.FreeList.Len() - pc.gp.MaxIdleConns
 	if flen < 0 {
 		flen = 0

@@ -31,10 +31,11 @@ func TestAdd1(t *testing.T) {
 		//Cfunc: gpool.CreateThriftFramedConn[server.ServerTestClient],
 		Cfunc: gpool.CreateThriftBufferConnThriftExt[server.ServerTestClient],
 		//Cfunc: gpool.CreateThriftBufferConn[server.ServerTestClient],
-		Nc:           server.NewServerTestClientFactory,
-		MaxConnLife:  5,
-		MaxConns:     10,
-		MaxIdleConns: 5,
+		Nc:              server.NewServerTestClientFactory,
+		MaxConnLife:     5,
+		MaxIdleConnLife: 5,
+		MaxConns:        10,
+		MaxIdleConns:    5,
 	}
 	addPool := gpool.NewRpcPoolSelector[server.ServerTestClient](ctx, g_conf)
 
@@ -69,6 +70,7 @@ func TestAdd1(t *testing.T) {
 				//nctx = nctx.SetReqExtData(nctx, "request_id", util.NewRequestID())
 				//addPool.ThriftExtCall(nctx, process)
 				addPool.ThriftWithTimeOutExtCall(nctx, 1*time.Second, process)
+				//time.Sleep(6 * time.Second)
 				addPool.ThriftExtCall(nctx, process)
 				//addPool.ThriftCall(ctx, process)
 			}
