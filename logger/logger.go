@@ -96,6 +96,7 @@ type Glogconf struct {
 	Colorful    bool
 	Goid        bool
 	Loglevel    LEVEL
+	CtxValueKey string
 }
 
 type Glog struct {
@@ -147,6 +148,7 @@ func NewDefaultGLog() (res *Glog) {
 			Stdout:      true,
 			Colorful:    true,
 			Loglevel:    DEBUG,
+			CtxValueKey: "trace_id,request_id",
 		},
 		LogormConf: &dlog.Config{
 			SlowThreshold:             time.Second,
@@ -292,7 +294,22 @@ func getIdsInLog(ctx context.Context) string {
 	var builder strings.Builder
 	builder.Grow(100)
 	trace_id := ""
-	if m := ctx.Value("trace_id"); m != nil {
+	sks := Gfilelog.Logconf.CtxValueKey
+	parts := strings.Split(sks, ",")
+	plen := len(parts)
+	for index, k := range parts {
+		if m := ctx.Value(k); m != nil {
+			if value, ok := m.(string); ok {
+				builder.WriteString(value)
+			}
+		} else {
+			builder.WriteString("-")
+		}
+		if index != plen-1 {
+			builder.WriteString(" ")
+		}
+	}
+	/*if m := ctx.Value("trace_id"); m != nil {
 		if value, ok := m.(string); ok {
 			builder.WriteString(value)
 			builder.WriteString(" ")
@@ -306,7 +323,7 @@ func getIdsInLog(ctx context.Context) string {
 		}
 	} else {
 		builder.WriteString("-")
-	}
+	}*/
 	trace_id = builder.String()
 	return trace_id
 }

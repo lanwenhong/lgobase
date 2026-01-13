@@ -21,6 +21,7 @@ func TestAdd1(t *testing.T) {
 		Stdout:       true,
 		Colorful:     true,
 		Loglevel:     logger.DEBUG,
+		CtxValueKey:  "trace_id,request_id",
 	}
 	logger.Newglog("./", "test.log", "test.log.err", myconf)
 	//logger.Debugf(ctx, "run")
@@ -32,7 +33,7 @@ func TestAdd1(t *testing.T) {
 		Cfunc: gpool.CreateThriftBufferConnThriftExt[server.ServerTestClient],
 		//Cfunc: gpool.CreateThriftBufferConn[server.ServerTestClient],
 		Nc:              server.NewServerTestClientFactory,
-		MaxConnLife:     5,
+		MaxConnLife:     500,
 		MaxIdleConnLife: 5,
 		MaxConns:        10,
 		MaxIdleConns:    5,
@@ -70,7 +71,7 @@ func TestAdd1(t *testing.T) {
 				//nctx = nctx.SetReqExtData(nctx, "request_id", util.NewRequestID())
 				//addPool.ThriftExtCall(nctx, process)
 				addPool.ThriftWithTimeOutExtCall(nctx, 1*time.Second, process)
-				//time.Sleep(6 * time.Second)
+				time.Sleep(6 * time.Second)
 				addPool.ThriftExtCall(nctx, process)
 				//addPool.ThriftCall(ctx, process)
 			}

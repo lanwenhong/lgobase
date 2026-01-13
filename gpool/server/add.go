@@ -60,6 +60,7 @@ func main() {
 		Stdout:       true,
 		Colorful:     true,
 		Loglevel:     logger.DEBUG,
+		CtxValueKey:  "trace_id,request_id",
 	}
 	logger.Newglog("./", "add.log", "add.log.err", myconf)
 
