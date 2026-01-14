@@ -660,7 +660,9 @@ func (glog *Glog) rename() {
 			f.lg_err = log.New(glog.LogObj.logfile_err, "", log.Ldate|log.Lmicroseconds|log.Lshortfile)
 		}
 	} else {
-		glog.coverNextOne()
+		if glog.isMustRename() {
+			glog.coverNextOne()
+		}
 	}
 }
 
