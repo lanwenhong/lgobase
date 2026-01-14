@@ -21,7 +21,7 @@ func TestAdd1(t *testing.T) {
 		Stdout:       true,
 		Colorful:     true,
 		Loglevel:     logger.DEBUG,
-		CtxValueKey:  "trace_id,request_id",
+		//CtxValueKey:  "trace_id,request_id",
 	}
 	logger.Newglog("./", "test.log", "test.log.err", myconf)
 	//logger.Debugf(ctx, "run")
@@ -71,8 +71,9 @@ func TestAdd1(t *testing.T) {
 				//nctx = nctx.SetReqExtData(nctx, "request_id", util.NewRequestID())
 				//addPool.ThriftExtCall(nctx, process)
 				addPool.ThriftWithTimeOutExtCall(nctx, 1*time.Second, process)
-				time.Sleep(6 * time.Second)
-				addPool.ThriftExtCall(nctx, process)
+				//time.Sleep(6 * time.Second)
+				//nctx = nctx.SetReqExtData(nctx, "request_id", util.NewRequestID())
+				//addPool.ThriftExtCall(nctx, process)
 				//addPool.ThriftCall(ctx, process)
 			}
 

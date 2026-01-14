@@ -176,6 +176,9 @@ func Newglog(fileDir string, fileName string, fileNameErr string, glog_conf *Glo
 	case ERROR:
 		dconfig.LogLevel = dlog.Error
 	}
+	if glog_conf.CtxValueKey == "" {
+		glog_conf.CtxValueKey = "trace_id,request_id"
+	}
 	glog := &Glog{
 		Logconf:    glog_conf,
 		LogormConf: dconfig,
