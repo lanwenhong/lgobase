@@ -233,16 +233,27 @@ func (glog *Glog) SetRollingFile(fileDir, fileName string, stdout bool) error {
 	}
 	glog.LogObj.mu.Lock()
 	defer glog.LogObj.mu.Unlock()
+
+	var builder strings.Builder
+	builder.Grow(100)
 	for i := 1; i <= int(glog.Logconf.MaxFileCount); i++ {
-		if isExist(fileDir + "/" + fileName + "." + strconv.Itoa(i)) {
+		builder.WriteString(fileName)
+		builder.WriteString(".")
+		builder.WriteString(strconv.Itoa(i))
+		fName := builder.String()
+
+		//if isExist(fileDir + "/" + fileName + "." + strconv.Itoa(i)) {
+		if isExist(filepath.Join(fileDir, fName)) {
 			glog.LogObj._suffix = i
 		} else {
 			break
 		}
+		builder.Reset()
 	}
 	if !glog.isMustRename() {
 		if !stdout {
-			glog.LogObj.logfile, _ = os.OpenFile(fileDir+"/"+fileName, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
+			//glog.LogObj.logfile, _ = os.OpenFile(fileDir+"/"+fileName, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
+			glog.LogObj.logfile, _ = os.OpenFile(filepath.Join(fileDir, fileName), os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
 			glog.LogObj.lg = log.New(glog.LogObj.logfile, "", log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile)
 		} else {
 			glog.LogObj.lg = log.New(os.Stdout, "", log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile)
@@ -250,7 +261,7 @@ func (glog *Glog) SetRollingFile(fileDir, fileName string, stdout bool) error {
 	} else {
 		glog.rename()
 	}
-	go glog.fileMonitor()
+	//go glog.fileMonitor()
 
 	return nil
 }
@@ -273,10 +284,12 @@ func (glog *Glog) SetRollingDaily(fileDir, fileName, fileName_err string, stdout
 
 	if !glog.isMustRename() {
 		if !stdout {
-			glog.LogObj.logfile, err = os.OpenFile(fileDir+"/"+fileName, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
+			//glog.LogObj.logfile, err = os.OpenFile(fileDir+"/"+fileName, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
+			glog.LogObj.logfile, err = os.OpenFile(filepath.Join(fileDir, fileName), os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
 			glog.LogObj.lg = log.New(glog.LogObj.logfile, "", log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile|log.LstdFlags)
 
-			glog.LogObj.logfile_err, err = os.OpenFile(fileDir+"/"+fileName_err, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
+			//glog.LogObj.logfile_err, err = os.OpenFile(fileDir+"/"+fileName_err, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
+			glog.LogObj.logfile_err, err = os.OpenFile(filepath.Join(fileDir, fileName_err), os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
 			glog.LogObj.lg_err = log.New(glog.LogObj.logfile_err, "", log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile|log.LstdFlags)
 		} else {
 			glog.LogObj.lg = log.New(os.Stdout, "", log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile)
@@ -594,7 +607,8 @@ func (glog *Glog) isMustRename() bool {
 		}
 	} else {
 		if glog.Logconf.MaxFileCount > 1 {
-			if glog.fileSize(glog.LogObj.dir+"/"+glog.LogObj.filename) >= glog.Logconf.MaxFileSize {
+			//if glog.fileSize(glog.LogObj.dir+"/"+glog.LogObj.filename) >= glog.Logconf.MaxFileSize {
+			if glog.fileSize(filepath.Join(glog.LogObj.dir, glog.LogObj.filename)) >= glog.Logconf.MaxFileSize {
 				return true
 			}
 		}
@@ -650,13 +664,20 @@ func (glog *Glog) rename() {
 	}
 }
 
-func (f *FILE) nextSuffix() int {
+/*func (f *FILE) nextSuffix() int {
 	return int(f._suffix%int(maxFileCount) + 1)
+}*/
+
+func (glog *Glog) nextSuffix() int {
+	f := glog.LogObj
+	f._suffix = int(f._suffix%int(glog.Logconf.MaxFileCount) + 1)
+	return f._suffix
 }
 
 func (glog *Glog) coverNextOne() {
 	f := glog.LogObj
-	f._suffix = f.nextSuffix()
+	//f._suffix = f.nextSuffix()
+	glog.nextSuffix()
 	if f.logfile != nil {
 		f.logfile.Close()
 	}
@@ -665,14 +686,17 @@ func (glog *Glog) coverNextOne() {
 	builder.Grow(100)
 
 	//if isExist(f.dir + "/" + f.filename + "." + strconv.Itoa(int(f._suffix))) {
+	builder.WriteString(f.filename)
+	builder.WriteString(".")
+	builder.WriteString(strconv.Itoa(int(f._suffix)))
 	if isExist(filepath.Join(f.dir, builder.String())) {
-		builder.WriteString(f.filename + "." + strconv.Itoa(int(f._suffix)))
+		//builder.WriteString(f.filename + "." + strconv.Itoa(int(f._suffix)))
 		//os.Remove(f.dir + "/" + f.filename + "." + strconv.Itoa(int(f._suffix)))
 		os.Remove(filepath.Join(f.dir, builder.String()))
-		builder.Reset()
 	}
+	//builder.Reset()
 
-	builder.WriteString(f.filename + "." + strconv.Itoa(int(f._suffix)))
+	//builder.WriteString(f.filename + "." + strconv.Itoa(int(f._suffix)))
 	//os.Rename(f.dir+"/"+f.filename, f.dir+"/"+f.filename+"."+strconv.Itoa(int(f._suffix)))
 	os.Rename(filepath.Join(f.dir, f.filename), filepath.Join(f.dir, builder.String()))
 	f.logfile, _ = os.Create(filepath.Join(f.dir, f.filename))
