@@ -103,6 +103,7 @@ type Glog struct {
 	LogObj     *FILE
 	Logconf    *Glogconf
 	LogormConf *dlog.Config
+	LogTags    []string
 }
 
 var Gfilelog = NewDefaultGLog()
@@ -157,6 +158,7 @@ func NewDefaultGLog() (res *Glog) {
 			Colorful:                  true,
 		},
 	}
+	res.LogTags = strings.Split(res.Logconf.CtxValueKey, ",")
 	res.SetRollingFile("", "", true)
 	return
 }
@@ -189,6 +191,7 @@ func Newglog(fileDir string, fileName string, fileNameErr string, glog_conf *Glo
 		glog.SetRollingDaily(fileDir, fileName, fileNameErr, glog_conf.Stdout)
 		//glog.SetRollingDaily(fileName, fileNameErr, glog_conf.Stdout)
 	}
+	glog.LogTags = strings.Split(glog.Logconf.CtxValueKey, ",")
 	Gfilelog = glog
 	return glog
 }
@@ -310,10 +313,10 @@ func getIdsInLog(ctx context.Context) string {
 	var builder strings.Builder
 	builder.Grow(100)
 	trace_id := ""
-	sks := Gfilelog.Logconf.CtxValueKey
-	parts := strings.Split(sks, ",")
-	plen := len(parts)
-	for index, k := range parts {
+	//sks := Gfilelog.Logconf.CtxValueKey
+	//parts := strings.Split(sks, ",")
+	plen := len(Gfilelog.LogTags)
+	for index, k := range Gfilelog.LogTags {
 		if m := ctx.Value(k); m != nil {
 			if value, ok := m.(string); ok {
 				builder.WriteString(value)
