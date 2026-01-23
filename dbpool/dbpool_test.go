@@ -87,7 +87,7 @@ func TestCreate(t *testing.T) {
 	myconf := &logger.Glogconf{
 		RotateMethod: logger.ROTATE_FILE_DAILY,
 		Stdout:       true,
-		ColorFull:    true,
+		Colorful:     true,
 		Loglevel:     logger.DEBUG,
 		//Goid:         true,
 	}
@@ -138,7 +138,7 @@ func TestCreateMulti(t *testing.T) {
 	myconf := &logger.Glogconf{
 		RotateMethod: logger.ROTATE_FILE_DAILY,
 		Stdout:       true,
-		ColorFull:    true,
+		Colorful:     true,
 		Loglevel:     logger.DEBUG,
 		//Goid:         true,
 	}
@@ -200,7 +200,7 @@ func TestQuery1(t *testing.T) {
 	myconf := &logger.Glogconf{
 		RotateMethod: logger.ROTATE_FILE_DAILY,
 		Stdout:       true,
-		ColorFull:    true,
+		Colorful:     true,
 		Loglevel:     logger.DEBUG,
 		//Goid:         true,
 	}
@@ -240,8 +240,8 @@ func TestQuery2(t *testing.T) {
 
 	myconf := &logger.Glogconf{
 		RotateMethod: logger.ROTATE_FILE_DAILY,
-		Stdout:       true,
-		ColorFull:    true,
+		Stdout:       false,
+		Colorful:     false,
 		Loglevel:     logger.DEBUG,
 		//Goid:         true,
 	}
@@ -257,7 +257,7 @@ func TestQuery2(t *testing.T) {
 		SlowThreshold:             time.Second, // 慢 SQL 阈值
 		LogLevel:                  dlog.Info,   // 日志级别
 		IgnoreRecordNotFoundError: true,        // 忽略ErrRecordNotFound（记录未找到）错误
-		Colorful:                  true,        // 禁用彩色打印
+		Colorful:                  false,       // 禁用彩色打印
 	}
 
 	db_conf := dbenc.DbConfNew(ctx, "db.ini")
@@ -286,7 +286,7 @@ func TestGendiByDb(t *testing.T) {
 	myconf := &logger.Glogconf{
 		RotateMethod: logger.ROTATE_FILE_DAILY,
 		Stdout:       true,
-		ColorFull:    true,
+		Colorful:     true,
 		Loglevel:     logger.DEBUG,
 		//Goid:         true,
 	}
@@ -337,7 +337,7 @@ func TestQueryMap(t *testing.T) {
 	myconf := &logger.Glogconf{
 		RotateMethod: logger.ROTATE_FILE_DAILY,
 		Stdout:       true,
-		ColorFull:    true,
+		Colorful:     true,
 		Loglevel:     logger.DEBUG,
 		//Goid:         true,
 	}
@@ -366,18 +366,18 @@ func TestQueryMap(t *testing.T) {
 	}
 	tdb := dbs.OrmPools["usercenter"]
 	var ret []map[string]interface{}
-	tdb.Raw("select id, username, FROM_UNIXTIME(ctime, '%Y-%m-%d %H:%i:%s') as ctime from users where id=?", 1).Scan(&ret)
-	t.Log(ret)
+	tdb.WithContext(ctx).Raw("select id, username, FROM_UNIXTIME(ctime, '%Y-%m-%d %H:%i:%s') as ctime from users where id=?", 1).Scan(&ret)
+	logger.Debugf(ctx, "ret:%v", ret)
 
 	var re []map[string]interface{}
 	var ilist interface{} = nil
 	ilist = []int64{7133368332320837558, 7060864841283604340}
-	tdb.Table("users").Select("*").Where("id in ?", ilist).Scan(&re)
+	tdb.WithContext(ctx).Table("users").Select("*").Where("id in ?", ilist).Scan(&re)
 
 	var re1 map[string]interface{}
 	xid := 7133368332320837558
 	var iid interface{} = nil
 	iid = xid
-	tdb.Table("users").Select("*").Where("id = ?", iid).Find(&re1)
-	t.Log(re1)
+	tdb.WithContext(ctx).Table("users").Select("*").Where("id = ?", iid).Find(&re1)
+	logger.Debugf(ctx, "re1: %v", re1)
 }

@@ -28,17 +28,27 @@ func TestDblog(t *testing.T) {
 		SlowThreshold:             time.Second,
 		LogLevel:                  dlog.Info,
 		IgnoreRecordNotFoundError: true,
-		Colorful:                  true,
+		Colorful:                  false,
 	}
 
 	//ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	//defer cancel()
 	ctx := context.WithValue(context.Background(), "trace_id", NewRequestID())
 
-	mylog := logger.New(nil, d_conf)
+	myconf := &logger.Glogconf{
+		RotateMethod: logger.ROTATE_FILE_DAILY,
+		Stdout:       false,
+		Colorful:     false,
+		Loglevel:     logger.DEBUG,
+		//CtxValueKey:  "trace_id,request_id",
+	}
+
+	mylog := logger.New(logger.Newglog("./", "test.log", "test.log.err", myconf), d_conf)
 	mylog.Info(ctx, "xxxxxxxx%d%d%d", 1, 2, 3)
 	mylog.Warn(ctx, "xxxxxxxx%d%d%d", 1, 2, 3)
 	mylog.Error(ctx, "xxxxxxxx%d%d%d", 1, 2, 3)
+
+	logger.Debugf(ctx, "test test test")
 
 }
 
@@ -54,7 +64,7 @@ func TestDbColorlog(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	mylog := logger.New(nil, d_conf)
+	mylog := logger.New(logger.NewDefaultGLog(), d_conf)
 	mylog.Info(ctx, "xxxxxxxx%d%d%d", 1, 2, 3)
 	mylog.Warn(ctx, "xxxxxxxx%d%d%d", 1, 2, 3)
 	mylog.Error(ctx, "xxxxxxxx%d%d%d", 1, 2, 3)
@@ -65,7 +75,7 @@ func TestDbTraceErrLog(t *testing.T) {
 		SlowThreshold:             time.Second,
 		LogLevel:                  dlog.Info,
 		IgnoreRecordNotFoundError: true,
-		Colorful:                  true,
+		Colorful:                  false,
 	}
 
 	//ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -73,7 +83,15 @@ func TestDbTraceErrLog(t *testing.T) {
 	//ctx := context.WithValue(context.Background(), "trace_id", NewRequestID())
 	ctx := context.Background()
 
-	mylog := logger.New(nil, d_conf)
+	myconf := &logger.Glogconf{
+		RotateMethod: logger.ROTATE_FILE_DAILY,
+		Stdout:       false,
+		Colorful:     false,
+		Loglevel:     logger.DEBUG,
+		//CtxValueKey:  "trace_id,request_id",
+	}
+
+	mylog := logger.New(logger.Newglog("./", "test.log", "test.log.err", myconf), d_conf)
 	stringTime := "2017-08-30 16:40:41"
 	loc, _ := time.LoadLocation("Local")
 	begin, _ := time.ParseInLocation("2006-01-02 15:04:05", stringTime, loc)
@@ -87,19 +105,27 @@ func TestDBTraceWarnLog(t *testing.T) {
 		SlowThreshold:             time.Second,
 		LogLevel:                  dlog.Info,
 		IgnoreRecordNotFoundError: true,
-		Colorful:                  true,
+		Colorful:                  false,
+	}
+	myconf := &logger.Glogconf{
+		RotateMethod: logger.ROTATE_FILE_DAILY,
+		Stdout:       false,
+		Colorful:     false,
+		Loglevel:     logger.DEBUG,
+		//CtxValueKey:  "trace_id,request_id",
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	mylog := logger.New(nil, d_conf)
+	mylog := logger.New(logger.Newglog("./", "test.log", "test.log.err", myconf), d_conf)
 	stringTime := "2017-08-30 16:40:41"
 	loc, _ := time.LoadLocation("Local")
 	begin, _ := time.ParseInLocation("2006-01-02 15:04:05", stringTime, loc)
 
 	mylog.Trace(ctx, begin, testdb, nil)
 	mylog.Trace(ctx, time.Now(), testdb, nil)
+	logger.Debugf(ctx, "test test test")
 }
 
 func TestDbWithfilelog(t *testing.T) {

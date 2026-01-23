@@ -269,6 +269,10 @@ func (glog *Glog) SetRollingFile(fileDir, fileName string, stdout bool) error {
 	return nil
 }
 
+func (glog *Glog) GetLogger() *log.Logger {
+	return glog.LogObj.lg
+}
+
 func (glog *Glog) SetRollingDaily(fileDir, fileName, fileName_err string, stdout bool) error {
 	var err error = nil
 	t, _ := time.Parse(DATEFORMAT, time.Now().Format(DATEFORMAT))
