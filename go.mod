@@ -11,7 +11,7 @@ require (
 	github.com/hyperjumptech/grule-rule-engine v1.20.3
 	github.com/jmoiron/sqlx v1.3.4
 	github.com/json-iterator/go v1.1.12
-	github.com/kjk/betterguid v0.0.0-20170621091430-c442874ba63a
+	//github.com/kjk/betterguid v0.0.0-20170621091430-c442874ba63a
 	github.com/oklog/ulid v1.3.1
 	github.com/redis/go-redis/v9 v9.7.0
 	github.com/rs/xid v1.6.0
@@ -21,6 +21,11 @@ require (
 	github.com/sony/sonyflake v1.2.0
 	gorm.io/driver/mysql v1.5.1
 	gorm.io/gorm v1.25.3
+)
+
+require (
+	github.com/gin-gonic/gin v1.11.0
+	github.com/go-resty/resty/v2 v2.16.5
 )
 
 require (
@@ -39,14 +44,12 @@ require (
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.8 // indirect
 	github.com/gin-contrib/sse v1.1.0 // indirect
-	github.com/gin-gonic/gin v1.11.0 // indirect
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect
 	github.com/go-git/go-billy/v5 v5.6.2 // indirect
 	github.com/go-git/go-git/v5 v5.16.2 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/go-playground/validator/v10 v10.27.0 // indirect
-	github.com/go-resty/resty/v2 v2.16.5 // indirect
 	github.com/goccy/go-json v0.10.2 // indirect
 	github.com/goccy/go-yaml v1.18.0 // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
