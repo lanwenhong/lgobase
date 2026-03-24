@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"log/slog"
 	"os"
 	"path"
 	"time"
@@ -14,20 +15,6 @@ import (
 )
 
 var (
-	/*infoStr      = "%s [INFO] call_at=%s|"
-	warnStr      = "%s [WARN] call_at=%s|"
-	errStr       = "%s [ERROR] call_at=%s|"
-	traceStr     = "%s [INFO] call_at=%s|time=%.3fms|rows=%v|%s"
-	traceWarnStr = "%s [WARN] call_at=%s|%s|time=%.3fms|rows=%v|%s"
-	traceErrStr  = "%s [ERROR] call_at=%s|%s|time=%.3fms|rows=%v|%s"
-
-	infoStr_no_trace      = "[INFO] call_at=%s|"
-	warnStr_no_trace      = "[WARN] call_at=%s|"
-	errStr_no_trace       = "[ERROR] call_at=%s|"
-	traceStr_no_trace     = "[INFO] call_at=%s|time=%.3fms|rows=%v|%s"
-	traceWarnStr_no_trace = "[WARN] call_at=%s|%s|time=%.3fms|rows=%v|%s"
-	traceErrStr_no_trace  = "[ERROR] call_at=%s|%s|time=%.3fms|rows=%v|%s"*/
-
 	infoStr      = "%s %s [INFO] "
 	warnStr      = "%s %s [WARN] "
 	errStr       = "%s %s [ERROR] "
@@ -43,15 +30,11 @@ var (
 	traceErrStr_no_trace  = "%s [ERROR] %s|time=%.3fms|rows=%v|%s"
 )
 
-type Writer interface {
-	Printf(string, ...interface{})
-	Output(calldepth int, s string) error
-}
-
 type MyDBlogger struct {
 	//Logobj *FILE
 	glog *Glog
-	Writer
+	//Writer
+	Writer *slog.Logger
 	dlog.Config
 	infoStr, warnStr, errStr            string
 	traceStr, traceErrStr, traceWarnStr string
@@ -82,62 +65,6 @@ func FileWithShortLineNumV2(fullPathWithLine string) string {
 }
 
 func New(glog *Glog, config dlog.Config) dlog.Interface {
-
-	if config.Colorful {
-		//infoStr = dlog.Green + "%s\n" + dlog.Reset + dlog.Green + "[info] " + dlog.Reset
-		//infoStr = dlog.Green + "%s [INFO] " + "call_at=%s" + "|" + dlog.Reset
-		infoStr = dlog.Green + "%s " + "%s [INFO] " + dlog.Reset
-
-		//warnStr = dlog.BlueBold + "%s\n" + dlog.Reset + dlog.Magenta + "[warn] " + dlog.Reset
-		//warnStr = dlog.BlueBold + "%s" + dlog.Reset + dlog.Magenta + " [warn] " + dlog.Reset
-		//warnStr = dlog.Yellow + "%s [WARN] " + "call_at=%s" + "|" + dlog.Reset
-		warnStr = dlog.Yellow + "%s " + "%s [WARN] " + dlog.Reset
-
-		//errStr = dlog.Magenta + "%s\n" + dlog.Reset + dlog.Red + "[error] " + dlog.Reset
-		//errStr = dlog.Red + "%s [ERROR] " + "call_at=%s" + "|" + dlog.Reset
-		errStr = dlog.Red + "%s " + "%s [ERROR] " + dlog.Reset
-
-		//traceStr = dlog.Green + "%s\n" + dlog.Reset + dlog.Yellow + "[%.3fms] " + dlog.BlueBold + "[rows:%v]" + dlog.Reset + " %s"
-		//traceStr = dlog.Green + "call_at=%s" + " [info] " + "time=%.3fms" + "|" + "rows=%v" + "|%s" + dlog.Reset
-		//traceStr = dlog.Green + "%s [INFO] " + "call_at=%s" + "|" + "time=%.3fms" + "|" + "rows=%v" + "|%s" + dlog.Reset
-		traceStr = dlog.Green + "%s " + "%s [INFO] " + "time=%.3fms" + "|" + "rows=%v" + "|%s" + dlog.Reset
-
-		//traceWarnStr = dlog.Yellow + "call_at=%s" + " [warn] " + "%s" + "|" + "time=%.3fms" + "|" + "rows=%v" + "|" + "%s" + dlog.Reset
-		//traceWarnStr = dlog.Yellow + "%s [WARN] " + "call_at=%s" + "|" + "%s" + "|" + "time=%.3fms" + "|" + "rows=%v" + "|" + "%s" + dlog.Reset
-		traceWarnStr = dlog.Yellow + "%s " + "%s [WARN] " + "%s" + "|" + "time=%.3fms" + "|" + "rows=%v" + "|" + "%s" + dlog.Reset
-
-		//traceErrStr = dlog.RedBold + "%s " + dlog.MagentaBold + "%s\n" + dlog.Reset + dlog.Yellow + "[%.3fms] " + dlog.BlueBold + "[rows:%v]" + dlog.Reset + " %s"
-		//traceErrStr = dlog.RedBold + "call_at=%s" + " [error] " + "%s" + "|" + "time=%.3fms" + "|" + "rows=%v" + "|" + "%s" + dlog.Reset
-		//traceErrStr = dlog.RedBold + "%s [ERROR] " + "call_at=%s" + "|" + "%s" + "|" + "time=%.3fms" + "|" + "rows=%v" + "|" + "%s" + dlog.Reset
-		traceErrStr = dlog.RedBold + "%s " + "%s [ERROR] " + "%s" + "|" + "time=%.3fms" + "|" + "rows=%v" + "|" + "%s" + dlog.Reset
-
-		//infoStr_no_trace = dlog.Green + "[INFO] " + "call_at=%s" + "|" + dlog.Reset
-		infoStr_no_trace = dlog.Green + "%s " + "[INFO] " + dlog.Reset
-
-		//warnStr = dlog.BlueBold + "%s\n" + dlog.Reset + dlog.Magenta + "[warn] " + dlog.Reset
-		//warnStr = dlog.BlueBold + "%s" + dlog.Reset + dlog.Magenta + " [warn] " + dlog.Reset
-		//warnStr_no_trace = dlog.Yellow + "[WARN] " + "call_at=%s" + "|" + dlog.Reset
-		warnStr_no_trace = dlog.Yellow + "%s " + "[WARN] " + dlog.Reset
-
-		//errStr = dlog.Magenta + "%s\n" + dlog.Reset + dlog.Red + "[error] " + dlog.Reset
-		//errStr_no_trace = dlog.Red + "[ERROR] " + "call_at=%s" + "|" + dlog.Reset
-		errStr_no_trace = dlog.Red + "%s " + "[ERROR] " + dlog.Reset
-
-		//traceStr = dlog.Green + "%s\n" + dlog.Reset + dlog.Yellow + "[%.3fms] " + dlog.BlueBold + "[rows:%v]" + dlog.Reset + " %s"
-		//traceStr = dlog.Green + "call_at=%s" + " [info] " + "time=%.3fms" + "|" + "rows=%v" + "|%s" + dlog.Reset
-		//traceStr_no_trace = dlog.Green + "[INFO] " + "call_at=%s" + "|" + "time=%.3fms" + "|" + "rows=%v" + "|%s" + dlog.Reset
-		traceStr_no_trace = dlog.Green + "%s " + "[INFO] " + "time=%.3fms" + "|" + "rows=%v" + "|%s" + dlog.Reset
-
-		//traceWarnStr = dlog.Yellow + "call_at=%s" + " [warn] " + "%s" + "|" + "time=%.3fms" + "|" + "rows=%v" + "|" + "%s" + dlog.Reset
-		//traceWarnStr_no_trace = dlog.Yellow + "[WARN] " + "call_at=%s" + "|" + "%s" + "|" + "time=%.3fms" + "|" + "rows=%v" + "|" + "%s" + dlog.Reset
-		traceWarnStr_no_trace = dlog.Yellow + "%s " + "[WARN] " + "%s" + "|" + "time=%.3fms" + "|" + "rows=%v" + "|" + "%s" + dlog.Reset
-
-		//traceErrStr = dlog.RedBold + "%s " + dlog.MagentaBold + "%s\n" + dlog.Reset + dlog.Yellow + "[%.3fms] " + dlog.BlueBold + "[rows:%v]" + dlog.Reset + " %s"
-		//traceErrStr = dlog.RedBold + "call_at=%s" + " [error] " + "%s" + "|" + "time=%.3fms" + "|" + "rows=%v" + "|" + "%s" + dlog.Reset
-		//traceErrStr_no_trace = dlog.RedBold + "[ERROR] " + "call_at=%s" + "|" + "%s" + "|" + "time=%.3fms" + "|" + "rows=%v" + "|" + "%s" + dlog.Reset
-		traceErrStr_no_trace = dlog.RedBold + "%s " + "[ERROR] " + "%s" + "|" + "time=%.3fms" + "|" + "rows=%v" + "|" + "%s" + dlog.Reset
-
-	}
 	if glog != nil && glog.LogObj != nil {
 		return &MyDBlogger{
 			glog:         glog,
@@ -151,9 +78,11 @@ func New(glog *Glog, config dlog.Config) dlog.Interface {
 			traceErrStr:  traceErrStr,
 		}
 	} else {
+		w := NewCustomLogger(os.Stdout, glog.LogObj.logfile, nil, log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile)
+		slog.SetDefault(w)
 		return &MyDBlogger{
 			glog:         nil,
-			Writer:       log.New(os.Stdout, "", log.LstdFlags|log.Lmicroseconds|log.Lshortfile),
+			Writer:       w,
 			Config:       config,
 			infoStr:      infoStr,
 			warnStr:      warnStr,
@@ -177,109 +106,53 @@ func (l *MyDBlogger) LogMode(level dlog.LogLevel) dlog.Interface {
 }
 
 func (l MyDBlogger) Info(ctx context.Context, msg string, data ...interface{}) {
+	//cmd := []interface{}{}
 	srcFileLineNum := FileWithShortLineNumV2(utils.FileWithLineNum())
-	l.glog.GetLogger().SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
-
-	trace_id := getIdsInLog(ctx)
-	cmd := []interface{}{}
-	cmd = append(cmd, srcFileLineNum)
-	if trace_id != "" {
-		cmd = append(cmd, trace_id)
-	} else {
-		l.infoStr = infoStr_no_trace
-	}
-
-	//cmd = append(cmd, FileWithShortLineNumV2())
-	cmd = append(cmd, data...)
+	data = append(data, "call_line")
+	data = append(data, srcFileLineNum)
 	if l.glog != nil && l.glog.LogObj != nil {
 		l.glog.fileCheck()
 	}
-
 	if l.LogLevel >= dlog.Info {
-		if l.Config.Colorful {
-			l.Printf(l.infoStr+dlog.Green+msg+dlog.Reset, cmd...)
-		} else {
-			l.Printf(l.infoStr+msg, cmd...)
-		}
+		slog.Default().InfoContext(ctx, msg, data...)
 	}
 
-	l.glog.GetLogger().SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile)
 }
 
 func (l MyDBlogger) Warn(ctx context.Context, msg string, data ...interface{}) {
 	srcFileLineNum := FileWithShortLineNumV2(utils.FileWithLineNum())
-	l.glog.GetLogger().SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
-
-	trace_id := getIdsInLog(ctx)
-	cmd := []interface{}{}
-	cmd = append(cmd, srcFileLineNum)
-
-	if trace_id != "" {
-		cmd = append(cmd, trace_id)
-	} else {
-		l.warnStr = warnStr_no_trace
-	}
-
-	//cmd = append(cmd, utils.FileWithLineNum())
-	cmd = append(cmd, data...)
+	data = append(data, "call_line")
+	data = append(data, srcFileLineNum)
 
 	if l.glog != nil && l.glog.LogObj != nil {
 		l.glog.fileCheck()
 	}
 	if l.LogLevel >= dlog.Warn {
 		if l.Config.Colorful {
-			l.Printf(l.warnStr+dlog.Yellow+msg+dlog.Reset, cmd...)
+			slog.Default().WarnContext(ctx, msg, data...)
 		} else {
-			l.Printf(l.warnStr+msg, cmd...)
+			slog.Default().WarnContext(ctx, msg, data...)
 		}
 	}
-	l.glog.GetLogger().SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile)
 }
 
 func (l MyDBlogger) Error(ctx context.Context, msg string, data ...interface{}) {
 	srcFileLineNum := FileWithShortLineNumV2(utils.FileWithLineNum())
-	l.glog.GetLogger().SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
-
-	trace_id := getIdsInLog(ctx)
-	cmd := []interface{}{}
-	cmd = append(cmd, srcFileLineNum)
-
-	if trace_id != "" {
-		cmd = append(cmd, trace_id)
-	} else {
-		l.errStr = errStr_no_trace
-	}
-
-	//cmd = append(cmd, utils.FileWithLineNum())
-	cmd = append(cmd, data...)
-
+	data = append(data, "call_line")
+	data = append(data, srcFileLineNum)
 	if l.glog != nil && l.glog.LogObj != nil {
 		l.glog.fileCheck()
 	}
 	if l.LogLevel >= dlog.Error {
 		if l.Config.Colorful {
-			l.Printf(l.errStr+dlog.Red+msg+dlog.Reset, cmd...)
+			slog.Default().ErrorContext(ctx, msg, data...)
 		} else {
-			l.Printf(l.errStr+msg, cmd...)
+			slog.Default().ErrorContext(ctx, msg, data...)
 		}
 	}
-	l.glog.GetLogger().SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile)
 }
 
 func (l MyDBlogger) Trace(ctx context.Context, begin time.Time, fc func() (string, int64), err error) {
-	srcFileLineNum := FileWithShortLineNumV2(utils.FileWithLineNum())
-	l.glog.GetLogger().SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
-	trace_id := getIdsInLog(ctx)
-	v := make([]interface{}, 0, 100)
-	v = append(v, srcFileLineNum)
-	if trace_id == "" {
-		l.traceStr = traceStr_no_trace
-		l.traceWarnStr = traceWarnStr_no_trace
-		l.traceErrStr = traceErrStr_no_trace
-	} else {
-		v = append(v, trace_id)
-	}
-
 	if l.glog != nil && l.glog.LogObj != nil {
 		l.fileCheck()
 	}
@@ -291,46 +164,14 @@ func (l MyDBlogger) Trace(ctx context.Context, begin time.Time, fc func() (strin
 	switch {
 	case err != nil && l.LogLevel >= dlog.Error && (!errors.Is(err, dlog.ErrRecordNotFound) || !l.IgnoreRecordNotFoundError):
 		sql, rows := fc()
-		//v = append(v, utils.FileWithLineNum())
-		v = append(v, err)
-		v = append(v, float64(elapsed.Nanoseconds())/1e6)
-		if rows == -1 {
-			v = append(v, "-")
-			v = append(v, sql)
-			l.Printf(l.traceErrStr, v...)
-		} else {
-			v = append(v, rows)
-			v = append(v, sql)
-			l.Printf(l.traceErrStr, v...)
-		}
+		slog.Default().ErrorContext(ctx, "SQLERRLOG", "sql", sql, "time", float64(elapsed.Nanoseconds())/1e6, "rows", rows, "err", err, "call_line", FileWithShortLineNumV2(utils.FileWithLineNum()))
+
 	case elapsed > l.SlowThreshold && l.SlowThreshold != 0 && l.LogLevel >= dlog.Warn:
 		sql, rows := fc()
 		slowLog := fmt.Sprintf("SLOW SQL >= %v", l.SlowThreshold)
-		//v = append(v, utils.FileWithLineNum())
-		v = append(v, slowLog)
-		v = append(v, float64(elapsed.Nanoseconds())/1e6)
-		if rows == -1 {
-			v = append(v, "-")
-			v = append(v, sql)
-			l.Printf(l.traceWarnStr, v...)
-		} else {
-			v = append(v, rows)
-			v = append(v, sql)
-			l.Printf(l.traceWarnStr, v...)
-		}
+		slog.Default().WarnContext(ctx, "SQLSLOWLOG", "slowlog", slowLog, "rows", rows, "sql", sql, "time", float64(elapsed.Nanoseconds())/1e6, "call_line", FileWithShortLineNumV2(utils.FileWithLineNum()))
 	case l.LogLevel == dlog.Info:
 		sql, rows := fc()
-		//v = append(v, utils.FileWithLineNum())
-		v = append(v, float64(elapsed.Nanoseconds())/1e6)
-		if rows == -1 {
-			v = append(v, "-")
-			v = append(v, sql)
-			l.Printf(l.traceStr, v...)
-		} else {
-			v = append(v, rows)
-			v = append(v, sql)
-			l.Printf(l.traceStr, v...)
-		}
+		slog.Default().InfoContext(ctx, "SQLLOG", "rows", rows, "sql", sql, "time", float64(elapsed.Nanoseconds())/1e6, "call_line", FileWithShortLineNumV2(utils.FileWithLineNum()))
 	}
-	l.glog.GetLogger().SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile)
 }
