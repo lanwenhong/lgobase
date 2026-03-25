@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/lanwenhong/lgobase/gpool"
@@ -22,7 +24,9 @@ func (sh *SvrHandler) Add(ctx context.Context, a int32, b int32) (int32, error) 
 	//logger.Debugf(ctx, "Rp: %p rquestID: %s", sh.Rp, rid)
 	//ctx = context.WithValue(ctx, "trace_id", util.NewRequestID())
 	c := a + b
-	logger.Debugf(ctx, "c: %d", c)
+	//logger.Debugf(ctx, "c: %d", c)
+	starttime := time.Now()
+	logger.Debug(ctx, "AddServer", "func", "Add", "ret", c, "time", fmt.Sprintf("%v", time.Since(starttime)))
 	//time.Sleep(2 * time.Second)
 	return c, nil
 }
@@ -60,7 +64,7 @@ func main() {
 		Stdout:       true,
 		Colorful:     true,
 		Loglevel:     logger.DEBUG,
-		CtxValueKey:  "trace_id,request_id",
+		CtxValueKey:  "trace_id,request_id,client_service",
 	}
 	logger.Newglog("./", "add.log", "add.log.err", myconf)
 

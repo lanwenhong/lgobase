@@ -68,6 +68,7 @@ func TestAdd1(t *testing.T) {
 				}
 				ctx := context.WithValue(ctx, "request_id", util.NewRequestID())
 				nctx := gpool.NewExtContext(ctx)
+				nctx = nctx.SetReqExtData(ctx, "client_service", "testAdd")
 				//nctx = nctx.SetReqExtData(nctx, "request_id", util.NewRequestID())
 				//addPool.ThriftExtCall(nctx, process)
 				addPool.ThriftWithTimeOutExtCall(nctx, 1*time.Second, process)

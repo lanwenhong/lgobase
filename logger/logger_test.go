@@ -207,7 +207,7 @@ func TestLogRatate(t *testing.T) {
 	db_conf := dbenc.DbConfNew(ctx, "../dbpool/db.ini")
 	dbs := dbpool.DbpoolNew(db_conf)
 	//dbs.SetormLog(ctx, db_conf)
-	tk := "qfconf://usercenter?maxopen=1000&maxidle=30"
+	tk := "qfconf://test1?maxopen=1000&maxidle=30"
 	err := dbs.Add(ctx, "usercenter", tk, dbpool.USE_GORM)
 	if err != nil {
 		t.Fatal(err)
@@ -234,14 +234,14 @@ func TestLogRatate(t *testing.T) {
 }
 
 func TestLogDebug(t *testing.T) {
-	/*myconf := &logger.Glogconf{
+	myconf := &logger.Glogconf{
 		RotateMethod: logger.ROTATE_FILE_DAILY,
 		Colorful:     true,
 		Stdout:       true,
 		Loglevel:     logger.DEBUG,
 		//Format:       logger.TEXT_FORMAT,
 	}
-	logger.Newglog("./", "test.log", "test.log.err", myconf)*/
+	logger.Newglog("./", "test.log", "test.log.err", myconf)
 	ctx := context.WithValue(context.Background(), "trace_id", NewRequestID())
 	//ctx := context.Background()
 	logger.Debug(ctx, "test", "userid", 1, "userid2", 2)
@@ -255,5 +255,7 @@ func TestLogDebug(t *testing.T) {
 
 	//logger.Error(ctx, "liushishi", "jujingyi", 111, 2, 3)
 	logger.Errorf(ctx, "%s %s %d %d %d", "liushishi", "jujingyi", 111, 2, 3)
+
+	logger.Debugf(ctx, "ddddddd")
 
 }

@@ -138,7 +138,7 @@ func NewDefaultGLog() (res *Glog) {
 			Stdout:      true,
 			Colorful:    true,
 			Loglevel:    DEBUG,
-			CtxValueKey: "trace_id,request_id",
+			CtxValueKey: "trace_id,request_id,client_service",
 		},
 		LogormConf: &dlog.Config{
 			SlowThreshold:             time.Second,
@@ -169,7 +169,7 @@ func Newglog(fileDir string, fileName string, fileNameErr string, glog_conf *Glo
 		dconfig.LogLevel = dlog.Error
 	}
 	if glog_conf.CtxValueKey == "" {
-		glog_conf.CtxValueKey = "trace_id,request_id"
+		glog_conf.CtxValueKey = "trace_id,request_id,client_service"
 	}
 	glog := &Glog{
 		Logconf:    glog_conf,
@@ -345,8 +345,8 @@ func Debugf(ctx context.Context, fmtstr string, v ...interface{}) {
 	}
 }
 
-func Info(ctx context.Context, v ...interface{}) {
-	slog.Default().InfoContext(ctx, "info log", v...)
+func Info(ctx context.Context, msg string, v ...interface{}) {
+	slog.Default().InfoContext(ctx, msg, v...)
 }
 
 func Infof(ctx context.Context, fmtstr string, v ...interface{}) {
@@ -367,8 +367,8 @@ func Infof(ctx context.Context, fmtstr string, v ...interface{}) {
 	}
 }
 
-func Warn(ctx context.Context, v ...interface{}) {
-	slog.Default().WarnContext(ctx, "warn log", v...)
+func Warn(ctx context.Context, msg string, v ...interface{}) {
+	slog.Default().WarnContext(ctx, msg, v...)
 
 }
 
@@ -392,8 +392,8 @@ func Warnf(ctx context.Context, fmtstr string, v ...interface{}) {
 
 }
 
-func Error(ctx context.Context, v ...interface{}) {
-	slog.Default().ErrorContext(ctx, "error log", v...)
+func Error(ctx context.Context, msg string, v ...interface{}) {
+	slog.Default().ErrorContext(ctx, msg, v...)
 
 }
 

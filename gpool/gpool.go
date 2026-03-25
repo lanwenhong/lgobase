@@ -430,8 +430,10 @@ func (gp *Gpool[T]) ThriftCall2(ctx context.Context, process func(client interfa
 			errStr = rpc_err.Error()
 		}
 		address := gp.Addr
-		logger.Infof(ctx, "func=ThriftCall2|method=%v|addr=%s:%d|time=%v|err=%s",
-			rpc_name, address, gp.TimeOut, time.Since(starttime), errStr)
+		//logger.Infof(ctx, "func=ThriftCall2|method=%v|addr=%s:%d|time=%v|err=%s",
+		//rpc_name, address, gp.TimeOut, time.Since(starttime), errStr)
+		//logger.Info(ctx, "gpool", "func", "ThriftCall2", "method", rpc_name, "addr", fmt.Sprintf("%s:%d", address, gp.TimeOut), "time", time.Since(starttime), "err", errStr)
+		logger.Info(ctx, "gpool", "func", "ThriftCall2", "method", rpc_name, "addr", fmt.Sprintf("%s:%d", address, gp.TimeOut), "time", fmt.Sprintf("%v", time.Since(starttime)), "err", errStr)
 	}()
 
 	pc, err := gp.Get(ctx)
@@ -477,8 +479,10 @@ func (gp *Gpool[T]) ThriftWithTimeOutCall2(ctx context.Context, timeout time.Dur
 			errStr = rpc_err.Error()
 		}
 		address := gp.Addr
-		logger.Infof(ctx, "func=ThriftCall2|method=%v|addr=%s:%d|time=%v|err=%s",
-			rpc_name, address, gp.TimeOut, time.Since(starttime), errStr)
+		//logger.Infof(ctx, "func=ThriftCall2|method=%v|addr=%s:%d|time=%v|err=%s",
+		//rpc_name, address, gp.TimeOut, time.Since(starttime), errStr)
+		logger.Info(ctx, "gpool", "func", "ThriftCall2", "method", rpc_name, "addr", fmt.Sprintf("%s:%d", address, gp.TimeOut), "time", fmt.Sprintf("%v", time.Since(starttime)), "err", errStr)
+
 	}()
 
 	pc, err := gp.Get(ctx)
@@ -528,8 +532,11 @@ func (gp *Gpool[T]) ThriftExtCall2(ctx context.Context, process func(ctx context
 		//nCtx := ctx.(*ExtContext)
 		//rid := nCtx.GetReqExtData("request_id")
 		address := gp.Addr
-		logger.Infof(ctx, "func=ThriftCall2|method=%v|addr=%s:%d|time=%v|err=%s",
-			rpc_name, address, gp.TimeOut, time.Since(starttime), errStr)
+		//logger.Infof(ctx, "func=ThriftCall2|method=%v|addr=%s:%d|time=%v|err=%s",
+		//rpc_name, address, gp.TimeOut, time.Since(starttime), errStr)
+		//logger.Info(ctx, "gpool", "func", "ThriftCall2", "method", rpc_name, "addr", fmt.Sprintf("%s:%d", address, gp.TimeOut), "time", time.Since(starttime), "err", errStr)
+		logger.Info(ctx, "gpool", "func", "ThriftCall2", "method", rpc_name, "addr", fmt.Sprintf("%s:%d", address, gp.TimeOut), "time", fmt.Sprintf("%v", time.Since(starttime)), "err", errStr)
+
 	}()
 
 	pc, err := gp.Get(ctx)
@@ -578,8 +585,9 @@ func (gp *Gpool[T]) ThriftWithTimeOutExtCall2(ctx context.Context, timeout time.
 		//nCtx := ctx.(*ExtContext)
 		//rid := nCtx.GetReqExtData("request_id")
 		address := gp.Addr
-		logger.Infof(ctx, "func=ThriftCall2|method=%v|addr=%s:%d|time=%v|err=%s",
-			rpc_name, address, gp.TimeOut, time.Since(starttime), errStr)
+		//logger.Infof(ctx, "func=ThriftCall2|method=%v|addr=%s:%d|time=%v|err=%s",
+		//rpc_name, address, gp.TimeOut, time.Since(starttime), errStr)
+		logger.Info(ctx, "gpool", "func", "ThriftCall2", "method", rpc_name, "addr", fmt.Sprintf("%s:%d", address, gp.TimeOut), "time", fmt.Sprintf("%v", time.Since(starttime)), "err", errStr)
 	}()
 
 	pc, err := gp.Get(ctx)
