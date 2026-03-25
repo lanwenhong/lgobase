@@ -234,14 +234,14 @@ func TestLogRatate(t *testing.T) {
 }
 
 func TestLogDebug(t *testing.T) {
-	myconf := &logger.Glogconf{
+	/*myconf := &logger.Glogconf{
 		RotateMethod: logger.ROTATE_FILE_DAILY,
 		Colorful:     true,
 		Stdout:       true,
 		Loglevel:     logger.DEBUG,
 		//Format:       logger.TEXT_FORMAT,
-	}
-	logger.Newglog("./", "test.log", "test.log.err", myconf)
+	}*/
+	//logger.Newglog("./", "test.log", "test.log.err", myconf)
 	ctx := context.WithValue(context.Background(), "trace_id", NewRequestID())
 	//ctx := context.Background()
 	logger.Debug(ctx, "test", "userid", 1, "userid2", 2)

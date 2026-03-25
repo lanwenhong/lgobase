@@ -328,14 +328,17 @@ func Debug(ctx context.Context, msg string, v ...any) {
 }
 
 func Debugf(ctx context.Context, fmtstr string, v ...interface{}) {
-	trace_id := getIdsInLog(ctx)
 	p_fmt := ""
 	values := make([]interface{}, 0, 100)
-	if trace_id != "" {
-		p_fmt = "%s [DEBUG] " + fmtstr
-		values = append(values, trace_id)
+	if Gfilelog.Logconf.Format == TEXT_FORMAT {
+		trace_id := getIdsInLog(ctx)
+		if trace_id != "" {
+			values = append(values, trace_id)
+		} else {
+			p_fmt = "[DEBUG] " + fmtstr
+		}
 	} else {
-		p_fmt = "[DEBUG] " + fmtstr
+		p_fmt = fmtstr
 	}
 	if Gfilelog != nil && Gfilelog.LogObj != nil {
 		Gfilelog.fileCheck()
@@ -350,14 +353,18 @@ func Info(ctx context.Context, msg string, v ...interface{}) {
 }
 
 func Infof(ctx context.Context, fmtstr string, v ...interface{}) {
-	trace_id := getIdsInLog(ctx)
 	p_fmt := ""
 	values := make([]interface{}, 0, 100)
-	if trace_id != "" {
-		p_fmt = "%s [INFO] " + fmtstr
-		values = append(values, trace_id)
+	if Gfilelog.Logconf.Format == TEXT_FORMAT {
+		trace_id := getIdsInLog(ctx)
+		if trace_id != "" {
+			p_fmt = "%s [INFO] " + fmtstr
+			values = append(values, trace_id)
+		} else {
+			p_fmt = "[INFO] " + fmtstr
+		}
 	} else {
-		p_fmt = "[INFO] " + fmtstr
+		p_fmt = fmtstr
 	}
 	if Gfilelog != nil && Gfilelog.LogObj != nil {
 		Gfilelog.fileCheck()
@@ -376,11 +383,15 @@ func Warnf(ctx context.Context, fmtstr string, v ...interface{}) {
 	trace_id := getIdsInLog(ctx)
 	p_fmt := ""
 	values := make([]interface{}, 0, 100)
-	if trace_id != "" {
-		p_fmt = "%s [WARN] " + fmtstr
-		values = append(values, trace_id)
+	if Gfilelog.Logconf.Format == TEXT_FORMAT {
+		if trace_id != "" {
+			p_fmt = "%s [WARN] " + fmtstr
+			values = append(values, trace_id)
+		} else {
+			p_fmt = "[WARN] " + fmtstr
+		}
 	} else {
-		p_fmt = "[WARN] " + fmtstr
+		p_fmt = fmtstr
 	}
 
 	if Gfilelog != nil && Gfilelog.LogObj != nil {
@@ -401,13 +412,17 @@ func Errorf(ctx context.Context, fmtstr string, v ...interface{}) {
 	trace_id := getIdsInLog(ctx)
 	p_fmt := ""
 	values := make([]interface{}, 0, 100)
-	if trace_id != "" {
-		p_fmt = "%s [ERROR] " + fmtstr
-		values = append(values, trace_id)
-	} else {
-		p_fmt = "[ERROR] " + fmtstr
-	}
 
+	if Gfilelog.Logconf.Format == TEXT_FORMAT {
+		if trace_id != "" {
+			p_fmt = "%s [ERROR] " + fmtstr
+			values = append(values, trace_id)
+		} else {
+			p_fmt = "[ERROR] " + fmtstr
+		}
+	} else {
+		p_fmt = fmtstr
+	}
 	if Gfilelog != nil && Gfilelog.LogObj != nil {
 		Gfilelog.fileCheck()
 		if Gfilelog.Logconf.Loglevel <= ERROR {

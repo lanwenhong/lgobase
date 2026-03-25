@@ -55,7 +55,7 @@ func NewHttpClient(transport *http.Transport) *resty.Client {
 		costTime := resp.Time()
 		//logger.Infof(ctx, "recv|method=%s|url=%s|code=%d|ret=%s|time=%dms", resp.Request.Method, resp.Request.URL, resp.StatusCode(), resp.String(), costTime.Milliseconds())
 		logger.Info(ctx, "HttpClient", "func", "recv", "method", resp.Request.Method, "url", resp.Request.URL,
-			"code", resp.StatusCode(), "ret", resp.String(), "time", fmt.Sprintf("%dms", costTime.Milliseconds()))
+			"code", resp.StatusCode(), "ret", resp.String(), "cost", fmt.Sprintf("%dms", costTime.Milliseconds()))
 		return nil
 	})
 	return client
