@@ -34,8 +34,8 @@ func TestAdd1(t *testing.T) {
 		//Cfunc: gpool.CreateThriftBufferConn[server.ServerTestClient],
 		Nc:              server.NewServerTestClientFactory,
 		MaxConnLife:     500,
-		MaxIdleConnLife: 5,
-		MaxConns:        10,
+		MaxIdleConnLife: 50,
+		MaxConns:        300,
 		MaxIdleConns:    5,
 	}
 	addPool := gpool.NewRpcPoolSelector[server.ServerTestClient](ctx, g_conf)
