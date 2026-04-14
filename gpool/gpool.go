@@ -171,8 +171,8 @@ func (gp *Gpool[T]) getConnFromFreeList(ctx context.Context) (*PoolConn[T], erro
 		// if reterr != nil {
 		// 	logger.Warnf(ctx, "open err %s", reterr.Error())
 		// }
-
-		logger.Infof(ctx, "func=reopen|pc=%p|ctime=%d|idle=%d|connNow=%d|MaxConnLife=%d|MaxIdleConnLife=%d", pc, pc.Ctime, pc.IdleTime, connNow, gp.MaxConnLife, gp.MaxIdleConnLife)
+		//logger.Infof(ctx, "func=reopen|pc=%p|ctime=%d|idle=%d|connNow=%d|MaxConnLife=%d|MaxIdleConnLife=%d", pc, pc.Ctime, pc.IdleTime, connNow, gp.MaxConnLife, gp.MaxIdleConnLife)
+		logger.Info(ctx, "gpool", "func", "reopen", "ctime", pc.Ctime, "idle", pc.IdleTime, "connNow", connNow, "MaxConnLife", gp.MaxConnLife, "MaxIdleConnLife", gp.MaxIdleConnLife)
 		pc.Gc.Close()
 		gp.FreeList.Remove(e)
 		//connNew, err := gp.getConnFromNew(ctx)
@@ -182,9 +182,9 @@ func (gp *Gpool[T]) getConnFromFreeList(ctx context.Context) (*PoolConn[T], erro
 	gp.FreeList.Remove(e)
 	e.Value.(*PoolConn[T]).e = gp.UseList.PushBack(e.Value)
 	logger.Debugf(ctx, "after get flist len %d ulist len %d", gp.FreeList.Len(), gp.UseList.Len())
-	logger.Infof(ctx, "func=getConnFromFreeList|pc=%p|ctime=%d|idle=%d|usedTime=%d|idleTime=%d",
-		pc, pc.Ctime, pc.IdleTime, int64(connNow)-int64(pc.Ctime), int64(connNow)-int64(pc.IdleTime))
-	//return e.Value.(*PoolConn[T]), reterr
+	//logger.Infof(ctx, "func=getConnFromFreeList|pc=%p|ctime=%d|idle=%d|usedTime=%d|idleTime=%d",
+	//pc, pc.Ctime, pc.IdleTime, int64(connNow)-int64(pc.Ctime), int64(connNow)-int64(pc.IdleTime))
+	logger.Info(ctx, "gpool", "func", "getConnFromFreeList", "ctime", pc.Ctime, "idle", pc.IdleTime, "usedTime", int64(connNow)-int64(pc.Ctime), "idleTime", int64(connNow)-int64(pc.IdleTime))
 	return pc, reterr
 }
 
@@ -208,7 +208,8 @@ func (gp *Gpool[T]) getConnFromNew(ctx context.Context) (*PoolConn[T], error) {
 		pc = nil
 	}
 	if pc != nil {
-		logger.Infof(ctx, "func=getConnFromNew|pc=%p|ctime=%d|usedTime=0", pc, pc.Ctime)
+		//logger.Infof(ctx, "func=getConnFromNew|pc=%p|ctime=%d|usedTime=0", pc, pc.Ctime)
+		logger.Info(ctx, "gpool", "func", "getConnFromNew", "ctime", pc.Ctime, "usedTime", 0)
 	}
 	return pc, err
 }
