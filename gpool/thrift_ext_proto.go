@@ -239,11 +239,7 @@ func (p *ExtProcessor) Process(ctx context.Context, in, out thrift.TProtocol) (b
 			if errRM.(thrift.TProtocolException).TypeId() == thrift.END_OF_FILE {
 				return false, thrift.NewTTransportException(thrift.END_OF_FILE, "connection closed (EOF)")
 			} else {
-				if errRM.(thrift.TProtocolException).TypeId() != thrift.TIMED_OUT {
-					logger.Warnf(ctx, "read preBuf: %v", errRM)
-				} else {
-					logger.Debugf(ctx, "read preBuf: %v", errRM)
-				}
+				logger.Warnf(ctx, "read preBuf: %v", errRM)
 				return false, thrift.NewTTransportException(thrift.INVALID_DATA, "invalid data")
 			}
 		}
