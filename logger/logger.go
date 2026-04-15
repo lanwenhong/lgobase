@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -13,21 +14,6 @@ import (
 	"time"
 
 	dlog "gorm.io/gorm/logger"
-)
-
-const (
-	Reset       = "\033[0m"
-	Red         = "\033[31m"
-	Green       = "\033[32m"
-	Yellow      = "\033[33m"
-	Blue        = "\033[34m"
-	Magenta     = "\033[35m"
-	Cyan        = "\033[36m"
-	White       = "\033[37m"
-	BlueBold    = "\033[34;1m"
-	MagentaBold = "\033[35;1m"
-	RedBold     = "\033[31;1m"
-	YellowBold  = "\033[33;1m"
 )
 
 const (
@@ -43,8 +29,6 @@ var maxFileCount int32
 var dailyRolling bool = true
 var consoleAppender bool = true
 var RollingFile bool = false
-
-//var LogObj *FILE = nil
 
 const DATEFORMAT = "2006-01-02"
 
@@ -77,10 +61,9 @@ type FILE struct {
 	Ldate        *time.Time
 	mu           *sync.RWMutex
 	logfile      *os.File
-	lg           *log.Logger
+	lg           *slog.Logger
 
 	logfile_err *os.File
-	lg_err      *log.Logger
 }
 
 type Glogconf struct {
@@ -97,6 +80,7 @@ type Glogconf struct {
 	Goid        bool
 	Loglevel    LEVEL
 	CtxValueKey string
+	Format      int
 }
 
 type Glog struct {
@@ -140,16 +124,21 @@ func GetstrGoid() string {
 // NewDefaultGLog
 // 生成默认的日志配置
 func NewDefaultGLog() (res *Glog) {
+
+	originalHandler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		AddSource: false, // 关闭官方长路径
+		Level:     slog.LevelDebug,
+	})
 	res = &Glog{
 		LogObj: &FILE{
-			lg: log.New(os.Stdout, "", log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile),
+			lg: slog.New(NewMyModifyHandler(os.Stdout, nil, nil, originalHandler)),
 		},
 		Logconf: &Glogconf{
 			RollingFile: false,
 			Stdout:      true,
 			Colorful:    true,
 			Loglevel:    DEBUG,
-			CtxValueKey: "trace_id,request_id",
+			CtxValueKey: "trace_id,request_id,client_service",
 		},
 		LogormConf: &dlog.Config{
 			SlowThreshold:             time.Second,
@@ -160,6 +149,7 @@ func NewDefaultGLog() (res *Glog) {
 	}
 	res.LogTags = strings.Split(res.Logconf.CtxValueKey, ",")
 	res.SetRollingFile("", "", true)
+	slog.SetDefault(res.LogObj.lg)
 	return
 }
 
@@ -179,7 +169,7 @@ func Newglog(fileDir string, fileName string, fileNameErr string, glog_conf *Glo
 		dconfig.LogLevel = dlog.Error
 	}
 	if glog_conf.CtxValueKey == "" {
-		glog_conf.CtxValueKey = "trace_id,request_id"
+		glog_conf.CtxValueKey = "trace_id,request_id,client_service"
 	}
 	glog := &Glog{
 		Logconf:    glog_conf,
@@ -189,7 +179,6 @@ func Newglog(fileDir string, fileName string, fileNameErr string, glog_conf *Glo
 		glog.SetRollingFile(fileDir, fileName, glog_conf.Stdout)
 	} else {
 		glog.SetRollingDaily(fileDir, fileName, fileNameErr, glog_conf.Stdout)
-		//glog.SetRollingDaily(fileName, fileNameErr, glog_conf.Stdout)
 	}
 	glog.LogTags = strings.Split(glog.Logconf.CtxValueKey, ",")
 	Gfilelog = glog
@@ -215,15 +204,24 @@ func (glog *Glog) fileMonitor() {
 }
 
 func (glog *Glog) fileCheck() {
-	/*defer func() {
-		if err := recover(); err != nil {
-			log.Println(err)
-		}
-	}()*/
 	if glog.LogObj != nil && glog.isMustRename() {
 		glog.LogObj.mu.Lock()
 		defer glog.LogObj.mu.Unlock()
 		glog.rename()
+	}
+}
+
+func (glog *Glog) setSlog(errFile *os.File) {
+	if glog.Logconf.Format == TEXT_FORMAT {
+		glog.LogObj.lg = NewCustomLogger(os.Stdout, glog.LogObj.logfile, errFile, log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile)
+		slog.SetDefault(glog.LogObj.lg)
+	} else {
+		originalHandler := slog.NewJSONHandler(glog.LogObj.logfile, &slog.HandlerOptions{
+			AddSource: false, // 关闭官方长路径
+			Level:     slog.LevelDebug,
+		})
+		glog.LogObj.lg = slog.New(NewMyModifyHandler(os.Stdout, glog.LogObj.logfile, errFile, originalHandler))
+		slog.SetDefault(glog.LogObj.lg)
 	}
 }
 
@@ -244,8 +242,6 @@ func (glog *Glog) SetRollingFile(fileDir, fileName string, stdout bool) error {
 		builder.WriteString(".")
 		builder.WriteString(strconv.Itoa(i))
 		fName := builder.String()
-
-		//if isExist(fileDir + "/" + fileName + "." + strconv.Itoa(i)) {
 		if isExist(filepath.Join(fileDir, fName)) {
 			glog.LogObj._suffix = i
 		} else {
@@ -255,21 +251,18 @@ func (glog *Glog) SetRollingFile(fileDir, fileName string, stdout bool) error {
 	}
 	if !glog.isMustRename() {
 		if !stdout {
-			//glog.LogObj.logfile, _ = os.OpenFile(fileDir+"/"+fileName, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
 			glog.LogObj.logfile, _ = os.OpenFile(filepath.Join(fileDir, fileName), os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
-			glog.LogObj.lg = log.New(glog.LogObj.logfile, "", log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile)
+			glog.setSlog(nil)
 		} else {
-			glog.LogObj.lg = log.New(os.Stdout, "", log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile)
+			glog.setSlog(nil)
 		}
 	} else {
 		glog.rename()
 	}
-	//go glog.fileMonitor()
-
 	return nil
 }
 
-func (glog *Glog) GetLogger() *log.Logger {
+func (glog *Glog) GetLogger() *slog.Logger {
 	return glog.LogObj.lg
 }
 
@@ -291,15 +284,11 @@ func (glog *Glog) SetRollingDaily(fileDir, fileName, fileName_err string, stdout
 
 	if !glog.isMustRename() {
 		if !stdout {
-			//glog.LogObj.logfile, err = os.OpenFile(fileDir+"/"+fileName, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
 			glog.LogObj.logfile, err = os.OpenFile(filepath.Join(fileDir, fileName), os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
-			glog.LogObj.lg = log.New(glog.LogObj.logfile, "", log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile|log.LstdFlags)
-
-			//glog.LogObj.logfile_err, err = os.OpenFile(fileDir+"/"+fileName_err, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
 			glog.LogObj.logfile_err, err = os.OpenFile(filepath.Join(fileDir, fileName_err), os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
-			glog.LogObj.lg_err = log.New(glog.LogObj.logfile_err, "", log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile|log.LstdFlags)
+			glog.setSlog(glog.LogObj.logfile_err)
 		} else {
-			glog.LogObj.lg = log.New(os.Stdout, "", log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile)
+			glog.setSlog(nil)
 		}
 	} else {
 		glog.rename()
@@ -317,8 +306,6 @@ func getIdsInLog(ctx context.Context) string {
 	var builder strings.Builder
 	builder.Grow(100)
 	trace_id := ""
-	//sks := Gfilelog.Logconf.CtxValueKey
-	//parts := strings.Split(sks, ",")
 	plen := len(Gfilelog.LogTags)
 	for index, k := range Gfilelog.LogTags {
 		if m := ctx.Value(k); m != nil {
@@ -332,281 +319,120 @@ func getIdsInLog(ctx context.Context) string {
 			builder.WriteString(" ")
 		}
 	}
-	/*if m := ctx.Value("trace_id"); m != nil {
-		if value, ok := m.(string); ok {
-			builder.WriteString(value)
-			builder.WriteString(" ")
-		}
-	} else {
-		builder.WriteString("- ")
-	}
-	if m := ctx.Value("request_id"); m != nil {
-		if value, ok := m.(string); ok {
-			builder.WriteString(value)
-		}
-	} else {
-		builder.WriteString("-")
-	}*/
 	trace_id = builder.String()
 	return trace_id
 }
 
-func pDebugWithGid(ctx context.Context, depth int, fmtstr string, v ...interface{}) {
-	trace_id := getIdsInLog(ctx)
-	p_fmt := ""
-	//values := []interface{}{}
-	values := make([]interface{}, 0, 100)
-	if trace_id != "" {
-		//p_fmt = Red + "trace_id-%s [DEBUG] " + fmtstr + Reset
-		//p_fmt = "trace_id %s [DEBUG] " + fmtstr
-		p_fmt = "%s [DEBUG] " + fmtstr
-		values = append(values, trace_id)
-	} else {
-		p_fmt = "[DEBUG] " + fmtstr
-	}
-
-	if Gfilelog.Logconf.Stdout && Gfilelog.Logconf.Colorful {
-		p_fmt = Green + p_fmt + Reset
-	}
-
-	if Gfilelog != nil && Gfilelog.LogObj != nil {
-		Gfilelog.fileCheck()
-		if Gfilelog.Logconf.Loglevel <= DEBUG {
-			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf(p_fmt, append(values, v...)...))
-		}
-	}
-
-}
-
-func pDebug(ctx context.Context, depth int, v ...interface{}) {
-	trace_id := getIdsInLog(ctx)
-	prefix := ""
-	if trace_id != "" {
-		//prefix = fmt.Sprintf("trace_id %s [DEBUG]", trace_id)
-		prefix = fmt.Sprintf("%s [DEBUG]", trace_id)
-	} else {
-		prefix = fmt.Sprintf("%s", "[DEBUG]")
-	}
-
-	if Gfilelog != nil && Gfilelog.LogObj != nil {
-		Gfilelog.fileCheck()
-		//Gfilelog.LogObj.mu.RLock()
-		//defer Gfilelog.LogObj.mu.RUnlock()
-		if Gfilelog.Logconf.Stdout && Gfilelog.Logconf.Colorful && Gfilelog.Logconf.Loglevel <= DEBUG {
-			values := []interface{}{Green + prefix}
-			values = append(values, v...)
-			values = append(values, Reset)
-			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintln(values...))
-		} else if Gfilelog.Logconf.Loglevel <= DEBUG {
-			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintln(append([]interface{}{prefix}, v...)...))
-		}
-	}
-
-}
-
-func Debug(ctx context.Context, v ...interface{}) {
-	pDebug(ctx, 3, v...)
-
+func Debug(ctx context.Context, msg string, v ...any) {
+	slog.Default().DebugContext(ctx, msg, v...)
 }
 
 func Debugf(ctx context.Context, fmtstr string, v ...interface{}) {
-	pDebugWithGid(ctx, 3, fmtstr, v...)
+	p_fmt := ""
+	values := make([]interface{}, 0, 100)
+	if Gfilelog.Logconf.Format == TEXT_FORMAT {
+		trace_id := getIdsInLog(ctx)
+		if trace_id != "" {
+			values = append(values, trace_id)
+		} else {
+			p_fmt = "[DEBUG] " + fmtstr
+		}
+	} else {
+		p_fmt = fmtstr
+	}
+	if Gfilelog != nil && Gfilelog.LogObj != nil {
+		Gfilelog.fileCheck()
+		if Gfilelog.Logconf.Loglevel <= DEBUG {
+			slog.Default().DebugContext(ctx, fmt.Sprintf(p_fmt, append(values, v...)...))
+		}
+	}
 }
 
-func pInfoWithGid(ctx context.Context, depth int, fmtstr string, v ...interface{}) {
-	trace_id := getIdsInLog(ctx)
-	p_fmt := ""
-	//values := []interface{}{}
-	values := make([]interface{}, 0, 100)
-	if trace_id != "" {
-		//p_fmt = "trace_id %s [INFO] " + fmtstr
-		p_fmt = "%s [INFO] " + fmtstr
-		values = append(values, trace_id)
-	} else {
-		p_fmt = "[INFO] " + fmtstr
-	}
+func Info(ctx context.Context, msg string, v ...interface{}) {
+	slog.Default().InfoContext(ctx, msg, v...)
+}
 
-	if Gfilelog.Logconf.Stdout && Gfilelog.Logconf.Colorful {
-		p_fmt = Green + p_fmt + Reset
+func Infof(ctx context.Context, fmtstr string, v ...interface{}) {
+	p_fmt := ""
+	values := make([]interface{}, 0, 100)
+	if Gfilelog.Logconf.Format == TEXT_FORMAT {
+		trace_id := getIdsInLog(ctx)
+		if trace_id != "" {
+			p_fmt = "%s [INFO] " + fmtstr
+			values = append(values, trace_id)
+		} else {
+			p_fmt = "[INFO] " + fmtstr
+		}
+	} else {
+		p_fmt = fmtstr
 	}
 	if Gfilelog != nil && Gfilelog.LogObj != nil {
 		Gfilelog.fileCheck()
 		if Gfilelog.Logconf.Loglevel <= INFO {
-			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf(p_fmt, append(values, v...)...))
+			slog.Default().InfoContext(ctx, fmt.Sprintf(p_fmt, append(values, v...)...))
 		}
 	}
 }
 
-func pInfo(ctx context.Context, depth int, v ...interface{}) {
-	trace_id := getIdsInLog(ctx)
-	//prefix := fmt.Sprintf("trace_id-%s [INFO]", trace_id)
-	prefix := ""
-	if trace_id != "" {
-		//prefix = fmt.Sprintf("trace_id %s [INFO]", trace_id)
-		prefix = fmt.Sprintf("%s [INFO]", trace_id)
-	} else {
-		prefix = fmt.Sprintf("%s", "[INFO]")
-	}
-
-	if Gfilelog != nil && Gfilelog.LogObj != nil {
-		Gfilelog.fileCheck()
-		//Gfilelog.LogObj.mu.RLock()
-		//defer Gfilelog.LogObj.mu.RUnlock()
-		if Gfilelog.Logconf.Stdout && Gfilelog.Logconf.Colorful && Gfilelog.Logconf.Loglevel <= INFO {
-			values := []interface{}{Green + prefix}
-			values = append(values, v...)
-			values = append(values, Reset)
-			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintln(values...))
-		} else if Gfilelog.Logconf.Loglevel <= INFO {
-			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintln(append([]interface{}{prefix}, v...)...))
-		}
-	}
-}
-
-func Info(ctx context.Context, v ...interface{}) {
-	pInfo(ctx, 3, v...)
-}
-
-func Infof(ctx context.Context, fmtstr string, v ...interface{}) {
-	pInfoWithGid(ctx, 3, fmtstr, v...)
+func Warn(ctx context.Context, msg string, v ...interface{}) {
+	slog.Default().WarnContext(ctx, msg, v...)
 
 }
 
-func pWarnWithGid(ctx context.Context, depth int, fmtstr string, v ...interface{}) {
+func Warnf(ctx context.Context, fmtstr string, v ...interface{}) {
 	trace_id := getIdsInLog(ctx)
 	p_fmt := ""
-	//values := []interface{}{}
 	values := make([]interface{}, 0, 100)
-	if trace_id != "" {
-		// p_fmt = Red + "trace_id-%s [WARN] " + fmtstr + Reset
-		//p_fmt = "trace_id %s [WARN] " + fmtstr
-		p_fmt = "%s [WARN] " + fmtstr
-		values = append(values, trace_id)
+	if Gfilelog.Logconf.Format == TEXT_FORMAT {
+		if trace_id != "" {
+			p_fmt = "%s [WARN] " + fmtstr
+			values = append(values, trace_id)
+		} else {
+			p_fmt = "[WARN] " + fmtstr
+		}
 	} else {
-		p_fmt = "[WARN] " + fmtstr
-	}
-
-	if Gfilelog.Logconf.Stdout && Gfilelog.Logconf.Colorful {
-		p_fmt = Yellow + p_fmt + Reset
+		p_fmt = fmtstr
 	}
 
 	if Gfilelog != nil && Gfilelog.LogObj != nil {
 		Gfilelog.fileCheck()
 		if Gfilelog.Logconf.Loglevel <= WARN {
-			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf(p_fmt, append(values, v...)...))
-			if !Gfilelog.Logconf.Stdout {
-				Gfilelog.LogObj.lg_err.Output(depth, fmt.Sprintf(p_fmt, append(values, v...)...))
-			}
+			slog.Default().WarnContext(ctx, fmt.Sprintf(p_fmt, append(values, v...)...))
 		}
 	}
+
 }
 
-func pWarn(ctx context.Context, depth int, v ...interface{}) {
-	trace_id := getIdsInLog(ctx)
-	//prefix := fmt.Sprintf("trace_id-%s [WARN]", trace_id)
-	prefix := ""
-	if trace_id != "" {
-		//prefix = fmt.Sprintf("trace_id %s [WARN]", trace_id)
-		prefix = fmt.Sprintf("%s [WARN]", trace_id)
-	} else {
-		prefix = fmt.Sprintf("%s", "[WARN]")
-	}
+func Error(ctx context.Context, msg string, v ...interface{}) {
+	slog.Default().ErrorContext(ctx, msg, v...)
 
-	if Gfilelog != nil && Gfilelog.LogObj != nil {
-		Gfilelog.fileCheck()
-		//Gfilelog.LogObj.mu.RLock()
-		//defer Gfilelog.LogObj.mu.RUnlock()
-		if Gfilelog.Logconf.Stdout && Gfilelog.Logconf.Colorful && Gfilelog.Logconf.Loglevel <= WARN {
-			values := []interface{}{Yellow + prefix}
-			values = append(values, v...)
-			values = append(values, Reset)
-			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintln(values...))
-		} else if Gfilelog.Logconf.Stdout && Gfilelog.Logconf.Loglevel <= WARN {
-			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintln(append([]interface{}{prefix}, v...)...))
-		} else if Gfilelog.Logconf.Loglevel <= WARN {
-			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintln(append([]interface{}{prefix}, v...)...))
-			Gfilelog.LogObj.lg_err.Output(depth, fmt.Sprintln(append([]interface{}{prefix}, v...)...))
-		}
-	}
-}
-
-func Warn(ctx context.Context, v ...interface{}) {
-	pWarn(ctx, 3, v...)
-}
-
-func Warnf(ctx context.Context, fmtstr string, v ...interface{}) {
-	pWarnWithGid(ctx, 3, fmtstr, v...)
-}
-
-func pErrorWithGid(ctx context.Context, depth int, fmtstr string, v ...interface{}) {
-	trace_id := getIdsInLog(ctx)
-	p_fmt := ""
-	//values := []interface{}{}
-	values := make([]interface{}, 0, 100)
-	if trace_id != "" {
-		//p_fmt = "trace_id %s [ERROR] " + fmtstr
-		p_fmt = "%s [ERROR] " + fmtstr
-		values = append(values, trace_id)
-	} else {
-		p_fmt = "[ERROR] " + fmtstr
-	}
-
-	if Gfilelog.Logconf.Stdout && Gfilelog.Logconf.Colorful {
-		p_fmt = Red + p_fmt + Reset
-	}
-
-	if Gfilelog != nil && Gfilelog.LogObj != nil {
-		Gfilelog.fileCheck()
-		if Gfilelog.Logconf.Loglevel <= ERROR {
-			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintf(p_fmt, append(values, v...)...))
-			if !Gfilelog.Logconf.Stdout {
-				Gfilelog.LogObj.lg_err.Output(depth, fmt.Sprintf(p_fmt, append(values, v...)...))
-			}
-		}
-	}
-}
-
-func pError(ctx context.Context, depth int, v ...interface{}) {
-	trace_id := getIdsInLog(ctx)
-	//prefix := fmt.Sprintf("trace_id-%s [ERROR]", trace_id)
-	prefix := ""
-	if trace_id != "" {
-		//prefix = fmt.Sprintf("trace_id %s [ERROR]", trace_id)
-		prefix = fmt.Sprintf("%s [ERROR]", trace_id)
-	} else {
-		prefix = fmt.Sprintf("%s", "[ERROR]")
-	}
-
-	if Gfilelog != nil && Gfilelog.LogObj != nil {
-		Gfilelog.fileCheck()
-		//Gfilelog.LogObj.mu.RLock()
-		//defer Gfilelog.LogObj.mu.RUnlock()
-		if Gfilelog.Logconf.Stdout && Gfilelog.Logconf.Colorful && Gfilelog.Logconf.Loglevel <= ERROR {
-			values := []interface{}{Red + prefix}
-			values = append(values, v...)
-			values = append(values, Reset)
-			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintln(values...))
-		} else if Gfilelog.Logconf.Stdout && Gfilelog.Logconf.Loglevel <= ERROR {
-			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintln(append([]interface{}{prefix}, v...)...))
-		} else if Gfilelog.Logconf.Loglevel <= WARN {
-			Gfilelog.LogObj.lg.Output(depth, fmt.Sprintln(append([]interface{}{prefix}, v...)...))
-			Gfilelog.LogObj.lg_err.Output(depth, fmt.Sprintln(append([]interface{}{prefix}, v...)...))
-		}
-	}
-}
-
-func Error(ctx context.Context, v ...interface{}) {
-	pError(ctx, 3, v...)
 }
 
 func Errorf(ctx context.Context, fmtstr string, v ...interface{}) {
-	pErrorWithGid(ctx, 3, fmtstr, v...)
+	trace_id := getIdsInLog(ctx)
+	p_fmt := ""
+	values := make([]interface{}, 0, 100)
+
+	if Gfilelog.Logconf.Format == TEXT_FORMAT {
+		if trace_id != "" {
+			p_fmt = "%s [ERROR] " + fmtstr
+			values = append(values, trace_id)
+		} else {
+			p_fmt = "[ERROR] " + fmtstr
+		}
+	} else {
+		p_fmt = fmtstr
+	}
+	if Gfilelog != nil && Gfilelog.LogObj != nil {
+		Gfilelog.fileCheck()
+		if Gfilelog.Logconf.Loglevel <= ERROR {
+			slog.Default().ErrorContext(ctx, fmt.Sprintf(p_fmt, append(values, v...)...))
+		}
+	}
+
 }
 
 func (glog *Glog) isMustRename() bool {
-	/*if glog.Logconf.Stdout {
-		return false
-	}*/
 	if glog.Logconf.RotateMethod == ROTATE_FILE_DAILY {
 		t, _ := time.Parse(DATEFORMAT, time.Now().Format(DATEFORMAT))
 		if t.After(*(glog.LogObj.Ldate)) {
@@ -614,7 +440,6 @@ func (glog *Glog) isMustRename() bool {
 		}
 	} else {
 		if glog.Logconf.MaxFileCount > 1 {
-			//if glog.fileSize(glog.LogObj.dir+"/"+glog.LogObj.filename) >= glog.Logconf.MaxFileSize {
 			if glog.fileSize(filepath.Join(glog.LogObj.dir, glog.LogObj.filename)) >= glog.Logconf.MaxFileSize {
 				return true
 			}
@@ -632,15 +457,12 @@ func (glog *Glog) rename() {
 	if glog.Logconf.RotateMethod == ROTATE_FILE_DAILY {
 		var builder strings.Builder
 		builder.Grow(100)
-
-		//fn := f.dir + "/" + f.filename + "." + f.Ldate.Format(DATEFORMAT)
 		builder.WriteString(f.filename)
 		builder.WriteString(".")
 		builder.WriteString(f.Ldate.Format(DATEFORMAT))
 		fn := filepath.Join(f.dir, builder.String())
 		builder.Reset()
 
-		//fn_err := f.dir + "/" + f.filename_err + "." + f.Ldate.Format(DATEFORMAT)
 		builder.WriteString(f.filename_err)
 		builder.WriteString(".")
 		builder.WriteString(f.Ldate.Format(DATEFORMAT))
@@ -651,20 +473,18 @@ func (glog *Glog) rename() {
 				f.logfile.Close()
 				f.logfile_err.Close()
 			}
-			//err := os.Rename(f.dir+"/"+f.filename, fn)
 			err := os.Rename(filepath.Join(f.dir, f.filename), fn)
 			if err != nil {
-				f.lg.Println("rename err", err.Error())
+				slog.Error("rename err: %s", err.Error())
 			}
-			//err = os.Rename(f.dir+"/"+f.filename_err, fn_err)
 			err = os.Rename(filepath.Join(f.dir, f.filename_err), fn_err)
 			t, _ := time.Parse(DATEFORMAT, time.Now().Format(DATEFORMAT))
 			f.Ldate = &t
 
 			f.logfile, _ = os.Create(filepath.Join(f.dir, f.filename))
-			f.lg = log.New(glog.LogObj.logfile, "", log.Ldate|log.Lmicroseconds|log.Lshortfile)
 			f.logfile_err, _ = os.Create(filepath.Join(f.dir, f.filename_err))
-			f.lg_err = log.New(glog.LogObj.logfile_err, "", log.Ldate|log.Lmicroseconds|log.Lshortfile)
+			glog.setSlog(f.logfile_err)
+			slog.SetDefault(f.lg)
 		}
 	} else {
 		if glog.isMustRename() {
@@ -672,10 +492,6 @@ func (glog *Glog) rename() {
 		}
 	}
 }
-
-/*func (f *FILE) nextSuffix() int {
-	return int(f._suffix%int(maxFileCount) + 1)
-}*/
 
 func (glog *Glog) nextSuffix() int {
 	f := glog.LogObj
@@ -685,7 +501,6 @@ func (glog *Glog) nextSuffix() int {
 
 func (glog *Glog) coverNextOne() {
 	f := glog.LogObj
-	//f._suffix = f.nextSuffix()
 	glog.nextSuffix()
 	if f.logfile != nil {
 		f.logfile.Close()
@@ -694,22 +509,16 @@ func (glog *Glog) coverNextOne() {
 	var builder strings.Builder
 	builder.Grow(100)
 
-	//if isExist(f.dir + "/" + f.filename + "." + strconv.Itoa(int(f._suffix))) {
 	builder.WriteString(f.filename)
 	builder.WriteString(".")
 	builder.WriteString(strconv.Itoa(int(f._suffix)))
 	if isExist(filepath.Join(f.dir, builder.String())) {
-		//builder.WriteString(f.filename + "." + strconv.Itoa(int(f._suffix)))
-		//os.Remove(f.dir + "/" + f.filename + "." + strconv.Itoa(int(f._suffix)))
 		os.Remove(filepath.Join(f.dir, builder.String()))
 	}
-	//builder.Reset()
-
-	//builder.WriteString(f.filename + "." + strconv.Itoa(int(f._suffix)))
-	//os.Rename(f.dir+"/"+f.filename, f.dir+"/"+f.filename+"."+strconv.Itoa(int(f._suffix)))
 	os.Rename(filepath.Join(f.dir, f.filename), filepath.Join(f.dir, builder.String()))
 	f.logfile, _ = os.Create(filepath.Join(f.dir, f.filename))
-	f.lg = log.New(f.logfile, "", log.Ldate|log.Lmicroseconds|log.Lshortfile)
+	glog.setSlog(nil)
+	slog.SetDefault(f.lg)
 }
 
 func (glog *Glog) fileSize(file string) int64 {

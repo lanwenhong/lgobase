@@ -16,7 +16,7 @@ import (
 
 	//"github.com/google/uuid"
 
-	"github.com/kjk/betterguid"
+	//"github.com/kjk/betterguid"
 	"github.com/oklog/ulid"
 	"github.com/rs/xid"
 	"github.com/segmentio/ksuid"
@@ -73,10 +73,10 @@ func GenKsuid() string {
 	return sid
 }
 
-func GenBetterGUID() string {
+/*func GenBetterGUID() string {
 	id := betterguid.New()
 	return id
-}
+}*/
 
 func GenUlid() string {
 	t := time.Now().UTC()

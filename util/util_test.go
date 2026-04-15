@@ -17,8 +17,8 @@ func TestGenid(t *testing.T) {
 	id = util.GenKsuid()
 	t.Log(id)
 
-	id = util.GenBetterGUID()
-	t.Log(id)
+	/*id = util.GenBetterGUID()
+	t.Log(id)*/
 
 	id = util.GenUlid()
 	t.Log(id)

@@ -87,7 +87,7 @@ func TestCreate(t *testing.T) {
 	myconf := &logger.Glogconf{
 		RotateMethod: logger.ROTATE_FILE_DAILY,
 		Stdout:       true,
-		Colorful:     true,
+		Colorful:     false,
 		Loglevel:     logger.DEBUG,
 		//Goid:         true,
 	}
@@ -216,7 +216,7 @@ func TestQuery1(t *testing.T) {
 		SlowThreshold:             time.Second, // 慢 SQL 阈值
 		LogLevel:                  dlog.Info,   // 日志级别
 		IgnoreRecordNotFoundError: true,        // 忽略ErrRecordNotFound（记录未找到）错误
-		Colorful:                  true,        // 禁用彩色打印
+		Colorful:                  false,       // 禁用彩色打印
 	}
 
 	db_conf := dbenc.DbConfNew(ctx, "db.ini")
@@ -272,7 +272,7 @@ func TestQuery2(t *testing.T) {
 	//tdb.WithContext(ctx).Where("name = ?", "wowow").First(&user)
 	start := time.Date(2023, 1, 1, 0, 0, 0, 0, time.Local)
 	end := time.Date(2023, 8, 12, 4, 12, 31, 0, time.Local)
-	logger.Debug(ctx, "start: %s end: %s", start, end)
+	logger.Debugf(ctx, "start: %s end: %s", start, end)
 	tdb.WithContext(ctx).Where("createat between ? and ?", start, end).Find(&users)
 
 	t.Log(users)

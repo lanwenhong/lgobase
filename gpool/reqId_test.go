@@ -18,8 +18,8 @@ func TestAdd1(t *testing.T) {
 	ctx = context.WithValue(ctx, "trace_id", util.NewProcessID())
 	myconf := &logger.Glogconf{
 		RotateMethod: logger.ROTATE_FILE_DAILY,
-		Stdout:       true,
-		Colorful:     true,
+		Stdout:       false,
+		Colorful:     false,
 		Loglevel:     logger.DEBUG,
 		//CtxValueKey:  "trace_id,request_id",
 	}
@@ -34,23 +34,23 @@ func TestAdd1(t *testing.T) {
 		//Cfunc: gpool.CreateThriftBufferConn[server.ServerTestClient],
 		Nc:              server.NewServerTestClientFactory,
 		MaxConnLife:     500,
-		MaxIdleConnLife: 5,
-		MaxConns:        10,
+		MaxIdleConnLife: 50,
+		MaxConns:        300,
 		MaxIdleConns:    5,
 	}
 	addPool := gpool.NewRpcPoolSelector[server.ServerTestClient](ctx, g_conf)
 
 	wg := sync.WaitGroup{}
-	for i := 0; i < 1; i++ {
+	for i := 0; i < 20; i++ {
 		wg.Add(1)
 		go func() {
 			//ctx := context.WithValue(ctx, "trace_id", util.NewRequestID())
 			//request_id := util.NewRequestID()
 			pid := util.NewProcessID()
-			logger.Debugf(ctx, "trade_id: %s", pid)
+			//logger.Debugf(ctx, "trade_id: %s", pid)
 			ctx := context.WithValue(ctx, "trace_id", pid)
 			defer wg.Done()
-			for i := 0; i < 1; i++ {
+			for i := 0; i < 100; i++ {
 				process := func(ctx context.Context, client interface{}) (string, error) {
 					//process := func(client interface{}) (string, error) {
 					c := client.(*server.ServerTestClient)
@@ -68,6 +68,7 @@ func TestAdd1(t *testing.T) {
 				}
 				ctx := context.WithValue(ctx, "request_id", util.NewRequestID())
 				nctx := gpool.NewExtContext(ctx)
+				nctx = nctx.SetReqExtData(ctx, "client_service", "testAdd")
 				//nctx = nctx.SetReqExtData(nctx, "request_id", util.NewRequestID())
 				//addPool.ThriftExtCall(nctx, process)
 				addPool.ThriftWithTimeOutExtCall(nctx, 1*time.Second, process)
