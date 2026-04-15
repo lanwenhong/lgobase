@@ -208,13 +208,15 @@ func (p *ExtProcessor) Process(ctx context.Context, in, out thrift.TProtocol) (b
 	preBuf := make([]byte, 4)
 	//starttime := time.Now()
 	_, err := io.ReadFull(in.Transport(), preBuf)
-	//magic, preBuf, _, err := p.ReadMagic(ctx, in, out)
-	//logger.Infof(ctx, "func=Process|time=%v", time.Since(starttime))
 	if err != nil {
 		if err.(thrift.TProtocolException).TypeId() == thrift.END_OF_FILE {
 			return false, thrift.NewTTransportException(thrift.END_OF_FILE, "connection closed (EOF)")
 		} else {
-			logger.Warnf(ctx, "read preBuf: %v", err)
+			if err.(thrift.TProtocolException).TypeId() != thrift.TIMED_OUT {
+				logger.Warnf(ctx, "read preBuf: %v", err)
+			} else {
+				logger.Debugf(ctx, "read preBuf: %v", err)
+			}
 			return false, thrift.NewTTransportException(thrift.INVALID_DATA, "invalid data")
 		}
 	}
@@ -237,7 +239,11 @@ func (p *ExtProcessor) Process(ctx context.Context, in, out thrift.TProtocol) (b
 			if errRM.(thrift.TProtocolException).TypeId() == thrift.END_OF_FILE {
 				return false, thrift.NewTTransportException(thrift.END_OF_FILE, "connection closed (EOF)")
 			} else {
-				logger.Warnf(ctx, "read preBuf: %v", errRM)
+				if errRM.(thrift.TProtocolException).TypeId() != thrift.TIMED_OUT {
+					logger.Warnf(ctx, "read preBuf: %v", errRM)
+				} else {
+					logger.Debugf(ctx, "read preBuf: %v", errRM)
+				}
 				return false, thrift.NewTTransportException(thrift.INVALID_DATA, "invalid data")
 			}
 		}
