@@ -20,6 +20,7 @@ const (
 	THRIFT_EXT_META_VERSION        = int16(1)
 	THRIFT_EXT_CALL_CLIENT_SERVICE = "call_client_service"
 	THRIFT_EXT_CLIENT_SERVICE      = "client_service"
+	THRIFT_EXT_DEPTH               = "depth"
 )
 
 // type RequestIDProtocolClient struct {
@@ -218,7 +219,7 @@ func (p *ExtProcessor) ReadMetaMap(ctx context.Context, in, out thrift.TProtocol
 		}
 		//logger.Debugf(ctx, "k=%s v=%s", k, v)
 		//reqData[k] = v
-		if k == "depth" {
+		if k == THRIFT_EXT_DEPTH {
 			iv, err := strconv.Atoi(v)
 			if err != nil {
 				logger.Warn(ctx, "thrift_ext", "err", err)
