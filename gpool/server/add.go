@@ -64,7 +64,7 @@ func main() {
 		Stdout:       true,
 		Colorful:     true,
 		Loglevel:     logger.DEBUG,
-		CtxValueKey:  "trace_id,request_id,client_service",
+		//CtxValueKey:  "trace_id,request_id,client_service,depth",
 	}
 	logger.Newglog("./", "add.log", "add.log.err", myconf)
 

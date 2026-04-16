@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/binary"
 	"io"
+	"strconv"
+	"strings"
 
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/google/uuid"
@@ -14,8 +16,10 @@ import (
 
 const (
 	//THRIFT_EXT_META_MAGIC   = int16(0x7FFF)
-	THRIFT_EXT_META_MAGIC   = int32(0x7FFFFFFF)
-	THRIFT_EXT_META_VERSION = int16(1)
+	THRIFT_EXT_META_MAGIC          = int32(0x7FFFFFFF)
+	THRIFT_EXT_META_VERSION        = int16(1)
+	THRIFT_EXT_CALL_CLIENT_SERVICE = "call_client_service"
+	THRIFT_EXT_CLIENT_SERVICE      = "client_service"
 )
 
 // type RequestIDProtocolClient struct {
@@ -57,8 +61,14 @@ func NewExtContext(ctx context.Context) *ExtContext {
 	}
 	nCtx.ReqExtData = make(map[string]string)
 
-	if rid, ok := ctx.Value("request_id").(string); ok {
+	/*if rid, ok := ctx.Value("request_id").(string); ok {
 		nCtx.ReqExtData["request_id"] = rid
+	}*/
+	klist := strings.Split(logger.Gfilelog.Logconf.CtxValueKey, ",")
+	for _, k := range klist {
+		if v, ok := ctx.Value(k).(string); ok {
+			nCtx.ReqExtData[k] = v
+		}
 	}
 	return nCtx
 }
@@ -66,6 +76,15 @@ func NewExtContext(ctx context.Context) *ExtContext {
 func (ec *ExtContext) SetReqExtData(ctx context.Context, k, v string) *ExtContext {
 	ec.ReqExtData[k] = v
 	ctx = context.WithValue(ctx, k, v)
+	return &ExtContext{
+		Context:    ctx,
+		ReqExtData: ec.ReqExtData,
+	}
+}
+
+func (ec *ExtContext) SetReqExtCallClientService(ctx context.Context, v string) *ExtContext {
+	ec.ReqExtData[THRIFT_EXT_CALL_CLIENT_SERVICE] = v
+	ctx = context.WithValue(ctx, THRIFT_EXT_CALL_CLIENT_SERVICE, v)
 	return &ExtContext{
 		Context:    ctx,
 		ReqExtData: ec.ReqExtData,
@@ -182,6 +201,8 @@ func (p *ExtProcessor) ReadMetaMap(ctx context.Context, in, out thrift.TProtocol
 		return ctx, err
 	}
 	logger.Debugf(ctx, "size: %d", size)
+	var foundDepth bool = false
+	var callClientService string = ""
 	for i := 0; i < size; i++ {
 		k, err := in.ReadString(ctx)
 		if err != nil {
@@ -195,11 +216,33 @@ func (p *ExtProcessor) ReadMetaMap(ctx context.Context, in, out thrift.TProtocol
 			//return ctx, reqData, err
 			return ctx, err
 		}
-		logger.Debugf(ctx, "k=%s v=%s", k, v)
+		//logger.Debugf(ctx, "k=%s v=%s", k, v)
 		//reqData[k] = v
-		ctx = context.WithValue(ctx, k, v)
-
+		if k == "depth" {
+			iv, err := strconv.Atoi(v)
+			if err != nil {
+				logger.Warn(ctx, "thrift_ext", "err", err)
+			} else {
+				foundDepth = true
+				iv += 1
+				ctx = context.WithValue(ctx, k, strconv.Itoa(iv))
+			}
+		} else if k == THRIFT_EXT_CALL_CLIENT_SERVICE {
+			//ctx = context.WithValue(ctx, "client_service", v)
+			callClientService = v
+		} else {
+			ctx = context.WithValue(ctx, k, v)
+		}
+		//logger.Debug(ctx, "thrift_ext", "k", k, "v", v)
 	}
+	if !foundDepth {
+		ctx = context.WithValue(ctx, "depth", "0")
+	}
+	if callClientService != "" {
+		ctx = context.WithValue(ctx, THRIFT_EXT_CLIENT_SERVICE, callClientService)
+		logger.Debug(ctx, "thrift_ext", "callCleintService", callClientService)
+	}
+	logger.Debug(ctx, "thrift_ext", "test", "ccc")
 	return ctx, err
 }
 
@@ -255,6 +298,7 @@ func (p *ExtProcessor) Process(ctx context.Context, in, out thrift.TProtocol) (b
 		ctx = context.WithValue(ctx, "request_id", util.NewRequestID())
 	}
 	//b, t := p.Processor.Process(newCtx, in, out)
+	logger.Debug(ctx, "thrift_ext", "test", "cccccc")
 	b, t := p.Processor.Process(ctx, in, out)
 	return b, t
 }
