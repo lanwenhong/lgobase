@@ -4,11 +4,37 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net/http"
+	"runtime"
+	"strconv"
 	"time"
-	
+
 	"github.com/go-resty/resty/v2"
 	"github.com/lanwenhong/lgobase/logger"
 )
+
+func GetCaller(skip int) (fileName string, line string, funcName string) {
+	pc, file, iline, ok := runtime.Caller(skip)
+	if !ok {
+		return "unknown", "0", "unknown"
+	}
+
+	// 提取函数名
+	fn := runtime.FuncForPC(pc)
+	if fn != nil {
+		funcName = fn.Name()
+	}
+
+	// 只取文件名，不要全路径
+	short := file
+	for i := len(file) - 1; i > 0; i-- {
+		if file[i] == '/' {
+			short = file[i+1:]
+			break
+		}
+	}
+	fileName = short
+	return fileName, ":" + strconv.Itoa(iline), funcName
+}
 
 func NewHttpClient(transport *http.Transport) *resty.Client {
 	client := resty.New()
@@ -18,18 +44,18 @@ func NewHttpClient(transport *http.Transport) *resty.Client {
 			MaxIdleConns:        100,              // 最大空闲连接数
 			MaxIdleConnsPerHost: 20,               // 每个主机的最大空闲连接数
 			IdleConnTimeout:     30 * time.Second, // 空闲连接超时时间（超过则关闭）
-			
+
 			// 3. 其他 Transport 配置
 			MaxConnsPerHost:       50,               // 每个主机的最大并发连接数
 			ResponseHeaderTimeout: 10 * time.Second, // 等待响应头的超时时间
 			ExpectContinueTimeout: 1 * time.Second,  // 发送 Expect: 100-continue 后的超时时间
 		}
-		
+
 		client.SetTransport(DefaultTransport)
 	} else {
 		client.SetTransport(transport)
 	}
-	
+
 	client.OnBeforeRequest(func(c *resty.Client, req *resty.Request) error {
 		s := "NonStringBody"
 		if req.Body != nil {
@@ -44,12 +70,13 @@ func NewHttpClient(transport *http.Transport) *resty.Client {
 				s = fmt.Sprintf("%v", req.Body)
 			}
 		}
+		file, line, fn := GetCaller(6)
 		ctx := req.Context()
 		//logger.Infof(ctx, "send|mehtod=%s|url=%s|body=%s", req.Method, req.URL, s)
-		logger.Info(ctx, "HttpClient", "func", "send", "method", req.Method, "url", req.URL, "body", s)
+		logger.Info(ctx, "HttpClient", "func", "send", "method", req.Method, "url", req.URL, "body", s, "srcFile", file+line, "fn", fn)
 		return nil
 	})
-	
+
 	client.OnAfterResponse(func(c *resty.Client, resp *resty.Response) error {
 		ctx := resp.Request.Context()
 		costTime := resp.Time()
@@ -57,9 +84,10 @@ func NewHttpClient(transport *http.Transport) *resty.Client {
 		if ctx.Value("log_resp") == "false" {
 			ret = "*"
 		}
+		file, line, fn := GetCaller(5)
 		//logger.Infof(ctx, "recv|method=%s|url=%s|code=%d|ret=%s|time=%dms", resp.Request.Method, resp.Request.URL, resp.StatusCode(), resp.String(), costTime.Milliseconds())
 		logger.Info(ctx, "HttpClient", "func", "recv", "method", resp.Request.Method, "url", resp.Request.URL,
-			"code", resp.StatusCode(), "ret", ret, "cost", fmt.Sprintf("%dms", costTime.Milliseconds()))
+			"code", resp.StatusCode(), "ret", ret, "cost", fmt.Sprintf("%dms", costTime.Milliseconds()), "srcFile", file+line, "fn", fn)
 		return nil
 	})
 	return client
