@@ -138,7 +138,7 @@ func NewDefaultGLog() (res *Glog) {
 			Stdout:      true,
 			Colorful:    true,
 			Loglevel:    DEBUG,
-			CtxValueKey: "trace_id,request_id,client_service,depth",
+			CtxValueKey: "trace_id,request_id,client_service,trace_depth",
 		},
 		LogormConf: &dlog.Config{
 			SlowThreshold:             time.Second,
@@ -169,7 +169,7 @@ func Newglog(fileDir string, fileName string, fileNameErr string, glog_conf *Glo
 		dconfig.LogLevel = dlog.Error
 	}
 	if glog_conf.CtxValueKey == "" {
-		glog_conf.CtxValueKey = "trace_id,request_id,client_service,depth"
+		glog_conf.CtxValueKey = "trace_id,request_id,client_service,trace_depth"
 	}
 	glog := &Glog{
 		Logconf:    glog_conf,
