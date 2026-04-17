@@ -138,7 +138,7 @@ func NewDefaultGLog() (res *Glog) {
 			Stdout:      true,
 			Colorful:    true,
 			Loglevel:    DEBUG,
-			CtxValueKey: "trace_id,request_id,client_service",
+			CtxValueKey: "trace_id,request_id,client_service,depth",
 		},
 		LogormConf: &dlog.Config{
 			SlowThreshold:             time.Second,
