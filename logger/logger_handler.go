@@ -227,11 +227,11 @@ func (h *CustomHandler) Handle(ctx context.Context, r slog.Record) error {
 	}
 	// 日期
 	if h.Flags&log.Ldate != 0 {
-		buf = r.Time.AppendFormat(buf, "2006-01-02 ")
+		buf = r.Time.AppendFormat(buf, "2006-01-02")
 	}
 	// 时间+微秒
 	if h.Flags&log.Lmicroseconds != 0 {
-		buf = r.Time.AppendFormat(buf, "15:04:05.000000 ")
+		buf = r.Time.AppendFormat(buf, "15:04:05.000000")
 	}
 
 	// 核心：支持 fmt 格式化
