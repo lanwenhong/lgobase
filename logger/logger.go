@@ -395,10 +395,7 @@ func Infof(ctx context.Context, fmtstr string, v ...interface{}) {
 }
 
 func Warn(ctx context.Context, msg string, v ...interface{}) {
-	if Gfilelog.Logconf.Loglevel <= WARN {
-		slog.Default().WarnContext(ctx, msg, v...)
-	}
-
+	slog.Default().WarnContext(ctx, msg, v...)
 }
 
 func Warnf(ctx context.Context, fmtstr string, v ...interface{}) {
@@ -426,10 +423,7 @@ func Warnf(ctx context.Context, fmtstr string, v ...interface{}) {
 }
 
 func Error(ctx context.Context, msg string, v ...interface{}) {
-	if Gfilelog.Logconf.Loglevel <= ERROR {
-		slog.Default().ErrorContext(ctx, msg, v...)
-	}
-
+	slog.Default().ErrorContext(ctx, msg, v...)
 }
 
 func Errorf(ctx context.Context, fmtstr string, v ...interface{}) {
