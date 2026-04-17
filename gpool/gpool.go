@@ -587,6 +587,8 @@ func (gp *Gpool[T]) ThriftExtCall2(ctx context.Context, process func(ctx context
 	}
 	client := pc.Gc.GetThrfitClient()
 	//rpc_name, err = process(ctx, client)
+	clientService := util.GetEnv("CLIENT_SERVICE", "-")
+	ctx = context.WithValue(ctx, "Client-Service", clientService)
 	_, err = process(ctx, client)
 	if err != nil {
 		rpc_err = err
