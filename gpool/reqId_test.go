@@ -18,10 +18,10 @@ func TestAdd1(t *testing.T) {
 	ctx = context.WithValue(ctx, "trace_id", util.NewProcessID())
 	myconf := &logger.Glogconf{
 		RotateMethod: logger.ROTATE_FILE_DAILY,
-		Stdout:       false,
+		Stdout:       true,
 		Colorful:     false,
-		Loglevel:     logger.DEBUG,
-		//CtxValueKey:  "trace_id,request_id",
+		Loglevel:     logger.INFO,
+		//CtxValueKey:  "trace_id,request_id,client_service,depth",
 	}
 	logger.Newglog("./", "test.log", "test.log.err", myconf)
 	//logger.Debugf(ctx, "run")
@@ -41,7 +41,7 @@ func TestAdd1(t *testing.T) {
 	addPool := gpool.NewRpcPoolSelector[server.ServerTestClient](ctx, g_conf)
 
 	wg := sync.WaitGroup{}
-	for i := 0; i < 20; i++ {
+	for i := 0; i < 1; i++ {
 		wg.Add(1)
 		go func() {
 			//ctx := context.WithValue(ctx, "trace_id", util.NewRequestID())
@@ -50,7 +50,7 @@ func TestAdd1(t *testing.T) {
 			//logger.Debugf(ctx, "trade_id: %s", pid)
 			ctx := context.WithValue(ctx, "trace_id", pid)
 			defer wg.Done()
-			for i := 0; i < 100; i++ {
+			for i := 0; i < 1; i++ {
 				process := func(ctx context.Context, client interface{}) (string, error) {
 					//process := func(client interface{}) (string, error) {
 					c := client.(*server.ServerTestClient)
@@ -67,17 +67,26 @@ func TestAdd1(t *testing.T) {
 					return "add", err
 				}
 				ctx := context.WithValue(ctx, "request_id", util.NewRequestID())
-				nctx := gpool.NewExtContext(ctx)
-				nctx = nctx.SetReqExtData(ctx, "client_service", "testAdd")
+				ctx = context.WithValue(ctx, "depth", "4")
+				ctx = context.WithValue(ctx, "client_service", "callAdd")
+
+				//callCtx := context.WithValue(ctx, "client_service", "testAdd")
+				callCtx := gpool.NewExtContext(ctx)
+				callCtx = callCtx.SetReqExtCallClientService(callCtx, "testAdd")
+				//nctx := gpool.NewExtContext(ctx)
+				//ctx = nctx.SetReqExtData(ctx, "client_service", "testAdd")
+				//ctx = nctx.SetReqExtData(ctx, "depth", "4")
 				//nctx = nctx.SetReqExtData(nctx, "request_id", util.NewRequestID())
 				//addPool.ThriftExtCall(nctx, process)
-				addPool.ThriftWithTimeOutExtCall(nctx, 1*time.Second, process)
+				//nctx := gpool.NewExtContext(callCtx)
+
+				addPool.ThriftWithTimeOutExtCall(callCtx, 1*time.Second, process)
+				logger.Debug(ctx, "testAddClient", "do", "test")
 				//time.Sleep(6 * time.Second)
 				//nctx = nctx.SetReqExtData(nctx, "request_id", util.NewRequestID())
 				//addPool.ThriftExtCall(nctx, process)
 				//addPool.ThriftCall(ctx, process)
 			}
-
 		}()
 	}
 	wg.Wait()
