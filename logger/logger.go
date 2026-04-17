@@ -211,6 +211,23 @@ func (glog *Glog) fileCheck() {
 	}
 }
 
+func (glog *Glog) getSlogLevel() slog.Level {
+	var sLevel = slog.LevelDebug
+
+	switch glog.Logconf.Loglevel {
+	case DEBUG:
+		sLevel = slog.LevelDebug
+	case INFO:
+		sLevel = slog.LevelInfo
+	case WARN:
+		sLevel = slog.LevelWarn
+	case ERROR:
+		sLevel = slog.LevelError
+
+	}
+	return sLevel
+}
+
 func (glog *Glog) setSlog(errFile *os.File) {
 	if glog.Logconf.Format == TEXT_FORMAT {
 		glog.LogObj.lg = NewCustomLogger(os.Stdout, glog.LogObj.logfile, errFile, log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile)
@@ -218,7 +235,8 @@ func (glog *Glog) setSlog(errFile *os.File) {
 	} else {
 		originalHandler := slog.NewJSONHandler(glog.LogObj.logfile, &slog.HandlerOptions{
 			AddSource: false, // 关闭官方长路径
-			Level:     slog.LevelDebug,
+			Level:     glog.getSlogLevel(),
+			//Level:     slog.LevelDebug,
 		})
 		glog.LogObj.lg = slog.New(NewMyModifyHandler(os.Stdout, glog.LogObj.logfile, errFile, originalHandler))
 		slog.SetDefault(glog.LogObj.lg)
@@ -349,7 +367,9 @@ func Debugf(ctx context.Context, fmtstr string, v ...interface{}) {
 }
 
 func Info(ctx context.Context, msg string, v ...interface{}) {
+	//if Gfilelog.Logconf.Loglevel <= INFO {
 	slog.Default().InfoContext(ctx, msg, v...)
+	//}
 }
 
 func Infof(ctx context.Context, fmtstr string, v ...interface{}) {
@@ -375,7 +395,9 @@ func Infof(ctx context.Context, fmtstr string, v ...interface{}) {
 }
 
 func Warn(ctx context.Context, msg string, v ...interface{}) {
-	slog.Default().WarnContext(ctx, msg, v...)
+	if Gfilelog.Logconf.Loglevel <= WARN {
+		slog.Default().WarnContext(ctx, msg, v...)
+	}
 
 }
 
@@ -404,7 +426,9 @@ func Warnf(ctx context.Context, fmtstr string, v ...interface{}) {
 }
 
 func Error(ctx context.Context, msg string, v ...interface{}) {
-	slog.Default().ErrorContext(ctx, msg, v...)
+	if Gfilelog.Logconf.Loglevel <= ERROR {
+		slog.Default().ErrorContext(ctx, msg, v...)
+	}
 
 }
 
