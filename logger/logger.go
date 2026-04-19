@@ -342,7 +342,10 @@ func getIdsInLog(ctx context.Context) string {
 }
 
 func Debug(ctx context.Context, msg string, v ...any) {
-	slog.Default().DebugContext(ctx, msg, v...)
+	if Gfilelog != nil && Gfilelog.LogObj != nil {
+		Gfilelog.fileCheck()
+		slog.Default().DebugContext(ctx, msg, v...)
+	}
 }
 
 func Debugf(ctx context.Context, fmtstr string, v ...interface{}) {
@@ -367,9 +370,10 @@ func Debugf(ctx context.Context, fmtstr string, v ...interface{}) {
 }
 
 func Info(ctx context.Context, msg string, v ...interface{}) {
-	//if Gfilelog.Logconf.Loglevel <= INFO {
-	slog.Default().InfoContext(ctx, msg, v...)
-	//}
+	if Gfilelog != nil && Gfilelog.LogObj != nil {
+		Gfilelog.fileCheck()
+		slog.Default().InfoContext(ctx, msg, v...)
+	}
 }
 
 func Infof(ctx context.Context, fmtstr string, v ...interface{}) {
@@ -395,7 +399,10 @@ func Infof(ctx context.Context, fmtstr string, v ...interface{}) {
 }
 
 func Warn(ctx context.Context, msg string, v ...interface{}) {
-	slog.Default().WarnContext(ctx, msg, v...)
+	if Gfilelog != nil && Gfilelog.LogObj != nil {
+		Gfilelog.fileCheck()
+		slog.Default().WarnContext(ctx, msg, v...)
+	}
 }
 
 func Warnf(ctx context.Context, fmtstr string, v ...interface{}) {
@@ -423,7 +430,10 @@ func Warnf(ctx context.Context, fmtstr string, v ...interface{}) {
 }
 
 func Error(ctx context.Context, msg string, v ...interface{}) {
-	slog.Default().ErrorContext(ctx, msg, v...)
+	if Gfilelog != nil && Gfilelog.LogObj != nil {
+		Gfilelog.fileCheck()
+		slog.Default().ErrorContext(ctx, msg, v...)
+	}
 }
 
 func Errorf(ctx context.Context, fmtstr string, v ...interface{}) {
