@@ -556,7 +556,13 @@ func (gp *Gpool[T]) ThriftWithTimeOutCall2(ctx context.Context, timeout time.Dur
 func (gp *Gpool[T]) ThriftExtCall2(ctx context.Context, process func(ctx context.Context, client interface{}) (string, error)) error {
 	var rpc_err error
 	//var rpc_name string = ""
-
+	if eCtx, ok := ctx.(*ExtContext); ok {
+		clientService := eCtx.GetReqExtData(THRIFT_EXT_CALL_CLIENT_SERVICE)
+		if clientService == "" {
+			eCtx = eCtx.SetReqExtCallClientService(eCtx, util.GetEnv("CLIENT_SERVICE", "-"))
+			ctx = eCtx
+		}
+	}
 	file, line, fn := gp.GetCaller(3)
 	starttime := time.Now()
 	defer func() {
@@ -613,6 +619,13 @@ func (gp *Gpool[T]) ThriftExtCall2(ctx context.Context, process func(ctx context
 func (gp *Gpool[T]) ThriftWithTimeOutExtCall2(ctx context.Context, timeout time.Duration, process func(ctx context.Context, client interface{}) (string, error)) error {
 	var rpc_err error
 	//var rpc_name string = ""
+	if eCtx, ok := ctx.(*ExtContext); ok {
+		clientService := eCtx.GetReqExtData(THRIFT_EXT_CALL_CLIENT_SERVICE)
+		if clientService == "" {
+			eCtx = eCtx.SetReqExtCallClientService(eCtx, util.GetEnv("CLIENT_SERVICE", "-"))
+			ctx = eCtx
+		}
+	}
 	file, line, fn := gp.GetCaller(3)
 	starttime := time.Now()
 	defer func() {

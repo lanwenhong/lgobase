@@ -209,7 +209,6 @@ func (rps *RpcPoolSelector[T]) ThriftExtCall(ctx context.Context, process func(c
 		if rid == "" {
 			eCtx = eCtx.SetReqExtData(eCtx, "request_id", util.NewRequestID())
 		}
-		eCtx = eCtx.SetReqExtCallClientService(eCtx, util.GetEnv("CLIENT_SERVICE", "-"))
 		nCtx = eCtx
 	} else {
 		logger.Warnf(ctx, "ctx format error")

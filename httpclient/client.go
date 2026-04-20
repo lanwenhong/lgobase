@@ -3,10 +3,9 @@ package httpclient
 import (
 	"crypto/tls"
 	"fmt"
+	"github.com/lanwenhong/lgobase/util"
 	"net/http"
 	"time"
-
-	"github.com/lanwenhong/lgobase/util"
 
 	"github.com/go-resty/resty/v2"
 	"github.com/lanwenhong/lgobase/logger"
@@ -47,8 +46,10 @@ func NewHttpClient(transport *http.Transport) *resty.Client {
 			}
 		}
 		ctx := req.Context()
-		clientService := util.GetEnv("CLIENT_SERVICE", "-")
-		client.SetHeader("Client-Service", clientService)
+		clientService := client.Header.Get("Client-Service")
+		if clientService == "" {
+			client.SetHeader("Client-Service", util.GetEnv("CLIENT_SERVICE", "-"))
+		}
 		//logger.Infof(ctx, "send|mehtod=%s|url=%s|body=%s", req.Method, req.URL, s)
 		logger.Info(ctx, "HttpClient", "func", "send", "method", req.Method, "url", req.URL, "body", s)
 		return nil
