@@ -85,9 +85,8 @@ func (h *MyModifyHandler) Handle(ctx context.Context, r slog.Record) error {
 			r.AddAttrs(slog.String(k, "-"))
 		}
 	}
-
 	var buf bytes.Buffer
-	base := slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})
+	base := slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug, ReplaceAttr: DesensitizeReplaceAttr})
 	if err := base.Handle(ctx, r); err != nil {
 		return err
 	}
