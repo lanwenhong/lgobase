@@ -234,28 +234,25 @@ func TestLogRatate(t *testing.T) {
 }
 
 func TestLogDebug(t *testing.T) {
-	/*myconf := &logger.Glogconf{
-		RotateMethod: logger.ROTATE_FILE_DAILY,
-		Colorful:     true,
-		Stdout:       true,
-		Loglevel:     logger.DEBUG,
-		//Format:       logger.TEXT_FORMAT,
-	}*/
-	//logger.Newglog("./", "test.log", "test.log.err", myconf)
+	myconf := &logger.Glogconf{
+		RotateMethod:     logger.ROTATE_FILE_DAILY,
+		Colorful:         true,
+		Stdout:           true,
+		Loglevel:         logger.DEBUG,
+		DesensitizeField: "xx",
+	}
+	logger.Newglog("./", "test.log", "test.log.err", myconf)
 	ctx := context.WithValue(context.Background(), "trace_id", NewRequestID())
 	//ctx := context.Background()
 	logger.Debug(ctx, "test", "userid", 1, "userid2", 2)
-	logger.Debugf(ctx, "%s %d %d", "xxx", 1, 3)
+	//logger.Debugf(ctx, "%s %d %d", "xxx", 1, 3)
 
-	//logger.Info(ctx, "liushishi", "jujingyi", 111, 2, 3)
-	logger.Infof(ctx, "%s %s %d %d %d", "liushishi", "jujingyi", 111, 2, 3)
+	logger.Info(ctx, "test", "xx", "jujingyi", "uid", 1)
+	//logger.Infof(ctx, "%s %s %d %d %d", "liushishi", "jujingyi", 111, 2, 3)
 
-	//logger.Warn(ctx, "ffff", 12, 13)
-	logger.Warnf(ctx, "%s %d %d", "ffff", 12, 13)
+	logger.Warn(ctx, "test", "ffff", 12)
+	//logger.Warnf(ctx, "%s %d %d", "ffff", 12, 13)
 
-	//logger.Error(ctx, "liushishi", "jujingyi", 111, 2, 3)
-	logger.Errorf(ctx, "%s %s %d %d %d", "liushishi", "jujingyi", 111, 2, 3)
-
-	logger.Debugf(ctx, "ddddddd")
-
+	logger.Error(ctx, "test", "xx", "jujingyi", "uid", 2)
+	//logger.Errorf(ctx, "%s %s %d %d %d", "liushishi", "jujingyi", 111, 2, 3)
 }

@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -67,30 +68,32 @@ type FILE struct {
 }
 
 type Glogconf struct {
-	//maxFileSize     int64
-	MaxFileSize int64
-	//maxFileCount    int32
-	MaxFileCount int32
-	//dailyRolling    bool
-	RotateMethod int
-	//consoleAppender bool
-	RollingFile bool
-	Stdout      bool
-	Colorful    bool
-	Goid        bool
-	Loglevel    LEVEL
-	CtxValueKey string
-	Format      int
+	MaxFileSize      int64
+	MaxFileCount     int32
+	RotateMethod     int
+	RollingFile      bool
+	Stdout           bool
+	Colorful         bool
+	Goid             bool
+	Loglevel         LEVEL
+	CtxValueKey      string
+	Format           int
+	DesensitizeField string
 }
 
 type Glog struct {
-	LogObj     *FILE
-	Logconf    *Glogconf
-	LogormConf *dlog.Config
-	LogTags    []string
+	LogObj              *FILE
+	Logconf             *Glogconf
+	LogormConf          *dlog.Config
+	LogTags             []string
+	DesensitizeFieldMap map[string]bool
+	JsonMatchRegex      *regexp.Regexp
+	XmlMatchRegex       *regexp.Regexp
 }
 
-var Gfilelog = NewDefaultGLog()
+// var Gfilelog = NewDefaultGLog()
+var Gfilelog *Glog = nil
+var GfilelogIgnore = NewDefaultGLog()
 
 func GetGoid() uint64 {
 	var (
@@ -123,13 +126,13 @@ func GetstrGoid() string {
 
 // NewDefaultGLog
 // 生成默认的日志配置
-func NewDefaultGLog() (res *Glog) {
-
+func NewDefaultGLog() *Glog {
 	originalHandler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-		AddSource: false, // 关闭官方长路径
-		Level:     slog.LevelDebug,
+		AddSource:   false, // 关闭官方长路径
+		Level:       slog.LevelDebug,
+		ReplaceAttr: DesensitizeReplaceAttr,
 	})
-	res = &Glog{
+	res := &Glog{
 		LogObj: &FILE{
 			lg: slog.New(NewMyModifyHandler(os.Stdout, nil, nil, originalHandler)),
 		},
@@ -148,9 +151,23 @@ func NewDefaultGLog() (res *Glog) {
 		},
 	}
 	res.LogTags = strings.Split(res.Logconf.CtxValueKey, ",")
+	res.loadDesensitizeField()
+	res.JsonMatchRegex = regexp.MustCompile(`(?s)^\s*(\{.*\}|\[.*\])\s*$`)
+	res.XmlMatchRegex = regexp.MustCompile(`(?s)^\s*<\w+.*>.*</\w+>\s*$`)
+
+	Gfilelog = res
+	/*originalHandler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		AddSource:   false, // 关闭官方长路径
+		Level:       slog.LevelDebug,
+		ReplaceAttr: DesensitizeReplaceAttr,
+	})
+	res.LogObj = &FILE{
+		lg: slog.New(NewMyModifyHandler(os.Stdout, nil, nil, originalHandler)),
+	}*/
+
 	res.SetRollingFile("", "", true)
 	slog.SetDefault(res.LogObj.lg)
-	return
+	return res
 }
 
 func Newglog(fileDir string, fileName string, fileNameErr string, glog_conf *Glogconf) *Glog {
@@ -175,6 +192,9 @@ func Newglog(fileDir string, fileName string, fileNameErr string, glog_conf *Glo
 		Logconf:    glog_conf,
 		LogormConf: dconfig,
 	}
+	glog.loadDesensitizeField()
+	glog.JsonMatchRegex = regexp.MustCompile(`^\s*(\{.*\}|\[.*\])\s*$`)
+	glog.XmlMatchRegex = regexp.MustCompile(`(?s)^\s*<\w+.*>.*</\w+>\s*$`)
 	if glog_conf.RotateMethod == ROTATE_FILE_NUM {
 		glog.SetRollingFile(fileDir, fileName, glog_conf.Stdout)
 	} else {
@@ -191,6 +211,17 @@ func SetConsole(isConsole bool) {
 
 func SetLevel(_level LEVEL) {
 	logLevel = _level
+}
+
+func (glog *Glog) loadDesensitizeField() {
+	if glog.Logconf.DesensitizeField != "" {
+		glog.DesensitizeFieldMap = make(map[string]bool)
+		field := strings.Split(glog.Logconf.DesensitizeField, ",")
+		for _, f := range field {
+			glog.DesensitizeFieldMap[f] = true
+		}
+	}
+	//fmt.Println(glog.DesensitizeFieldMap)
 }
 
 func (glog *Glog) fileMonitor() {
@@ -234,8 +265,9 @@ func (glog *Glog) setSlog(errFile *os.File) {
 		slog.SetDefault(glog.LogObj.lg)
 	} else {
 		originalHandler := slog.NewJSONHandler(glog.LogObj.logfile, &slog.HandlerOptions{
-			AddSource: false, // 关闭官方长路径
-			Level:     glog.getSlogLevel(),
+			AddSource:   false, // 关闭官方长路径
+			Level:       glog.getSlogLevel(),
+			ReplaceAttr: DesensitizeReplaceAttr,
 			//Level:     slog.LevelDebug,
 		})
 		glog.LogObj.lg = slog.New(NewMyModifyHandler(os.Stdout, glog.LogObj.logfile, errFile, originalHandler))
