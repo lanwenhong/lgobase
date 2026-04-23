@@ -43,14 +43,13 @@ func (h *DesensitizeHandler) sensitiveFieldMap(k string) bool {
 func (h *DesensitizeHandler) desensitizeMap(val reflect.Value) any {
 	res := make(map[string]any)
 	for _, k := range val.MapKeys() {
-		keyStr := strings.ToLower(k.String())
+		keyStr := k.String()
 		fieldVal := val.MapIndex(k).Interface()
 
 		if h.sensitiveFieldMap(keyStr) {
 			res[k.String()] = MASKSTR
 		} else {
-			//res[k.String()] = h.Desensitize(fieldVal)
-			res[k.String()] = fieldVal
+			res[k.String()] = h.Desensitize(fieldVal)
 		}
 	}
 	return res
@@ -58,7 +57,8 @@ func (h *DesensitizeHandler) desensitizeMap(val reflect.Value) any {
 
 func (h *DesensitizeHandler) desensitizeString(s string) any {
 	// JSON 字符串自动解析脱敏
-	if len(s) > 0 && (s[0] == '{' || s[0] == '[') {
+	//if len(s) > 0 && (s[0] == '{' || s[0] == '[') {
+	if Gfilelog.JsonMatchRegex.MatchString(s) {
 		var obj any
 		if err := json.Unmarshal([]byte(s), &obj); err == nil {
 			masked := h.Desensitize(obj)
@@ -66,20 +66,22 @@ func (h *DesensitizeHandler) desensitizeString(s string) any {
 			//return string(bs)
 			return json.RawMessage(bs)
 		} else {
-			fmt.Println(err)
+			fmt.Println("=======", err)
 		}
 	}
 
 	// XML 解析脱敏（无正则）
-	if strings.Contains(s, "<") && strings.Contains(s, ">") {
+	//if strings.Contains(s, "<") && strings.Contains(s, ">") {
+	if Gfilelog.XmlMatchRegex.MatchString(s) {
 		var node xmlNode
 		if err := xml.Unmarshal([]byte(s), &node); err == nil {
 			h.desensitizeXMLNode(&node)
 			bs, _ := xml.Marshal(node)
 			return string(bs)
+		} else {
+			fmt.Println("======", err)
 		}
 	}
-	//return MASKSTR
 	return s
 }
 
@@ -148,6 +150,9 @@ func (h *DesensitizeHandler) Desensitize(v any) any {
 }
 
 func DesensitizeReplaceAttr(groups []string, a slog.Attr) slog.Attr {
+	if Gfilelog.Logconf.DesensitizeField == "" {
+		return a
+	}
 	switch a.Key {
 	case slog.TimeKey, slog.LevelKey, slog.MessageKey,
 		slog.SourceKey, IGNORE_CALL_CLIENT_SERVIC, IGNORE_CLIENT_SERVICE,
@@ -155,14 +160,11 @@ func DesensitizeReplaceAttr(groups []string, a slog.Attr) slog.Attr {
 		IGNORE_COST, IGNORE_REQUEST_ID, IGNORE_TRACE_ID:
 		return a
 	}
-	//fmt.Println("=========================", a.Key)
 	h := NewDesensitizeHandler()
 	if h.sensitiveFieldMap(a.Key) {
 		a.Value = slog.AnyValue(MASKSTR)
 	} else {
 		a.Value = slog.AnyValue(h.Desensitize(a.Value.Any()))
 	}
-	//a.Value = slog.AnyValue(h.Desensitize(a))
-	//}
 	return a
 }

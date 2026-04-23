@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -86,27 +87,13 @@ type Glog struct {
 	LogormConf          *dlog.Config
 	LogTags             []string
 	DesensitizeFieldMap map[string]bool
+	JsonMatchRegex      *regexp.Regexp
+	XmlMatchRegex       *regexp.Regexp
 }
 
 // var Gfilelog = NewDefaultGLog()
 var Gfilelog *Glog = nil
 var GfilelogIgnore = NewDefaultGLog()
-
-//var Gfilelog *Glog = nil
-
-/*func DesensitizeReplaceAttr(groups []string, a slog.Attr) slog.Attr {
-	switch a.Key {
-	case slog.TimeKey, slog.LevelKey, slog.MessageKey,
-		slog.SourceKey, IGNORE_CALL_CLIENT_SERVIC, IGNORE_CLIENT_SERVICE,
-		IGNORE_TRACE_DEPTH, IGNORE_SRC_FIle, IGNORE_FN,
-		IGNORE_COST:
-		return a
-	}
-	h := NewDesensitizeHandler()
-	//fmt.Println(Gfilelog)
-	a.Value = slog.AnyValue(h.Desensitize(a.Value.Any()))
-	return a
-}*/
 
 func GetGoid() uint64 {
 	var (
@@ -165,6 +152,8 @@ func NewDefaultGLog() *Glog {
 	}
 	res.LogTags = strings.Split(res.Logconf.CtxValueKey, ",")
 	res.loadDesensitizeField()
+	res.JsonMatchRegex = regexp.MustCompile(`(?s)^\s*(\{.*\}|\[.*\])\s*$`)
+	res.XmlMatchRegex = regexp.MustCompile(`(?s)^\s*<\w+.*>.*</\w+>\s*$`)
 
 	Gfilelog = res
 	/*originalHandler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
@@ -204,6 +193,8 @@ func Newglog(fileDir string, fileName string, fileNameErr string, glog_conf *Glo
 		LogormConf: dconfig,
 	}
 	glog.loadDesensitizeField()
+	glog.JsonMatchRegex = regexp.MustCompile(`^\s*(\{.*\}|\[.*\])\s*$`)
+	glog.XmlMatchRegex = regexp.MustCompile(`(?s)^\s*<\w+.*>.*</\w+>\s*$`)
 	if glog_conf.RotateMethod == ROTATE_FILE_NUM {
 		glog.SetRollingFile(fileDir, fileName, glog_conf.Stdout)
 	} else {
