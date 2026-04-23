@@ -21,6 +21,8 @@ const (
 	MASKSTR                   = "******"
 )
 
+type DesensitizeFunc func(any) any
+
 type xmlNode struct {
 	XMLName xml.Name
 	Content string    `xml:",chardata"`
@@ -45,9 +47,15 @@ func (h *DesensitizeHandler) desensitizeMap(val reflect.Value) any {
 	for _, k := range val.MapKeys() {
 		keyStr := k.String()
 		fieldVal := val.MapIndex(k).Interface()
-
 		if h.sensitiveFieldMap(keyStr) {
-			res[k.String()] = MASKSTR
+			//res[k.String()] = MASKSTR
+			if dfunc, ok := Gfilelog.DesensitizeFuncMap[keyStr]; ok {
+				fmt.Println(keyStr)
+				fmt.Println(dfunc(fieldVal))
+				res[k.String()] = dfunc(fieldVal)
+			} else {
+				res[k.String()] = MASKSTR
+			}
 		} else {
 			res[k.String()] = h.Desensitize(fieldVal)
 		}
@@ -117,9 +125,16 @@ func (h *DesensitizeHandler) desensitizeStruct(val reflect.Value) any {
 }
 
 func (h *DesensitizeHandler) desensitizeXMLNode(n *xmlNode) {
-	name := strings.ToLower(n.XMLName.Local)
+	//name := strings.ToLower(n.XMLName.Local)
+	name := n.XMLName.Local
+	fmt.Println(name)
 	if h.sensitiveFieldMap(name) {
-		n.Content = MASKSTR
+		//n.Content = MASKSTR
+		if dfunc, ok := Gfilelog.DesensitizeFuncMap[name]; ok {
+			n.Content = dfunc(n.Content).(string)
+		} else {
+			n.Content = MASKSTR
+		}
 		return
 	}
 	for i := range n.Nodes {
@@ -184,8 +199,14 @@ func DesensitizeReplaceAttr(groups []string, a slog.Attr) slog.Attr {
 		IGNORE_COST, IGNORE_REQUEST_ID, IGNORE_TRACE_ID:
 		return a
 	}
+	//fmt.Println(Gfilelog.DesensitizeFuncMap)
+	//fmt.Println(a.Key)
 	if h.sensitiveFieldMap(a.Key) {
-		a.Value = slog.AnyValue(MASKSTR)
+		if dfunc, ok := Gfilelog.DesensitizeFuncMap[a.Key]; ok {
+			a.Value = slog.AnyValue(dfunc(a.Value.Any()))
+		} else {
+			a.Value = slog.AnyValue(MASKSTR)
+		}
 	} else {
 		a.Value = slog.AnyValue(h.Desensitize(a.Value.Any()))
 	}
