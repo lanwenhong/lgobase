@@ -92,7 +92,7 @@ func (h *DesensitizeHandler) desensitizeString(s string) any {
 			bs, _ := xml.Marshal(node)
 			return string(bs)
 		} else {
-			fmt.Println("======", err)
+			fmt.Println(err)
 		}
 	}
 
@@ -164,7 +164,17 @@ func (h *DesensitizeHandler) Desensitize(v any) any {
 }
 
 func DesensitizeReplaceAttr(groups []string, a slog.Attr) slog.Attr {
+	h := NewDesensitizeHandler()
 	if Gfilelog.Logconf.DesensitizeField == "" {
+		v := a.Value.Any()
+		val := reflect.ValueOf(v)
+		if val.Kind() == reflect.String && json.Valid([]byte(val.String())) {
+			/*s := val.String()
+			if json.Valid([]byte(s)) {
+				a.Value = slog.AnyValue(json.RawMessage(s))
+			}*/
+			a.Value = slog.AnyValue(h.Desensitize(a.Value.Any()))
+		}
 		return a
 	}
 	switch a.Key {
@@ -174,7 +184,6 @@ func DesensitizeReplaceAttr(groups []string, a slog.Attr) slog.Attr {
 		IGNORE_COST, IGNORE_REQUEST_ID, IGNORE_TRACE_ID:
 		return a
 	}
-	h := NewDesensitizeHandler()
 	if h.sensitiveFieldMap(a.Key) {
 		a.Value = slog.AnyValue(MASKSTR)
 	} else {
