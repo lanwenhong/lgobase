@@ -55,24 +55,37 @@ func (h *DesensitizeHandler) desensitizeMap(val reflect.Value) any {
 	return res
 }
 
+func (h *DesensitizeHandler) IsJSON(s string) bool {
+	if s == "" {
+		return false
+	}
+	var js json.RawMessage
+	return json.Unmarshal([]byte(s), &js) == nil
+}
+
+func (h *DesensitizeHandler) IsXML(s string) bool {
+	var node any
+	return xml.Unmarshal([]byte(s), &node) == nil
+}
+
 func (h *DesensitizeHandler) desensitizeString(s string) any {
 	// JSON 字符串自动解析脱敏
-	//if len(s) > 0 && (s[0] == '{' || s[0] == '[') {
-	if Gfilelog.JsonMatchRegex.MatchString(s) {
+	if len(s) > 0 && (s[0] == '{' || s[0] == '[') {
 		var obj any
 		if err := json.Unmarshal([]byte(s), &obj); err == nil {
 			masked := h.Desensitize(obj)
 			bs, _ := json.Marshal(masked)
-			//return string(bs)
 			return json.RawMessage(bs)
+			//return string(bs)
 		} else {
-			fmt.Println("=======", err)
+			fmt.Println(err)
 		}
 	}
 
 	// XML 解析脱敏（无正则）
-	//if strings.Contains(s, "<") && strings.Contains(s, ">") {
-	if Gfilelog.XmlMatchRegex.MatchString(s) {
+	if strings.Contains(s, "<") && strings.Contains(s, ">") {
+		//if len(s) > 0 && s[0] == '<' && h.IsXML(s) {
+		//if Gfilelog.XmlMatchRegex.MatchString(s) {
 		var node xmlNode
 		if err := xml.Unmarshal([]byte(s), &node); err == nil {
 			h.desensitizeXMLNode(&node)
@@ -82,6 +95,7 @@ func (h *DesensitizeHandler) desensitizeString(s string) any {
 			fmt.Println("======", err)
 		}
 	}
+
 	return s
 }
 
