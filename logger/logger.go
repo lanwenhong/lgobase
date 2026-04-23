@@ -87,6 +87,7 @@ type Glog struct {
 	LogormConf          *dlog.Config
 	LogTags             []string
 	DesensitizeFieldMap map[string]bool
+	DesensitizeFuncMap  map[string]DesensitizeFunc
 	JsonMatchRegex      *regexp.Regexp
 	XmlMatchRegex       *regexp.Regexp
 }
@@ -150,6 +151,7 @@ func NewDefaultGLog() *Glog {
 			Colorful:                  true,
 		},
 	}
+	res.DesensitizeFuncMap = make(map[string]DesensitizeFunc)
 	res.LogTags = strings.Split(res.Logconf.CtxValueKey, ",")
 	res.loadDesensitizeField()
 	res.JsonMatchRegex = regexp.MustCompile(`(?s)^\s*(\{.*\}|\[.*\])\s*$`)
@@ -192,6 +194,7 @@ func Newglog(fileDir string, fileName string, fileNameErr string, glog_conf *Glo
 		Logconf:    glog_conf,
 		LogormConf: dconfig,
 	}
+	glog.DesensitizeFuncMap = make(map[string]DesensitizeFunc)
 	glog.loadDesensitizeField()
 	glog.JsonMatchRegex = regexp.MustCompile(`^\s*(\{.*\}|\[.*\])\s*$`)
 	glog.XmlMatchRegex = regexp.MustCompile(`(?s)^\s*<\w+.*>.*</\w+>\s*$`)
@@ -314,6 +317,10 @@ func (glog *Glog) SetRollingFile(fileDir, fileName string, stdout bool) error {
 
 func (glog *Glog) GetLogger() *slog.Logger {
 	return glog.LogObj.lg
+}
+
+func (glog *Glog) RegisterDesensitizeFunc(ctx context.Context, k string, f DesensitizeFunc) {
+	glog.DesensitizeFuncMap[k] = f
 }
 
 func (glog *Glog) SetRollingDaily(fileDir, fileName, fileName_err string, stdout bool) error {
