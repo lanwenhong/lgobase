@@ -67,8 +67,8 @@ func TestDesensitizeComplex(t *testing.T) {
 func TestDesensitizeTradeData(t *testing.T) {
 	myconf := &logger.Glogconf{
 		RotateMethod:     logger.ROTATE_FILE_DAILY,
-		Colorful:         true,
-		Stdout:           true,
+		Colorful:         false,
+		Stdout:           false,
 		Loglevel:         logger.DEBUG,
 		DesensitizeField: "expired_date,iccdata,trackData,cardNo",
 	}

@@ -48,21 +48,29 @@ func appendInt(buf []byte, i int) []byte {
 }
 
 type MyModifyHandler struct {
-	Mu         sync.Mutex
-	Stdout     *os.File
-	LogFile    *os.File
-	LogFileErr *os.File
-	base       slog.Handler // 底层：官方 JSONHandler
+	Mu            sync.Mutex
+	Stdout        *os.File
+	LogFile       *os.File
+	LogFileErr    *os.File
+	warnErrBase   slog.Handler
+	debugInfoBase slog.Handler
+	base          slog.Handler // 底层：官方 JSONHandler
+	stdoutBase    slog.Handler
 }
 
-func NewMyModifyHandler(stdout, logFile, logFileErr *os.File, b slog.Handler) *MyModifyHandler {
-	return &MyModifyHandler{
-		Stdout:     stdout,
-		LogFile:    logFile,
-		LogFileErr: logFileErr,
-		base:       b,
-		//RegExp:     regexp.MustCompile(`^[\w\-\.]+\.go:\d+`),
+// func NewMyModifyHandler(stdout, logFile, logFileErr *os.File, b slog.Handler) *MyModifyHandler {
+func NewMyModifyHandler(stdout, logFile, logFileErr *os.File) *MyModifyHandler {
+	handler := &MyModifyHandler{
+		Stdout:        stdout,
+		LogFile:       logFile,
+		LogFileErr:    logFileErr,
+		warnErrBase:   slog.NewJSONHandler(logFileErr, &slog.HandlerOptions{Level: Gfilelog.getSlogLevel(), ReplaceAttr: DesensitizeReplaceAttr}),
+		debugInfoBase: slog.NewJSONHandler(logFile, &slog.HandlerOptions{Level: Gfilelog.getSlogLevel(), ReplaceAttr: DesensitizeReplaceAttr}),
+		stdoutBase:    slog.NewJSONHandler(stdout, &slog.HandlerOptions{Level: Gfilelog.getSlogLevel(), ReplaceAttr: DesensitizeReplaceAttr}),
+		//base:          b,
 	}
+	handler.base = handler.debugInfoBase
+	return handler
 }
 
 // 核心：在这里修改日志内容
@@ -85,56 +93,43 @@ func (h *MyModifyHandler) Handle(ctx context.Context, r slog.Record) error {
 			r.AddAttrs(slog.String(k, "-"))
 		}
 	}
-	var buf bytes.Buffer
-	base := slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug, ReplaceAttr: DesensitizeReplaceAttr})
-	if err := base.Handle(ctx, r); err != nil {
-		return err
-	}
-
-	data := buf.Bytes()
-	tbuf := make([]byte, 0, 1024)
-
-	if Gfilelog.Logconf.Colorful {
-		switch r.Level {
-		case slog.LevelWarn:
-			tbuf = append(tbuf, yellow...)
-		case slog.LevelDebug:
-			tbuf = append(tbuf, green...)
-		case slog.LevelInfo:
-			tbuf = append(tbuf, blue...)
-		case slog.LevelError:
-			tbuf = append(tbuf, red...)
-		}
-	}
-	tbuf = append(tbuf, data...)
-	if Gfilelog.Logconf.Colorful {
-		tbuf = append(tbuf, reset...)
-	}
-
 	var err error
-	//h.Mu.Lock()
-	//defer h.Mu.Unlock()
 	if Gfilelog.Logconf.Stdout {
-		h.Mu.Lock()
-		_, err = h.Stdout.Write(tbuf)
-		h.Mu.Unlock()
-	} else {
-		if r.Level < slog.LevelWarn {
-			h.Mu.Lock()
-			_, err = h.LogFile.Write(tbuf)
-			h.Mu.Unlock()
-		} else if r.Level >= slog.LevelWarn {
-			h.Mu.Lock()
-			_, err = h.LogFile.Write(tbuf)
-			h.Mu.Unlock()
-			if err != nil {
+		//处理彩色
+		if Gfilelog.Logconf.Colorful {
+			var buf bytes.Buffer
+			base := slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug, ReplaceAttr: DesensitizeReplaceAttr})
+			if err := base.Handle(ctx, r); err != nil {
 				return err
 			}
-			if h.LogFileErr != nil {
-				h.Mu.Lock()
-				_, err = h.LogFileErr.Write(tbuf)
-				h.Mu.Unlock()
+			data := buf.Bytes()
+			tbuf := make([]byte, 0, 1024)
+			switch r.Level {
+			case slog.LevelWarn:
+				tbuf = append(tbuf, yellow...)
+			case slog.LevelDebug:
+				tbuf = append(tbuf, green...)
+			case slog.LevelInfo:
+				tbuf = append(tbuf, blue...)
+			case slog.LevelError:
+				tbuf = append(tbuf, red...)
 			}
+			tbuf = append(tbuf, data...)
+			if Gfilelog.Logconf.Colorful {
+				tbuf = append(tbuf, reset...)
+			}
+			h.Mu.Lock()
+			_, err = h.Stdout.Write(tbuf)
+			h.Mu.Unlock()
+		} else {
+			err = h.stdoutBase.Handle(ctx, r)
+		}
+	} else {
+		if r.Level < slog.LevelWarn {
+			err = h.debugInfoBase.Handle(ctx, r)
+		} else {
+			err = h.debugInfoBase.Handle(ctx, r)
+			err = h.warnErrBase.Handle(ctx, r)
 		}
 	}
 	return err
