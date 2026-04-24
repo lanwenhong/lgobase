@@ -128,15 +128,7 @@ func GetstrGoid() string {
 // NewDefaultGLog
 // 生成默认的日志配置
 func NewDefaultGLog() *Glog {
-	/*originalHandler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-		AddSource:   false, // 关闭官方长路径
-		Level:       slog.LevelDebug,
-		ReplaceAttr: DesensitizeReplaceAttr,
-	})*/
 	res := &Glog{
-		/*LogObj: &FILE{
-			lg: slog.New(NewMyModifyHandler(os.Stdout, nil, nil, originalHandler)),
-		},*/
 		Logconf: &Glogconf{
 			RollingFile: false,
 			Stdout:      true,
@@ -161,16 +153,6 @@ func NewDefaultGLog() *Glog {
 	res.loadDesensitizeField()
 	res.JsonMatchRegex = regexp.MustCompile(`(?s)^\s*(\{.*\}|\[.*\])\s*$`)
 	res.XmlMatchRegex = regexp.MustCompile(`(?s)^\s*<\w+.*>.*</\w+>\s*$`)
-
-	/*originalHandler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-		AddSource:   false, // 关闭官方长路径
-		Level:       slog.LevelDebug,
-		ReplaceAttr: DesensitizeReplaceAttr,
-	})
-	res.LogObj = &FILE{
-		lg: slog.New(NewMyModifyHandler(os.Stdout, nil, nil, originalHandler)),
-	}*/
-
 	res.SetRollingFile("", "", true)
 	slog.SetDefault(res.LogObj.lg)
 	return res
@@ -271,13 +253,6 @@ func (glog *Glog) setSlog(errFile *os.File) {
 		glog.LogObj.lg = NewCustomLogger(os.Stdout, glog.LogObj.logfile, errFile, log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile)
 		slog.SetDefault(glog.LogObj.lg)
 	} else {
-		/*originalHandler := slog.NewJSONHandler(glog.LogObj.logfile, &slog.HandlerOptions{
-			AddSource:   false, // 关闭官方长路径
-			Level:       glog.getSlogLevel(),
-			ReplaceAttr: DesensitizeReplaceAttr,
-			//Level:     slog.LevelDebug,
-		})*/
-		//glog.LogObj.lg = slog.New(NewMyModifyHandler(os.Stdout, glog.LogObj.logfile, errFile, originalHandler))
 		glog.LogObj.lg = slog.New(NewMyModifyHandler(os.Stdout, glog.LogObj.logfile, errFile))
 		slog.SetDefault(glog.LogObj.lg)
 	}
