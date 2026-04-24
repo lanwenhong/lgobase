@@ -50,8 +50,8 @@ func (h *DesensitizeHandler) desensitizeMap(val reflect.Value) any {
 		if h.sensitiveFieldMap(keyStr) {
 			//res[k.String()] = MASKSTR
 			if dfunc, ok := Gfilelog.DesensitizeFuncMap[keyStr]; ok {
-				fmt.Println(keyStr)
-				fmt.Println(dfunc(fieldVal))
+				//fmt.Println(keyStr)
+				//fmt.Println(dfunc(fieldVal))
 				res[k.String()] = dfunc(fieldVal)
 			} else {
 				res[k.String()] = MASKSTR
