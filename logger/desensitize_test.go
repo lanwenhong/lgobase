@@ -9,13 +9,17 @@ import (
 	"github.com/lanwenhong/lgobase/util"
 )
 
+type TestStru struct {
+	CardNo string
+}
+
 func TestDesensitizeComplex(t *testing.T) {
 	myconf := &logger.Glogconf{
 		RotateMethod:     logger.ROTATE_FILE_DAILY,
 		Colorful:         true,
 		Stdout:           true,
 		Loglevel:         logger.DEBUG,
-		DesensitizeField: "xx,password,cardNo",
+		DesensitizeField: "xx,password,cardNo,CardNo",
 	}
 	log := logger.Newglog("./", "test.log", "test.log.err", myconf)
 	ctx := context.WithValue(context.Background(), "trace_id", util.NewRequestID())
@@ -32,12 +36,29 @@ func TestDesensitizeComplex(t *testing.T) {
 		return pre + "******" + suf
 	})
 
+	log.RegisterDesensitizeFunc(ctx, "CardNo", func(v any) any {
+		s := v.(string)
+		s = strings.ReplaceAll(s, " ", "")
+		s = strings.ReplaceAll(s, "-", "")
+
+		if len(s) <= 10 {
+			return s // 太短不脱敏
+		}
+		pre := s[:6]
+		suf := s[len(s)-4:]
+		return pre + "******" + suf
+	})
+
+	ts := TestStru{
+		CardNo: "11111111111111111111",
+	}
 	logger.Info(ctx, "全结构脱敏测试（含slice）",
 		// 普通字段
 		"phone", "13811112222",
 		"password", "testpwd",
 		"xx", "111111",
 
+		"testStru", ts,
 		// Map
 		"user", map[string]any{
 			"username": "test",
@@ -67,8 +88,8 @@ func TestDesensitizeComplex(t *testing.T) {
 func TestDesensitizeTradeData(t *testing.T) {
 	myconf := &logger.Glogconf{
 		RotateMethod:     logger.ROTATE_FILE_DAILY,
-		Colorful:         false,
-		Stdout:           false,
+		Colorful:         true,
+		Stdout:           true,
 		Loglevel:         logger.DEBUG,
 		DesensitizeField: "expired_date,iccdata,trackData,cardNo",
 	}
