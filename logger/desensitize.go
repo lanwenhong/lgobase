@@ -112,11 +112,18 @@ func (h *DesensitizeHandler) desensitizeStruct(val reflect.Value) any {
 	typ := val.Type()
 	for i := 0; i < val.NumField(); i++ {
 		field := typ.Field(i)
-		keyStr := strings.ToLower(field.Name)
+		//keyStr := strings.ToLower(field.Name)
+		keyStr := field.Name
 		fieldVal := val.Field(i).Interface()
 
 		if h.sensitiveFieldMap(keyStr) {
-			res[field.Name] = MASKSTR
+			if dfunc, ok := Gfilelog.DesensitizeFuncMap[keyStr]; ok {
+				//fmt.Println(keyStr)
+				//fmt.Println(dfunc(fieldVal))
+				res[field.Name] = dfunc(fieldVal)
+			} else {
+				res[field.Name] = MASKSTR
+			}
 		} else {
 			res[field.Name] = h.Desensitize(fieldVal)
 		}
@@ -127,7 +134,7 @@ func (h *DesensitizeHandler) desensitizeStruct(val reflect.Value) any {
 func (h *DesensitizeHandler) desensitizeXMLNode(n *xmlNode) {
 	//name := strings.ToLower(n.XMLName.Local)
 	name := n.XMLName.Local
-	fmt.Println(name)
+	//fmt.Println(name)
 	if h.sensitiveFieldMap(name) {
 		//n.Content = MASKSTR
 		if dfunc, ok := Gfilelog.DesensitizeFuncMap[name]; ok {
