@@ -114,8 +114,11 @@ func (h *DesensitizeHandler) desensitizeStruct(val reflect.Value) any {
 		field := typ.Field(i)
 		//keyStr := strings.ToLower(field.Name)
 		keyStr := field.Name
+		if !val.Field(i).CanInterface() {
+			res[keyStr] = val.Field(i)
+			continue
+		}
 		fieldVal := val.Field(i).Interface()
-
 		if h.sensitiveFieldMap(keyStr) {
 			if dfunc, ok := Gfilelog.DesensitizeFuncMap[keyStr]; ok {
 				//fmt.Println(keyStr)
@@ -188,15 +191,11 @@ func (h *DesensitizeHandler) Desensitize(v any) any {
 func DesensitizeReplaceAttr(groups []string, a slog.Attr) slog.Attr {
 	h := NewDesensitizeHandler()
 	if Gfilelog.Logconf.DesensitizeField == "" {
-		v := a.Value.Any()
+		/*v := a.Value.Any()
 		val := reflect.ValueOf(v)
 		if val.Kind() == reflect.String && json.Valid([]byte(val.String())) {
-			/*s := val.String()
-			if json.Valid([]byte(s)) {
-				a.Value = slog.AnyValue(json.RawMessage(s))
-			}*/
 			a.Value = slog.AnyValue(h.Desensitize(a.Value.Any()))
-		}
+		}*/
 		return a
 	}
 	switch a.Key {
@@ -206,8 +205,6 @@ func DesensitizeReplaceAttr(groups []string, a slog.Attr) slog.Attr {
 		IGNORE_COST, IGNORE_REQUEST_ID, IGNORE_TRACE_ID:
 		return a
 	}
-	//fmt.Println(Gfilelog.DesensitizeFuncMap)
-	//fmt.Println(a.Key)
 	if h.sensitiveFieldMap(a.Key) {
 		if dfunc, ok := Gfilelog.DesensitizeFuncMap[a.Key]; ok {
 			a.Value = slog.AnyValue(dfunc(a.Value.Any()))

@@ -10,6 +10,7 @@ import (
 )
 
 type TestStru struct {
+	cardNo string
 	CardNo string
 }
 
@@ -51,6 +52,7 @@ func TestDesensitizeComplex(t *testing.T) {
 
 	ts := TestStru{
 		CardNo: "11111111111111111111",
+		cardNo: "11111111111111111111",
 	}
 	logger.Info(ctx, "全结构脱敏测试（含slice）",
 		// 普通字段
