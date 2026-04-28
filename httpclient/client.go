@@ -5,11 +5,37 @@ import (
 	"fmt"
 	"github.com/lanwenhong/lgobase/util"
 	"net/http"
+	"runtime"
+	"strconv"
 	"time"
 
 	"github.com/go-resty/resty/v2"
 	"github.com/lanwenhong/lgobase/logger"
 )
+
+func GetCaller(skip int) (fileName string, line string, funcName string) {
+	pc, file, iline, ok := runtime.Caller(skip)
+	if !ok {
+		return "unknown", "0", "unknown"
+	}
+
+	// 提取函数名
+	fn := runtime.FuncForPC(pc)
+	if fn != nil {
+		funcName = fn.Name()
+	}
+
+	// 只取文件名，不要全路径
+	short := file
+	for i := len(file) - 1; i > 0; i-- {
+		if file[i] == '/' {
+			short = file[i+1:]
+			break
+		}
+	}
+	fileName = short
+	return fileName, ":" + strconv.Itoa(iline), funcName
+}
 
 func NewHttpClient(transport *http.Transport) *resty.Client {
 	client := resty.New()
@@ -45,13 +71,14 @@ func NewHttpClient(transport *http.Transport) *resty.Client {
 				s = fmt.Sprintf("%v", req.Body)
 			}
 		}
+		file, line, fn := GetCaller(6)
 		ctx := req.Context()
 		clientService := client.Header.Get("Client-Service")
 		if clientService == "" {
 			client.SetHeader("Client-Service", util.GetEnv("CLIENT_SERVICE", "-"))
 		}
 		//logger.Infof(ctx, "send|mehtod=%s|url=%s|body=%s", req.Method, req.URL, s)
-		logger.Info(ctx, "HttpClient", "func", "send", "method", req.Method, "url", req.URL, "body", s)
+		logger.Info(ctx, "HttpClient", "func", "send", "method", req.Method, "url", req.URL, "body", s, "srcFile", file+line, "fn", fn)
 		return nil
 	})
 
@@ -62,9 +89,10 @@ func NewHttpClient(transport *http.Transport) *resty.Client {
 		if ctx.Value("log_resp") == "false" {
 			ret = "*"
 		}
+		file, line, fn := GetCaller(5)
 		//logger.Infof(ctx, "recv|method=%s|url=%s|code=%d|ret=%s|time=%dms", resp.Request.Method, resp.Request.URL, resp.StatusCode(), resp.String(), costTime.Milliseconds())
 		logger.Info(ctx, "HttpClient", "func", "recv", "method", resp.Request.Method, "url", resp.Request.URL,
-			"code", resp.StatusCode(), "ret", ret, "cost", fmt.Sprintf("%dms", costTime.Milliseconds()))
+			"code", resp.StatusCode(), "ret", ret, "cost", fmt.Sprintf("%dms", costTime.Milliseconds()), "srcFile", file+line, "fn", fn)
 		return nil
 	})
 	return client
