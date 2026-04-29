@@ -19,7 +19,7 @@ func TestAdd1(t *testing.T) {
 	myconf := &logger.Glogconf{
 		RotateMethod: logger.ROTATE_FILE_DAILY,
 		Stdout:       true,
-		Colorful:     false,
+		Colorful:     true,
 		Loglevel:     logger.INFO,
 		//CtxValueKey:  "trace_id,request_id,client_service,depth",
 	}
@@ -67,7 +67,7 @@ func TestAdd1(t *testing.T) {
 					return "add", err
 				}
 				ctx := context.WithValue(ctx, "request_id", util.NewRequestID())
-				ctx = context.WithValue(ctx, "depth", "4")
+				ctx = context.WithValue(ctx, "trace_depth", "4")
 				ctx = context.WithValue(ctx, "client_service", "callAdd")
 
 				//callCtx := context.WithValue(ctx, "client_service", "testAdd")
