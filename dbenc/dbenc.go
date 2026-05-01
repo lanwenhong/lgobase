@@ -4,16 +4,13 @@ import (
 	"context"
 	"crypto/md5"
 	"encoding/hex"
-	"fmt"
+	config "github.com/lanwenhong/lgobase/gconfig"
+	"github.com/lanwenhong/lgobase/logger"
+	"github.com/lanwenhong/lgobase/util"
 	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
-	"time"
-
-	config "github.com/lanwenhong/lgobase/gconfig"
-	"github.com/lanwenhong/lgobase/logger"
-	"github.com/lanwenhong/lgobase/util"
 )
 
 type DbConf struct {
@@ -48,7 +45,7 @@ func DbConfNew(ctx context.Context, filename string) *DbConf {
 
 	if flag != "FFFFFFFF" {
 		cfg := config.NewGconf(filename)
-		err := cfg.GconfParse()
+		err := cfg.GconfParseFromString(string(fbuf))
 		if err != nil {
 			logger.Warnf(ctx, "db conf err: %s", err.Error())
 			return nil
@@ -90,19 +87,8 @@ func DbConfNew(ctx context.Context, filename string) *DbConf {
 		logger.Debugf(ctx, "datalen: %d data padlen: %d", len(realdata), padlen)
 		realdata = realdata[:len(realdata)-padlen]
 		logger.Debugf(ctx, "get data: %s", realdata)
-
-		gen := time.Now().UnixNano()
-		filename := fmt.Sprintf("/tmp/db_%d.conf", gen)
-		fd, err := os.Create(filename)
-		defer fd.Close()
-		if err != nil {
-			logger.Warnf(ctx, "create file %s %s", filename, err.Error())
-			return nil
-		}
-		fd.WriteString(string(realdata))
-
 		cfg := config.NewGconf(filename)
-		err = cfg.GconfParse()
+		err = cfg.GconfParseFromString(string(realdata))
 		if err != nil {
 			logger.Warnf(ctx, "db conf err: %s", err.Error())
 			return nil
