@@ -450,7 +450,7 @@ func (gp *Gpool[T]) GetCaller(skip int) (fileName string, line string, funcName 
 func (gp *Gpool[T]) ThriftCall2(ctx context.Context, process func(client interface{}) (string, error)) error {
 	var rpc_err error
 	var rpc_name string = ""
-	file, line, fn := gp.GetCaller(2)
+	//file, line, fn := gp.GetCaller(2)
 
 	starttime := time.Now()
 	defer func() {
@@ -462,9 +462,9 @@ func (gp *Gpool[T]) ThriftCall2(ctx context.Context, process func(client interfa
 		//logger.Infof(ctx, "func=ThriftCall2|method=%v|addr=%s:%d|time=%v|err=%s",
 		//rpc_name, address, gp.TimeOut, time.Since(starttime), errStr)
 		//logger.Info(ctx, "gpool", "func", "ThriftCall2", "method", rpc_name, "addr", fmt.Sprintf("%s:%d", address, gp.TimeOut), "time", time.Since(starttime), "err", errStr)
-		//logger.Info(ctx, "gpool", "func", "ThriftCall2", "method", rpc_name, "addr", fmt.Sprintf("%s:%d", address, gp.TimeOut), "cost", fmt.Sprintf("%v", time.Since(starttime)), "err", errStr)
-		logger.Info(ctx, "gpool", "func", "ThriftCall2", "method", rpc_name, "addr", fmt.Sprintf("%s:%d", address, gp.TimeOut),
-			"srcFile", file, "srcLine", line, "fn", fn, "cost", fmt.Sprintf("%v", time.Since(starttime)), "err", errStr)
+		logger.Info(ctx, "gpool", "func", "ThriftCall2", "method", rpc_name, "addr", fmt.Sprintf("%s:%d", address, gp.TimeOut), "cost", fmt.Sprintf("%v", time.Since(starttime)), "err", errStr)
+		//logger.Info(ctx, "gpool", "func", "ThriftCall2", "method", rpc_name, "addr", fmt.Sprintf("%s:%d", address, gp.TimeOut),
+		//"srcFile", file, "srcLine", line, "fn", fn, "cost", fmt.Sprintf("%v", time.Since(starttime)), "err", errStr)
 	}()
 
 	pc, err := gp.Get(ctx)
@@ -501,9 +501,8 @@ func (gp *Gpool[T]) ThriftCall2(ctx context.Context, process func(client interfa
 
 func (gp *Gpool[T]) ThriftWithTimeOutCall2(ctx context.Context, timeout time.Duration, process func(client interface{}) (string, error)) error {
 	var rpc_err error
-	//var rpc_name string = ""
-
-	file, line, fn := gp.GetCaller(2)
+	var rpc_name string = ""
+	//file, line, fn := gp.GetCaller(2)
 	starttime := time.Now()
 	defer func() {
 		errStr := ""
@@ -513,9 +512,9 @@ func (gp *Gpool[T]) ThriftWithTimeOutCall2(ctx context.Context, timeout time.Dur
 		address := gp.Addr
 		//logger.Infof(ctx, "func=ThriftCall2|method=%v|addr=%s:%d|time=%v|err=%s",
 		//rpc_name, address, gp.TimeOut, time.Since(starttime), errStr)
-		//logger.Info(ctx, "gpool", "func", "ThriftCall2", "method", rpc_name, "addr", fmt.Sprintf("%s:%d", address, gp.TimeOut), "cost", fmt.Sprintf("%v", time.Since(starttime)), "err", errStr)
-		logger.Info(ctx, "gpool", "func", "ThriftCall2", "addr", fmt.Sprintf("%s:%d", address, gp.TimeOut),
-			"srcFile", file+line, "fn", fn, "cost", fmt.Sprintf("%v", time.Since(starttime)), "err", errStr)
+		logger.Info(ctx, "gpool", "func", "ThriftCall2", "method", rpc_name, "addr", fmt.Sprintf("%s:%d", address, gp.TimeOut), "cost", fmt.Sprintf("%v", time.Since(starttime)), "err", errStr)
+		//logger.Info(ctx, "gpool", "func", "ThriftCall2", "addr", fmt.Sprintf("%s:%d", address, gp.TimeOut),
+		//"srcFile", file+line, "fn", fn, "cost", fmt.Sprintf("%v", time.Since(starttime)), "err", errStr)
 	}()
 
 	pc, err := gp.Get(ctx)
@@ -555,9 +554,8 @@ func (gp *Gpool[T]) ThriftWithTimeOutCall2(ctx context.Context, timeout time.Dur
 
 func (gp *Gpool[T]) ThriftExtCall2(ctx context.Context, process func(ctx context.Context, client interface{}) (string, error)) error {
 	var rpc_err error
-	//var rpc_name string = ""
-
-	file, line, fn := gp.GetCaller(3)
+	var rpc_name string = ""
+	//file, line, fn := gp.GetCaller(3)
 	starttime := time.Now()
 	defer func() {
 		errStr := ""
@@ -570,9 +568,9 @@ func (gp *Gpool[T]) ThriftExtCall2(ctx context.Context, process func(ctx context
 		//logger.Infof(ctx, "func=ThriftCall2|method=%v|addr=%s:%d|time=%v|err=%s",
 		//rpc_name, address, gp.TimeOut, time.Since(starttime), errStr)
 		//logger.Info(ctx, "gpool", "func", "ThriftCall2", "method", rpc_name, "addr", fmt.Sprintf("%s:%d", address, gp.TimeOut), "time", time.Since(starttime), "err", errStr)
-		//logger.Info(ctx, "gpool", "func", "ThriftCall2", "method", rpc_name, "addr", fmt.Sprintf("%s:%d", address, gp.TimeOut), "cost", fmt.Sprintf("%v", time.Since(starttime)), "err", errStr)
-		logger.Info(ctx, "gpool", "func", "ThriftCall2", "addr", fmt.Sprintf("%s:%d", address, gp.TimeOut),
-			"srcFile", file+line, "fn", fn, "cost", fmt.Sprintf("%v", time.Since(starttime)), "err", errStr)
+		logger.Info(ctx, "gpool", "func", "ThriftCall2", "method", rpc_name, "addr", fmt.Sprintf("%s:%d", address, gp.TimeOut), "cost", fmt.Sprintf("%v", time.Since(starttime)), "err", errStr)
+		//logger.Info(ctx, "gpool", "func", "ThriftCall2", "addr", fmt.Sprintf("%s:%d", address, gp.TimeOut),
+		//"srcFile", file+line, "fn", fn, "cost", fmt.Sprintf("%v", time.Since(starttime)), "err", errStr)
 
 	}()
 
@@ -612,8 +610,8 @@ func (gp *Gpool[T]) ThriftExtCall2(ctx context.Context, process func(ctx context
 
 func (gp *Gpool[T]) ThriftWithTimeOutExtCall2(ctx context.Context, timeout time.Duration, process func(ctx context.Context, client interface{}) (string, error)) error {
 	var rpc_err error
-	//var rpc_name string = ""
-	file, line, fn := gp.GetCaller(3)
+	var rpc_name string = ""
+	//file, line, fn := gp.GetCaller(3)
 	starttime := time.Now()
 	defer func() {
 		errStr := ""
@@ -625,9 +623,9 @@ func (gp *Gpool[T]) ThriftWithTimeOutExtCall2(ctx context.Context, timeout time.
 		address := gp.Addr
 		//logger.Infof(ctx, "func=ThriftCall2|method=%v|addr=%s:%d|time=%v|err=%s",
 		//rpc_name, address, gp.TimeOut, time.Since(starttime), errStr)
-		//logger.Info(ctx, "gpool", "func", "ThriftCall2", "method", rpc_name, "addr", fmt.Sprintf("%s:%d", address, gp.TimeOut), "cost", fmt.Sprintf("%v", time.Since(starttime)), "err", errStr)
-		logger.Info(ctx, "gpool", "func", "ThriftCall2", "addr", fmt.Sprintf("%s:%d", address, gp.TimeOut),
-			"srcFile", file+line, "fn", fn, "cost", fmt.Sprintf("%v", time.Since(starttime)), "err", errStr)
+		logger.Info(ctx, "gpool", "func", "ThriftCall2", "method", rpc_name, "addr", fmt.Sprintf("%s:%d", address, gp.TimeOut), "cost", fmt.Sprintf("%v", time.Since(starttime)), "err", errStr)
+		//logger.Info(ctx, "gpool", "func", "ThriftCall2", "addr", fmt.Sprintf("%s:%d", address, gp.TimeOut),
+		//"srcFile", file+line, "fn", fn, "cost", fmt.Sprintf("%v", time.Since(starttime)), "err", errStr)
 
 	}()
 
