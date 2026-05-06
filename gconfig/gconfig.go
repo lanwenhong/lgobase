@@ -160,16 +160,7 @@ func (gcf *Gconf) getIkExd(line_key string, ex_key string, exd_line string, re *
 	return nil
 }
 
-func (gcf *Gconf) GconfParse() error {
-	ctx := context.Background()
-	fi, err := os.Open(gcf.file)
-	if err != nil {
-		//fmt.Printf("read err %s", err.Error())
-		logger.Warnf(ctx, "read err %s", err.Error())
-		return nil
-	}
-	defer fi.Close()
-	br := bufio.NewReader(fi)
+func (gcf *Gconf) DoConfParse(ctx context.Context, br *bufio.Reader) error {
 	//mkey_reg := `^\[.*\]$`
 	mkey_reg := `^\[(\w+)]$`
 	//ikey_reg := `^(.*)\=(.*)$`
@@ -249,6 +240,27 @@ func (gcf *Gconf) GconfParse() error {
 	logger.Debugf(ctx, "%v", gcf.Gcf)
 	logger.Debugf(ctx, "%v", gcf.GlineExtend)
 	return nil
+}
+
+func (gcf *Gconf) GconfParse() error {
+	ctx := context.Background()
+	fi, err := os.Open(gcf.file)
+	if err != nil {
+		//fmt.Printf("read err %s", err.Error())
+		logger.Warnf(ctx, "read err %s", err.Error())
+		return nil
+	}
+	defer fi.Close()
+	br := bufio.NewReader(fi)
+	err = gcf.DoConfParse(ctx, br)
+	return err
+}
+
+func (gcf *Gconf) GconfParseFromString(content string) error {
+	ctx := context.Background()
+	br := bufio.NewReader(strings.NewReader(content))
+	err := gcf.DoConfParse(ctx, br)
+	return err
 }
 
 func (gcf *Gconf) HasSection(section string) bool {
