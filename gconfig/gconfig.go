@@ -160,16 +160,7 @@ func (gcf *Gconf) getIkExd(line_key string, ex_key string, exd_line string, re *
 	return nil
 }
 
-func (gcf *Gconf) GconfParse() error {
-	ctx := context.Background()
-	fi, err := os.Open(gcf.file)
-	if err != nil {
-		//fmt.Printf("read err %s", err.Error())
-		logger.Warnf(ctx, "read err %s", err.Error())
-		return nil
-	}
-	defer fi.Close()
-	br := bufio.NewReader(fi)
+func (gcf *Gconf) DoConfParse(ctx context.Context, br *bufio.Reader) error {
 	//mkey_reg := `^\[.*\]$`
 	mkey_reg := `^\[(\w+)]$`
 	//ikey_reg := `^(.*)\=(.*)$`
@@ -251,88 +242,25 @@ func (gcf *Gconf) GconfParse() error {
 	return nil
 }
 
+func (gcf *Gconf) GconfParse() error {
+	ctx := context.Background()
+	fi, err := os.Open(gcf.file)
+	if err != nil {
+		//fmt.Printf("read err %s", err.Error())
+		logger.Warnf(ctx, "read err %s", err.Error())
+		return nil
+	}
+	defer fi.Close()
+	br := bufio.NewReader(fi)
+	err = gcf.DoConfParse(ctx, br)
+	return err
+}
+
 func (gcf *Gconf) GconfParseFromString(content string) error {
 	ctx := context.Background()
 	br := bufio.NewReader(strings.NewReader(content))
-	//mkey_reg := `^\[.*\]$`
-	mkey_reg := `^\[(\w+)]$`
-	//ikey_reg := `^(.*)\=(.*)$`
-	ikey_reg := `^(?P<k>\w+)\s*\=\s*(?P<v>.*)$`
-	//ikey_reg_ex := `^\s{1,4}([\w][a-z,A-Z,0-9,=,<,>,>=,<=,!=,_,\,\s,\-,\\.]+)$`
-	ikey_reg_ex := `^\s{1,4}(.*)$`
-
-	mreg := regexp.MustCompile(mkey_reg)
-	ireg := regexp.MustCompile(ikey_reg)
-	ireg_ex := regexp.MustCompile(ikey_reg_ex)
-
-	var mkey string
-	//var imap map[string]string
-	var imap map[string][]string
-	var line_key string = ""
-	var ex_key string = ""
-	for {
-		line, _, err := br.ReadLine()
-		if err == io.EOF {
-			break
-		}
-		sline := string(line)
-		if mreg.MatchString(sline) {
-			//parse section
-			mk, err := gcf.getMk(sline, mreg)
-			if err != nil {
-				return err
-			}
-			//处理注释掉的行
-			if mk == "" {
-				//fmt.Printf("%s note\n", sline)
-				logger.Debugf(ctx, "%s note", sline)
-				imap = nil
-			} else {
-				mkey = mk
-				//fmt.Printf("mk: %s\n", mkey)
-				logger.Debugf(ctx, "mk: %s", mkey)
-				//imap = make(map[string]string)
-				imap = make(map[string][]string)
-				gcf.Gcf[mkey] = imap
-			}
-		} else if ireg.MatchString(sline) {
-			//parse line
-			if imap == nil {
-				//fmt.Printf("%s not found section\n", sline)
-				logger.Debugf(ctx, "%s not found section", sline)
-				continue
-			}
-			k, v, err := gcf.getIk(sline, ireg)
-			if err != nil {
-				return err
-			}
-			//处理注释掉的行
-			if k == "" {
-				//fmt.Printf("%s note\n", sline)
-				logger.Debugf(ctx, "%s note", sline)
-				continue
-			}
-			//fmt.Printf("k=%s v=%s\n", k, v)
-			logger.Debugf(ctx, "k=%s v=%s", k, v)
-			//imap[k] = v
-			imap[k] = append(imap[k], v)
-			line_key = k
-			ex_key = sline
-		} else if ireg_ex.MatchString(sline) {
-			//处理扩展行
-			//gcf.getIkExd(line_key, sline, ireg_ex)
-			gcf.getIkExd(line_key, ex_key, sline, ireg_ex)
-
-		} else {
-			//fmt.Println("no match continue")
-			logger.Debugf(ctx, "no match continue")
-		}
-	}
-	//fmt.Println(gcf.Gcf)
-	//fmt.Println(gcf.GlineExtend)
-	logger.Debugf(ctx, "%v", gcf.Gcf)
-	logger.Debugf(ctx, "%v", gcf.GlineExtend)
-	return nil
+	err := gcf.DoConfParse(ctx, br)
+	return err
 }
 
 func (gcf *Gconf) HasSection(section string) bool {
