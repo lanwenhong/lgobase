@@ -58,12 +58,35 @@ func (cr *GConfRule) AddRule(ctx context.Context, g_conf *Gconf) error {
 		logger.Debug(ctx, "rule config", "k", k)
 		logger.Debug(ctx, "rule_config", "v", v)
 
-		cre := GConfRuleEntry{}
+		for _, iv := range v {
+			cre := GConfRuleEntry{}
+			cre.Name = fmt.Sprintf("%s%d", cr.Sever, cnt)
+			cnt++
+			cre.Description = k
+			//cre.RuleWhen = v[0]
+			cre.RuleWhen = iv["rule"]
+			//s, err := strconv.Atoi(v[1])
+			s, err := strconv.Atoi(iv["Salience"])
+			if err != nil {
+				//logger.Warnf(ctx, "err: %s", err.Error())
+				panic(err)
+			}
+			cre.Salience = s
+			setRet := fmt.Sprintf("R.Set('%s')", k)
+			cre.RuleThen = []string{
+				setRet,
+				`Complete()`,
+			}
+			lcre = append(lcre, cre)
+		}
+		/*cre := GConfRuleEntry{}
 		cre.Name = fmt.Sprintf("%s%d", cr.Sever, cnt)
 		cnt++
 		cre.Description = k
-		cre.RuleWhen = v[0]
-		s, err := strconv.Atoi(v[1])
+		//cre.RuleWhen = v[0]
+		cre.RuleWhen = v[0][0]
+		//s, err := strconv.Atoi(v[1])
+		s, err := strconv.Atoi(v[0][1])
 		if err != nil {
 			//logger.Warnf(ctx, "err: %s", err.Error())
 			panic(err)
@@ -74,7 +97,7 @@ func (cr *GConfRule) AddRule(ctx context.Context, g_conf *Gconf) error {
 			setRet,
 			`Complete()`,
 		}
-		lcre = append(lcre, cre)
+		lcre = append(lcre, cre)*/
 	}
 
 	config := jsoniter.Config{

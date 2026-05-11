@@ -77,7 +77,7 @@ func TestGparse(t *testing.T) {
 	}
 }
 
-func buildRule(ctx context.Context, ex map[string]map[string][]string) error {
+func buildRule(ctx context.Context, ex map[string]map[string][]map[string]string) error {
 	logger.Debugf(ctx, "ex: %v", ex)
 
 	server := "test1"
@@ -87,17 +87,29 @@ func buildRule(ctx context.Context, ex map[string]map[string][]string) error {
 	for k, v := range c_test1 {
 		logger.Debugf(ctx, "k: %s", k)
 		logger.Debugf(ctx, "v: %s", v)
-		cr := GConfRule{}
-		//cr.Name = k
-		//cr.Name = util.GenXid()
-		//cr.Name = util.GenBetterGUID()
+		for _, iv := range v {
+			cr := GConfRule{}
+			cr.Name = fmt.Sprintf("%s%d", server, i)
+			i++
+			cr.Description = k
+			cr.RuleWhen = iv["rule"]
+			s, _ := strconv.Atoi(iv["Salience"])
+			cr.Salience = s
+			setRet := fmt.Sprintf("R.Set('%s')", k)
+			logger.Debugf(ctx, "setRet: %s", setRet)
+			cr.RuleThen = []string{
+				setRet,
+				`Complete()`,
+			}
+			lcr = append(lcr, cr)
+		}
+		/*cr := GConfRule{}
 		cr.Name = fmt.Sprintf("%s%d", server, i)
 		i++
 		cr.Description = k
-		//cr.Description = "cc"
-		cr.RuleWhen = v[0]
-		//cr.Salience = v[1]
-		s, _ := strconv.Atoi(v[1])
+		//cr.RuleWhen = v[0]
+		cr.RuleWhen = v[0][0]
+		s, _ := strconv.Atoi(v[0][1])
 		cr.Salience = s
 		setRet := fmt.Sprintf("R.Set('%s')", k)
 		logger.Debugf(ctx, "setRet: %s", setRet)
@@ -105,7 +117,7 @@ func buildRule(ctx context.Context, ex map[string]map[string][]string) error {
 			setRet,
 			`Complete()`,
 		}
-		lcr = append(lcr, cr)
+		lcr = append(lcr, cr)*/
 	}
 	logger.Debugf(ctx, "lcr: %v", lcr)
 

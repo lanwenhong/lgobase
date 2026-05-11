@@ -37,7 +37,7 @@ func TestLoadConf(t *testing.T) {
 		tConf := stru.(*TestConf)
 		x, _ := strconv.ParseInt(s[0], 10, 64)
 		tConf.TestC = int(x)
-		logger.Debugf(ctx, "cfg: %v", cfg)
+		logger.Debug(ctx, "test", "cfg", cfg)
 		return nil
 	}
 
@@ -53,7 +53,7 @@ func TestLoadConf(t *testing.T) {
 	}
 	logger.Debugf(ctx, "conf: %v", tConf)
 	dayuconf, _ := confparse.ParseExt(ctx, "section1", "pay_server", 0, cfg)
-	logger.Debugf(ctx, "dayuconf: %v", dayuconf)
+	logger.Debug(ctx, "conf test", "dayuconf", dayuconf)
 	/*logger.Debugf(ctx, "payserver0: %v", tConf.Cfg.Gcf["section1"]["pay_server"][0])
 	k := "pay_server = " + tConf.Cfg.Gcf["section1"]["pay_server"][0]
 	logger.Debugf(ctx, "payserver0 conf: %v", tConf.Cfg.GlineExtend["pay_server"][k])*/
