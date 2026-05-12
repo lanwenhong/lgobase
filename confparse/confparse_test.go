@@ -76,11 +76,16 @@ func TestLoadExtConf(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ec := confparse.NewExtendConf("pay_server", "pay_server = 192.168.100.103/1000", 0)
-	obj := &TestExtConf{}
-	err = ec.ParseExtStru(ctx, obj, cfg)
-	if err != nil {
-		t.Fatal(err)
+	pay_server := cfg.GlineExtend["pay_server"]
+	for k, _ := range pay_server {
+		logger.Debug(ctx, "conf test", "k", k)
+		ec := confparse.NewExtendConf("pay_server", k, 0)
+		obj := &TestExtConf{}
+		err = ec.ParseExtStru(ctx, obj, cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		logger.Debug(ctx, "extend conf test", "obj", obj)
+		//初始化gpool
 	}
-	logger.Debug(ctx, "extend conf test", "obj", obj)
 }
