@@ -3,10 +3,10 @@ package logger
 import (
 	"encoding/json"
 	"encoding/xml"
-	"fmt"
 	"log/slog"
 	"reflect"
 	"strings"
+	"unicode"
 )
 
 const (
@@ -64,43 +64,39 @@ func (h *DesensitizeHandler) desensitizeMap(val reflect.Value) any {
 }
 
 func (h *DesensitizeHandler) IsJSON(s string) bool {
-	if s == "" {
+	trimmed := strings.TrimLeftFunc(s, unicode.IsSpace)
+	if len(trimmed) == 0 {
 		return false
 	}
-	var js json.RawMessage
-	return json.Unmarshal([]byte(s), &js) == nil
+	return trimmed[0] == '{' || trimmed[0] == '['
 }
 
 func (h *DesensitizeHandler) IsXML(s string) bool {
-	var node any
-	return xml.Unmarshal([]byte(s), &node) == nil
+	trimmed := strings.TrimLeftFunc(s, unicode.IsSpace)
+	if len(trimmed) == 0 {
+		return false
+	}
+	return trimmed[0] == '<'
 }
 
 func (h *DesensitizeHandler) desensitizeString(s string) any {
 	// JSON 字符串自动解析脱敏
-	if len(s) > 0 && (s[0] == '{' || s[0] == '[') {
+	if h.IsJSON(s) {
 		var obj any
 		if err := json.Unmarshal([]byte(s), &obj); err == nil {
 			masked := h.Desensitize(obj)
 			bs, _ := json.Marshal(masked)
 			return json.RawMessage(bs)
-			//return string(bs)
-		} else {
-			fmt.Println(err)
 		}
 	}
 
 	// XML 解析脱敏（无正则）
-	if strings.Contains(s, "<") && strings.Contains(s, ">") {
-		//if len(s) > 0 && s[0] == '<' && h.IsXML(s) {
-		//if Gfilelog.XmlMatchRegex.MatchString(s) {
+	if h.IsXML(s) {
 		var node xmlNode
 		if err := xml.Unmarshal([]byte(s), &node); err == nil {
 			h.desensitizeXMLNode(&node)
 			bs, _ := xml.Marshal(node)
 			return string(bs)
-		} else {
-			fmt.Println(err)
 		}
 	}
 
@@ -176,6 +172,7 @@ func (h *DesensitizeHandler) Desensitize(v any) any {
 		}
 		val = val.Elem()
 	}
+
 	switch val.Kind() {
 	case reflect.String:
 		return h.desensitizeString(val.String())
