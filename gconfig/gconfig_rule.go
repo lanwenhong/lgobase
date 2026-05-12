@@ -63,15 +63,20 @@ func (cr *GConfRule) AddRule(ctx context.Context, g_conf *Gconf) error {
 			cre.Name = fmt.Sprintf("%s%d", cr.Sever, cnt)
 			cnt++
 			cre.Description = k
-			//cre.RuleWhen = v[0]
-			cre.RuleWhen = iv["rule"]
-			//s, err := strconv.Atoi(v[1])
-			s, err := strconv.Atoi(iv["Salience"])
-			if err != nil {
-				//logger.Warnf(ctx, "err: %s", err.Error())
-				panic(err)
+			if when, ok := iv["rule"]; ok {
+				cre.RuleWhen = when
+			} else {
+				continue
 			}
-			cre.Salience = s
+			if salience, ok2 := iv["Salience"]; ok2 {
+				s, err := strconv.Atoi(salience)
+				if err != nil {
+					panic(err)
+				}
+				cre.Salience = s
+			} else {
+				continue
+			}
 			setRet := fmt.Sprintf("R.Set('%s')", k)
 			cre.RuleThen = []string{
 				setRet,
@@ -79,27 +84,7 @@ func (cr *GConfRule) AddRule(ctx context.Context, g_conf *Gconf) error {
 			}
 			lcre = append(lcre, cre)
 		}
-		/*cre := GConfRuleEntry{}
-		cre.Name = fmt.Sprintf("%s%d", cr.Sever, cnt)
-		cnt++
-		cre.Description = k
-		//cre.RuleWhen = v[0]
-		cre.RuleWhen = v[0][0]
-		//s, err := strconv.Atoi(v[1])
-		s, err := strconv.Atoi(v[0][1])
-		if err != nil {
-			//logger.Warnf(ctx, "err: %s", err.Error())
-			panic(err)
-		}
-		cre.Salience = s
-		setRet := fmt.Sprintf("R.Set('%s')", k)
-		cre.RuleThen = []string{
-			setRet,
-			`Complete()`,
-		}
-		lcre = append(lcre, cre)*/
 	}
-
 	config := jsoniter.Config{
 		SortMapKeys: true,
 	}
