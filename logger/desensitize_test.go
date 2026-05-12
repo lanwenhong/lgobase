@@ -2,6 +2,8 @@ package logger
 
 import (
 	"context"
+	"errors"
+	"log/slog"
 	"strings"
 	"testing"
 
@@ -12,6 +14,13 @@ import (
 type TestStru struct {
 	cardNo string
 	CardNo string
+}
+
+func (ts TestStru) LogValue() slog.Value {
+	return slog.GroupValue(
+		slog.String("cardNo", ts.cardNo),
+		slog.String("CardNo", ts.CardNo),
+	)
 }
 
 func TestDesensitizeComplex(t *testing.T) {
@@ -59,6 +68,9 @@ func TestDesensitizeComplex(t *testing.T) {
 		"phone", "13811112222",
 		"password", "testpwd",
 		"xx", "111111",
+
+		"err", errors.New("test error"),
+		"err1", nil,
 
 		"testStru", ts,
 		// Map
