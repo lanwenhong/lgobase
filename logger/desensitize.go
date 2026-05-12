@@ -89,7 +89,7 @@ func (h *DesensitizeHandler) desensitizeString(s string) any {
 			return json.RawMessage(bs)
 		}
 	}
-	
+
 	// XML 解析脱敏（无正则）
 	if h.IsXML(s) {
 		var node xmlNode
@@ -99,7 +99,7 @@ func (h *DesensitizeHandler) desensitizeString(s string) any {
 			return string(bs)
 		}
 	}
-	
+
 	return s
 }
 
@@ -161,15 +161,18 @@ func (h *DesensitizeHandler) Desensitize(v any) any {
 	if v == nil {
 		return nil
 	}
-	
 	val := reflect.ValueOf(v)
+	//error不处理
+	if val.Type().Implements(reflect.TypeOf((*error)(nil)).Elem()) {
+		return v
+	}
 	for val.Kind() == reflect.Ptr {
 		if val.IsNil() {
 			return nil
 		}
 		val = val.Elem()
 	}
-	
+
 	switch val.Kind() {
 	case reflect.String:
 		return h.desensitizeString(val.String())

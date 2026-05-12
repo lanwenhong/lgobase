@@ -24,6 +24,15 @@ type TestConf struct {
 	Cfg        *gconfig.Gconf
 }
 
+type TestExtConf struct {
+	MaxConnLife     int64  `mapkey:"MaxConnLife"`
+	MaxConns        int    `mapkey:"MaxConns"`
+	MaxIdleConnLife int    `mapkey:"MaxIdleConnLife"`
+	MaxIdleConns    uint   `mapkey:"MaxIdleConns"`
+	Salience        int    `mapkey:"Salience"`
+	Proto           string `mapkey:"proto"`
+}
+
 func TestLoadConf(t *testing.T) {
 	ctx := context.Background()
 	filename := "test_rule.ini"
@@ -37,7 +46,7 @@ func TestLoadConf(t *testing.T) {
 		tConf := stru.(*TestConf)
 		x, _ := strconv.ParseInt(s[0], 10, 64)
 		tConf.TestC = int(x)
-		logger.Debugf(ctx, "cfg: %v", cfg)
+		logger.Debug(ctx, "test", "cfg", cfg)
 		return nil
 	}
 
@@ -53,8 +62,30 @@ func TestLoadConf(t *testing.T) {
 	}
 	logger.Debugf(ctx, "conf: %v", tConf)
 	dayuconf, _ := confparse.ParseExt(ctx, "section1", "pay_server", 0, cfg)
-	logger.Debugf(ctx, "dayuconf: %v", dayuconf)
+	logger.Debug(ctx, "conf test", "dayuconf", dayuconf)
 	/*logger.Debugf(ctx, "payserver0: %v", tConf.Cfg.Gcf["section1"]["pay_server"][0])
 	k := "pay_server = " + tConf.Cfg.Gcf["section1"]["pay_server"][0]
 	logger.Debugf(ctx, "payserver0 conf: %v", tConf.Cfg.GlineExtend["pay_server"][k])*/
+}
+
+func TestLoadExtConf(t *testing.T) {
+	ctx := context.Background()
+	filename := "test_rule.ini"
+	cfg := gconfig.NewGconf(filename)
+	err := cfg.GconfParse()
+	if err != nil {
+		t.Fatal(err)
+	}
+	pay_server := cfg.GlineExtend["pay_server"]
+	for k, _ := range pay_server {
+		logger.Debug(ctx, "conf test", "k", k)
+		ec := confparse.NewExtendConf("pay_server", k, 0)
+		obj := &TestExtConf{}
+		err = ec.ParseExtStru(ctx, obj, cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		logger.Debug(ctx, "extend conf test", "obj", obj)
+		//初始化gpool
+	}
 }
