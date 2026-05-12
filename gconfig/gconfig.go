@@ -84,8 +84,8 @@ func (gcf *Gconf) getIkExd(line_key string, ex_key string, exd_line string, re *
 	match := re.FindStringSubmatch(exd_line)
 	ctx := context.Background()
 	if len(match) >= 3 {
-		k := match[1]
-		v := match[2]
+		k := strings.TrimSpace(match[1])
+		v := strings.TrimSpace(match[2])
 		logger.Debug(ctx, "gconfig", "key", k, "value", v)
 		if _, ok := gcf.GlineExtend[line_key][ex_key]; ok {
 			exDataLen := len(gcf.GlineExtend[line_key][ex_key])
@@ -119,38 +119,6 @@ func (gcf *Gconf) getIkExd(line_key string, ex_key string, exd_line string, re *
 			*newLineTag = false
 		}
 	}
-	/*for i, _ := range groups {
-		if i != 0 {
-			//fmt.Println(match[i])
-			logger.Debugf(ctx, "line_key: %s ex_key: %s ex: %v", line_key, ex_key, gcf.GlineExtend)
-			logger.Debug(ctx, "gconfig", "newLineTag", *newLineTag)
-			if _, ok := gcf.GlineExtend[line_key][ex_key]; ok {
-				logger.Debugf(ctx, "new")
-				item := strings.Trim(match[i], " ")
-				exDataLen := len(gcf.GlineExtend[line_key][ex_key])
-				if *newLineTag {
-					gcf.GlineExtend[line_key][ex_key] = append(gcf.GlineExtend[line_key][ex_key], []string{item})
-					*newLineTag = false
-				} else {
-					gcf.GlineExtend[line_key][ex_key][exDataLen-1] = append(gcf.GlineExtend[line_key][ex_key][exDataLen-1], item)
-				}
-			} else {
-				val := []string{}
-				item := strings.Trim(match[i], " ")
-				val = append(val, item)
-				if _, ok := gcf.GlineExtend[line_key]; ok {
-					gcf.GlineExtend[line_key][ex_key] = append(gcf.GlineExtend[line_key][ex_key], val)
-				} else {
-					xval := make(map[string][][]string)
-					//xval[ex_key] = val
-					xval[ex_key] = append(xval[ex_key], val)
-					gcf.GlineExtend[line_key] = xval
-				}
-				*newLineTag = false
-			}
-		}
-	}*/
-
 	return nil
 }
 
