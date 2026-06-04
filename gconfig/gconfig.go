@@ -202,8 +202,8 @@ func (gcf *Gconf) DoConfParse(ctx context.Context, br *bufio.Reader) error {
 	}
 	//fmt.Println(gcf.Gcf)
 	//fmt.Println(gcf.GlineExtend)
-	logger.Debug(ctx, "gconfig", "Gcf", gcf.Gcf)
-	logger.Debug(ctx, "gconfig", "gcf.GlineExtend", gcf.GlineExtend)
+	//logger.Debug(ctx, "gconfig", "Gcf", gcf.Gcf)
+	//logger.Debug(ctx, "gconfig", "gcf.GlineExtend", gcf.GlineExtend)
 	return nil
 }
 
