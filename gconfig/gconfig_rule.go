@@ -2,6 +2,7 @@ package gconfig
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
@@ -46,6 +47,7 @@ func NewGConfRule(svr string) *GConfRule {
 
 func (cr *GConfRule) AddRule(ctx context.Context, g_conf *Gconf) error {
 	ex := g_conf.GlineExtend
+	logger.Debug(ctx, "rule config", "ex", ex)
 	if _, ok := ex[cr.Sever]; !ok {
 		return errors.New("not found " + cr.Sever)
 	}
@@ -53,33 +55,42 @@ func (cr *GConfRule) AddRule(ctx context.Context, g_conf *Gconf) error {
 	cnt := 0
 	lcre := []GConfRuleEntry{}
 	for k, v := range svrs {
-		logger.Debugf(ctx, "k: %s", k)
-		logger.Debugf(ctx, "v: %s", v)
+		logger.Debug(ctx, "rule config", "k", k)
+		logger.Debug(ctx, "rule_config", "v", v)
 
-		cre := GConfRuleEntry{}
-		cre.Name = fmt.Sprintf("%s%d", cr.Sever, cnt)
-		cnt++
-		cre.Description = k
-		cre.RuleWhen = v[0]
-		s, err := strconv.Atoi(v[1])
-		if err != nil {
-			logger.Warnf(ctx, "err: %s", err.Error())
-			panic(err)
+		for _, iv := range v {
+			cre := GConfRuleEntry{}
+			cre.Name = fmt.Sprintf("%s%d", cr.Sever, cnt)
+			cnt++
+			cre.Description = k
+			if when, ok := iv["rule"]; ok {
+				cre.RuleWhen = when
+			} else {
+				continue
+			}
+			if salience, ok2 := iv["Salience"]; ok2 {
+				s, err := strconv.Atoi(salience)
+				if err != nil {
+					panic(err)
+				}
+				cre.Salience = s
+			} else {
+				continue
+			}
+			setRet := fmt.Sprintf("R.Set('%s')", k)
+			cre.RuleThen = []string{
+				setRet,
+				`Complete()`,
+			}
+			lcre = append(lcre, cre)
 		}
-		cre.Salience = s
-		setRet := fmt.Sprintf("R.Set('%s')", k)
-		cre.RuleThen = []string{
-			setRet,
-			`Complete()`,
-		}
-		lcre = append(lcre, cre)
 	}
-
 	config := jsoniter.Config{
 		SortMapKeys: true,
 	}
 	jRuleSet, _ := config.Froze().Marshal(lcre)
-	logger.Debugf(ctx, "rule set: %s", jRuleSet)
+	//logger.Debugf(ctx, "rule set: %s", jRuleSet)
+	logger.Debug(ctx, "rule config", "rule_set", json.RawMessage((string(jRuleSet))))
 
 	Rdata, errJ := pkg.ParseJSONRuleset([]byte(jRuleSet))
 	if errJ != nil {

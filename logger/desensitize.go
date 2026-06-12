@@ -3,10 +3,10 @@ package logger
 import (
 	"encoding/json"
 	"encoding/xml"
-	"fmt"
 	"log/slog"
 	"reflect"
 	"strings"
+	"unicode"
 )
 
 const (
@@ -64,43 +64,39 @@ func (h *DesensitizeHandler) desensitizeMap(val reflect.Value) any {
 }
 
 func (h *DesensitizeHandler) IsJSON(s string) bool {
-	if s == "" {
+	trimmed := strings.TrimLeftFunc(s, unicode.IsSpace)
+	if len(trimmed) == 0 {
 		return false
 	}
-	var js json.RawMessage
-	return json.Unmarshal([]byte(s), &js) == nil
+	return trimmed[0] == '{' || trimmed[0] == '['
 }
 
 func (h *DesensitizeHandler) IsXML(s string) bool {
-	var node any
-	return xml.Unmarshal([]byte(s), &node) == nil
+	trimmed := strings.TrimLeftFunc(s, unicode.IsSpace)
+	if len(trimmed) == 0 {
+		return false
+	}
+	return trimmed[0] == '<'
 }
 
 func (h *DesensitizeHandler) desensitizeString(s string) any {
 	// JSON 字符串自动解析脱敏
-	if len(s) > 0 && (s[0] == '{' || s[0] == '[') {
+	if h.IsJSON(s) {
 		var obj any
 		if err := json.Unmarshal([]byte(s), &obj); err == nil {
 			masked := h.Desensitize(obj)
 			bs, _ := json.Marshal(masked)
 			return json.RawMessage(bs)
-			//return string(bs)
-		} else {
-			fmt.Println(err)
 		}
 	}
 
 	// XML 解析脱敏（无正则）
-	if strings.Contains(s, "<") && strings.Contains(s, ">") {
-		//if len(s) > 0 && s[0] == '<' && h.IsXML(s) {
-		//if Gfilelog.XmlMatchRegex.MatchString(s) {
+	if h.IsXML(s) {
 		var node xmlNode
 		if err := xml.Unmarshal([]byte(s), &node); err == nil {
 			h.desensitizeXMLNode(&node)
 			bs, _ := xml.Marshal(node)
 			return string(bs)
-		} else {
-			fmt.Println(err)
 		}
 	}
 
@@ -114,8 +110,11 @@ func (h *DesensitizeHandler) desensitizeStruct(val reflect.Value) any {
 		field := typ.Field(i)
 		//keyStr := strings.ToLower(field.Name)
 		keyStr := field.Name
+		if !val.Field(i).CanInterface() {
+			res[keyStr] = val.Field(i)
+			continue
+		}
 		fieldVal := val.Field(i).Interface()
-
 		if h.sensitiveFieldMap(keyStr) {
 			if dfunc, ok := Gfilelog.DesensitizeFuncMap[keyStr]; ok {
 				//fmt.Println(keyStr)
@@ -162,8 +161,11 @@ func (h *DesensitizeHandler) Desensitize(v any) any {
 	if v == nil {
 		return nil
 	}
-
 	val := reflect.ValueOf(v)
+	//error不处理
+	if val.Type().Implements(reflect.TypeOf((*error)(nil)).Elem()) {
+		return v
+	}
 	for val.Kind() == reflect.Ptr {
 		if val.IsNil() {
 			return nil
@@ -188,15 +190,11 @@ func (h *DesensitizeHandler) Desensitize(v any) any {
 func DesensitizeReplaceAttr(groups []string, a slog.Attr) slog.Attr {
 	h := NewDesensitizeHandler()
 	if Gfilelog.Logconf.DesensitizeField == "" {
-		v := a.Value.Any()
+		/*v := a.Value.Any()
 		val := reflect.ValueOf(v)
 		if val.Kind() == reflect.String && json.Valid([]byte(val.String())) {
-			/*s := val.String()
-			if json.Valid([]byte(s)) {
-				a.Value = slog.AnyValue(json.RawMessage(s))
-			}*/
 			a.Value = slog.AnyValue(h.Desensitize(a.Value.Any()))
-		}
+		}*/
 		return a
 	}
 	switch a.Key {
@@ -206,8 +204,6 @@ func DesensitizeReplaceAttr(groups []string, a slog.Attr) slog.Attr {
 		IGNORE_COST, IGNORE_REQUEST_ID, IGNORE_TRACE_ID:
 		return a
 	}
-	//fmt.Println(Gfilelog.DesensitizeFuncMap)
-	//fmt.Println(a.Key)
 	if h.sensitiveFieldMap(a.Key) {
 		if dfunc, ok := Gfilelog.DesensitizeFuncMap[a.Key]; ok {
 			a.Value = slog.AnyValue(dfunc(a.Value.Any()))

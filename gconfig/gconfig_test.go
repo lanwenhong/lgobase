@@ -30,6 +30,7 @@ type Trade struct {
 	Busicd string `json:"busicd"`
 	Txamt  int    `json:"txamt"`
 	STxamt string `json:"s_txamt"`
+	Chnlid int    `json:"chnlid"`
 }
 
 type Ret struct {
@@ -76,7 +77,7 @@ func TestGparse(t *testing.T) {
 	}
 }
 
-func buildRule(ctx context.Context, ex map[string]map[string][]string) error {
+func buildRule(ctx context.Context, ex map[string]map[string][]map[string]string) error {
 	logger.Debugf(ctx, "ex: %v", ex)
 
 	server := "test1"
@@ -86,17 +87,29 @@ func buildRule(ctx context.Context, ex map[string]map[string][]string) error {
 	for k, v := range c_test1 {
 		logger.Debugf(ctx, "k: %s", k)
 		logger.Debugf(ctx, "v: %s", v)
-		cr := GConfRule{}
-		//cr.Name = k
-		//cr.Name = util.GenXid()
-		//cr.Name = util.GenBetterGUID()
+		for _, iv := range v {
+			cr := GConfRule{}
+			cr.Name = fmt.Sprintf("%s%d", server, i)
+			i++
+			cr.Description = k
+			cr.RuleWhen = iv["rule"]
+			s, _ := strconv.Atoi(iv["Salience"])
+			cr.Salience = s
+			setRet := fmt.Sprintf("R.Set('%s')", k)
+			logger.Debugf(ctx, "setRet: %s", setRet)
+			cr.RuleThen = []string{
+				setRet,
+				`Complete()`,
+			}
+			lcr = append(lcr, cr)
+		}
+		/*cr := GConfRule{}
 		cr.Name = fmt.Sprintf("%s%d", server, i)
 		i++
 		cr.Description = k
-		//cr.Description = "cc"
-		cr.RuleWhen = v[0]
-		//cr.Salience = v[1]
-		s, _ := strconv.Atoi(v[1])
+		//cr.RuleWhen = v[0]
+		cr.RuleWhen = v[0][0]
+		s, _ := strconv.Atoi(v[0][1])
 		cr.Salience = s
 		setRet := fmt.Sprintf("R.Set('%s')", k)
 		logger.Debugf(ctx, "setRet: %s", setRet)
@@ -104,7 +117,7 @@ func buildRule(ctx context.Context, ex map[string]map[string][]string) error {
 			setRet,
 			`Complete()`,
 		}
-		lcr = append(lcr, cr)
+		lcr = append(lcr, cr)*/
 	}
 	logger.Debugf(ctx, "lcr: %v", lcr)
 
@@ -214,7 +227,13 @@ func TestGConfRule(t *testing.T) {
 
 func TestWithDataContext(t *testing.T) {
 	xlogger := logrus.New()
-	xlogger.Level = logrus.InfoLevel
+	xlogger.Level = logrus.DebugLevel
+
+	/*glog.Log = noop.WithFields(glog.Fields{"lib": "grule-rule-engine"})
+	glog.Log = glog.LogEntry{
+		Logger: glog.NewLogrus(xlogger).WithFields(glog.Fields{"lib": "grule-rule-engine"}),
+		Level:  glog.DebugLevel,
+	}*/
 
 	antlr.SetLogger(xlogger)
 	ctx := context.Background()
@@ -228,11 +247,44 @@ func TestWithDataContext(t *testing.T) {
 	gcr := gconfig.NewGConfRule("test1")
 	gcr.AddRule(ctx, g_cf)
 	trade := Trade{
-		Busicd: "7000",
+		Busicd: "802801",
+		Chnlid: 1132,
 		Txamt:  3000,
 	}
 	trade.STxamt = strconv.Itoa(trade.Txamt)
-
+	/*pTrade := `{
+	    "cardaid": "A0000000031010",
+	    "cardbin": "433668",
+	    "cardscheme": "VISA",
+	    "entry_mode": "tap",
+	    "extend_info": "TfSjLPt7l0aJQx3kYB/POxtD0T/+C4cLY/Sizy5tOYGzdReMNQp2PpDADO99TuieH1wGq118lxHNQ6LDUvsxZ5MvxbvGd/rnSvosJC6dkrRSF1gNPLxZj9frj4ku4M2IbVeN7hx2qDyXxDJoArPbfmERViboyDLUc32EEifherB3kRlNGNlCO3gCsOcWaFbgXN5y/krmkjBllUOZtWGFQn0d+oovbWH1VBzbQrfTkvBXTAda2hAGtsLLokoL2ZsLUD6MzV28McUhlj/DH7SZ/SWmOyg2nvhgODE+AxCf3uKBVyUnwUrbNQE3ZLY/pDG35Y899DF+IDB6k+BX9qT8w/pDuGSwqmqksrA0CBgaDCQa+nKH/rcfCrlUQDyI7a4VMSybC0z2hy7wFsoZ50AJXuKFGaXmCFYCjZkX6Jj0mHqYipu8//vRzDzZGtQuHBBA3IVIxXr9rJN7NA4SAQNCZ77ZLSYEoMHrGDpq2eEbqnGi4C2d7BagXbIy+lHXILVWceX/As2phFswCdkaCazGu8Vz7S64sKAqoAZbJn/dPR6ejKkTGf8W7u5tTcU4ew3LV/Md5e/buHRD8i1/SWuu6z2YAkgT8om6HmHUxDPANqDjsUnimGSLxdlNfGSdXcHcj2gal1ZvXbCVdYxm2vcoSQ\u003d\u003d",
+	    "tip_amt": "",
+	    "account_device_id": "24BGCASW8320",
+	    "app_name": "hjsh",
+	    "appver": "4.34.16.1",
+	    "busicd": "802801",
+	    "clisn": "035402",
+	    "clitm": "2025-09-19 09:50:02",
+	    "contact": "911300004230002",
+	    "lnglat": [
+	        "0",
+	        "0"
+	    ],
+	    "cardNo":"2321312312321312",
+	    "iccdata":"21312312312sadasdasdsad",
+	    "network": "wifi",
+	    "os": "Android",
+	    "osver": "10",
+	    "phonemodel": "A8S",
+	    "txamt": "100",
+	    "txcurrcd": "344",
+	    "txdtm": "2025-09-19 09:50:02",
+	    "txzone": "+0800",
+	    "udid": "8690710558929631",
+	    "userid": "1130081629",
+	    "opuid": null
+	}`*/
+	//pTrade := `{"busicd": "802801"}`
 	pTrade, _ := json.Marshal(trade)
 	logger.Debugf(ctx, "pTrade: %s", string(pTrade))
 	dataContext := ast.NewDataContext()
