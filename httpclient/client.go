@@ -3,6 +3,7 @@ package httpclient
 import (
 	"crypto/tls"
 	"fmt"
+	"github.com/lanwenhong/lgobase/util"
 	"net/http"
 	"runtime"
 	"strconv"
@@ -72,6 +73,10 @@ func NewHttpClient(transport *http.Transport) *resty.Client {
 		}
 		file, line, fn := GetCaller(6)
 		ctx := req.Context()
+		clientService := client.Header.Get("Client-Service")
+		if clientService == "" {
+			client.SetHeader("Client-Service", util.GetEnv("CLIENT_SERVICE", "-"))
+		}
 		//logger.Infof(ctx, "send|mehtod=%s|url=%s|body=%s", req.Method, req.URL, s)
 		logger.Info(ctx, "HttpClient", "func", "send", "method", req.Method, "url", req.URL, "body", s, "srcFile", file+line, "fn", fn)
 		return nil

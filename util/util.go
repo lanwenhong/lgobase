@@ -10,6 +10,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 
@@ -458,4 +459,11 @@ func (aescbc *AesCbc) AESDecryptCBC(ctx context.Context, ciphertextBase64 string
 		return nil, fmt.Errorf("无效的填充数据")
 	}
 	return plaintext, nil
+}
+
+func GetEnv(key, defaultValue string) string {
+	if value, ok := os.LookupEnv(key); ok {
+		return value
+	}
+	return defaultValue
 }
