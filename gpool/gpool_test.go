@@ -1,4 +1,4 @@
-package gpool
+package gpool_test
 
 import (
 	"context"
@@ -177,7 +177,7 @@ func TestFramedClient(t *testing.T) {
 
 	var rpc_err error = nil
 	gc, _ := gp.Get(ctx)
-	defer gc.CloseWithErr(ctx, rpc_err)
+	defer gc.Close(ctx)
 
 	client := gc.Gc.GetThrfitClient()
 	c, rpc_err := client.Add(ctx, 1, 2)
@@ -208,7 +208,7 @@ func TestGpoolReconnect(t *testing.T) {
 		gc, err := gp.Get(ctx)
 		client := gc.Gc.GetThrfitClient()
 		ret, err := client.Echo(ctx, "ganni")
-		gc.CloseWithErr(ctx, err)
+		gc.Close(ctx)
 		if err != nil {
 			t.Log(err.Error())
 			time.Sleep(1 * time.Second)
@@ -240,7 +240,7 @@ func TestGpoolList(t *testing.T) {
 				t.Log("<<<<<DEBUG>>>>>")
 				client := gc.Gc.GetThrfitClient()
 				ret, err := client.Echo(ctx, "ganni")
-				gc.CloseWithErr(ctx, err)
+				gc.Close(ctx)
 				if err != nil {
 					t.Log(err.Error())
 					cs <- "ferror"
@@ -262,7 +262,7 @@ func TestGpoolList(t *testing.T) {
 		t.Log("<<<<<<>>>>>", i)
 	}
 
-	if gp.GetFreeLen() != 5 {
+	if gp.FreeList.Len() != 5 {
 		t.Fatal("free len error")
 	}
 }

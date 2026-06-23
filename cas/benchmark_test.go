@@ -1,4 +1,4 @@
-package cas
+package cas_test
 
 import (
 	"context"

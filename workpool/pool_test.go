@@ -1,4 +1,4 @@
-package workpool
+package workpool_test
 
 import (
 	"context"

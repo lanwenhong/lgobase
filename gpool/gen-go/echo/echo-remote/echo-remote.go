@@ -6,14 +6,14 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	thrift "github.com/apache/thrift/lib/go/thrift"
+	"github.com/lanwenhong/lgobase/gpool/gen-go/echo"
 	"math"
 	"net"
 	"net/url"
 	"os"
 	"strconv"
 	"strings"
-	thrift "github.com/apache/thrift/lib/go/thrift"
-	"echo"
 )
 
 var _ = echo.GoUnusedProtection__
@@ -66,7 +66,7 @@ func main() {
 	flag.BoolVar(&useHttp, "http", false, "Use http")
 	flag.Var(headers, "H", "Headers to set on the http(s) request (e.g. -H \"Key: Value\")")
 	flag.Parse()
-	
+
 	if len(urlString) > 0 {
 		var err error
 		parsedUrl, err = url.Parse(urlString)
@@ -83,7 +83,7 @@ func main() {
 			flag.Usage()
 		}
 	}
-	
+
 	cmd := flag.Arg(0)
 	var err error
 	var cfg *thrift.TConfiguration = nil
@@ -140,10 +140,10 @@ func main() {
 		fmt.Fprintln(os.Stderr, "Error opening socket to ", host, ":", port, " ", err)
 		os.Exit(1)
 	}
-	
+
 	switch cmd {
 	case "echo":
-		if flag.NArg() - 1 != 1 {
+		if flag.NArg()-1 != 1 {
 			fmt.Fprintln(os.Stderr, "Echo requires 1 args")
 			flag.Usage()
 		}
@@ -168,7 +168,7 @@ func main() {
 		fmt.Print("\n")
 		break
 	case "ping":
-		if flag.NArg() - 1 != 0 {
+		if flag.NArg()-1 != 0 {
 			fmt.Fprintln(os.Stderr, "Ping requires 0 args")
 			flag.Usage()
 		}

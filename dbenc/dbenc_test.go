@@ -1,4 +1,4 @@
-package dbenc
+package dbenc_test
 
 import (
 	"context"

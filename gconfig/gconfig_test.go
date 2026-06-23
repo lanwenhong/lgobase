@@ -1,4 +1,4 @@
-package gconfig
+package gconfig_test
 
 import (
 	"context"

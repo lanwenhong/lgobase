@@ -1,4 +1,4 @@
-package gpool
+package gpool_test
 
 import (
 	"context"

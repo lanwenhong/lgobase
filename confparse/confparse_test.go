@@ -1,4 +1,4 @@
-package confparse
+package confparse_test
 
 import (
 	"context"

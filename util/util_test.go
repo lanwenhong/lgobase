@@ -1,4 +1,4 @@
-package util
+package util_test
 
 import (
 	"context"
@@ -107,6 +107,7 @@ func TestTokenDec(t *testing.T) {
 	//token := "CgAAAFKlK/BV/KsMFva5t9dmD2fugmfsoc3yK9wIiqV+CEwX"
 	//token := "CgAAAN+GTvV4QPdOsGRa5NhGx5vDXcwWqpYuc+PNHbkhMYKJ"
 	//token := "CgAAAK725CK5we3ucxp6/DyJUH2nmtbGC9FEsEZaFeoSRadM"
+	token := "CgAAAN-GTvV4QPdOsGRa5NhGx5vDXcwWqpYuc-PNHbkhMYKJ"
 
 	key := []byte("IypMcRkPXkbeNDRl6Km43boHr98udp7o")
 	//key := []byte("11111111111111111111111111111111")

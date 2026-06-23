@@ -1,4 +1,4 @@
-package dbpool
+package dbpool_test
 
 import (
 	"context"

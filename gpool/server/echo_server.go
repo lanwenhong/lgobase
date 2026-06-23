@@ -1,3 +1,5 @@
+//go:build gpool_echo_server
+
 package main
 
 import (

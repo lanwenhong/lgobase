@@ -6,14 +6,14 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	thrift "github.com/apache/thrift/lib/go/thrift"
+	"github.com/lanwenhong/lgobase/gpool/gen-go/server"
 	"math"
 	"net"
 	"net/url"
 	"os"
 	"strconv"
 	"strings"
-	thrift "github.com/apache/thrift/lib/go/thrift"
-	"server"
 )
 
 var _ = server.GoUnusedProtection__
@@ -67,7 +67,7 @@ func main() {
 	flag.BoolVar(&useHttp, "http", false, "Use http")
 	flag.Var(headers, "H", "Headers to set on the http(s) request (e.g. -H \"Key: Value\")")
 	flag.Parse()
-	
+
 	if len(urlString) > 0 {
 		var err error
 		parsedUrl, err = url.Parse(urlString)
@@ -84,7 +84,7 @@ func main() {
 			flag.Usage()
 		}
 	}
-	
+
 	cmd := flag.Arg(0)
 	var err error
 	var cfg *thrift.TConfiguration = nil
@@ -141,10 +141,10 @@ func main() {
 		fmt.Fprintln(os.Stderr, "Error opening socket to ", host, ":", port, " ", err)
 		os.Exit(1)
 	}
-	
+
 	switch cmd {
 	case "add":
-		if flag.NArg() - 1 != 2 {
+		if flag.NArg()-1 != 2 {
 			fmt.Fprintln(os.Stderr, "Add requires 2 args")
 			flag.Usage()
 		}
@@ -166,7 +166,7 @@ func main() {
 		fmt.Print("\n")
 		break
 	case "add1":
-		if flag.NArg() - 1 != 5 {
+		if flag.NArg()-1 != 5 {
 			fmt.Fprintln(os.Stderr, "Add1 requires 5 args")
 			flag.Usage()
 		}
@@ -220,7 +220,7 @@ func main() {
 		fmt.Print("\n")
 		break
 	case "postUser":
-		if flag.NArg() - 1 != 1 {
+		if flag.NArg()-1 != 1 {
 			fmt.Fprintln(os.Stderr, "PostUser requires 1 args")
 			flag.Usage()
 		}
