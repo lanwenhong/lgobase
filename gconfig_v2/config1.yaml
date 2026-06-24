@@ -1,0 +1,13 @@
+name: myapp
+version: 1.0.0
+debug: true
+
+server:
+  host: 127.0.0.1
+  port: 8080
+  test1:
+    k: 1111
+    v: 2222
+    test2:
+      tv: 3333
+      tk: 4444
