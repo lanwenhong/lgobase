@@ -1,0 +1,64 @@
+numbers:
+  ints: [1, 2, -3]
+  floats: [1.25, -2.5, 3e2]
+
+booleans:
+  yes_value: yes
+  no_value: no
+  on_value: on
+  off_value: off
+
+nulls:
+  null_value: null
+  tilde_value: ~
+
+times:
+  rfc3339: 2026-06-24T08:30:00Z
+  space_time: "2026-06-24 10:20:30"
+  date_only: 2026-06-24
+
+durations:
+  connect_timeout: 1ms
+  read_timeout: 2.4us
+  retry_backoff: 3s
+  batch: [1ms, 2.4us, 3s]
+  inline_map: {connect: 1ms, read: 2.4us}
+
+explicit_strings:
+  bool_text: !!str on
+  duration_text: !!str 1ms
+  number_text: !!str 123
+  quoted_text: !!str "host:3306"
+  empty_text: !!str
+  inline_map: {flag: !!str on, duration: !!str 1ms}
+  inline_list: [!!str on, !!str 1ms]
+
+multiline:
+  literal: |
+    select *
+    from users
+    where id = ?
+  literal_strip: |-
+    no trailing newline
+  folded: >
+    hello
+    world
+  tagged_literal: !!str |
+    on
+    1ms
+  list:
+    - |
+      item line 1
+      item line 2
+    - >
+      folded
+      item
+  named_list:
+    - script: |
+      echo hi
+      exit 0
+
+strings:
+  quoted_colon: "host:3306"
+  single_quote: 'it''s ok'
+  plain_version: 1.0.0

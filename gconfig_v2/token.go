@@ -28,6 +28,7 @@ type TokenNode struct {
 	nodeType int
 	indent   int
 	Obj      any
+	rawStr   bool
 }
 
 type Token struct {
@@ -179,6 +180,13 @@ func NewTokenNode(line, k, v string, indent int) *TokenNode {
 	return tk
 }
 
+func (token *TokenNode) toAny() any {
+	if token.value == "" && token.Obj == nil && token.key != "" {
+		return token.key
+	}
+	return token.Obj
+}
+
 func (tkn *TokenNode) NodeType2String(ctx context.Context) string {
 	switch tkn.nodeType {
 	//switch *asn.nt {
@@ -198,6 +206,8 @@ func (tkn *TokenNode) NodeType2String(ctx context.Context) string {
 		return "BOOL"
 	case NODE_TYPE_NULL:
 		return "NULL"
+	case NODE_TYPE_DURATION:
+		return "DURATION"
 	}
 	return ""
 }
@@ -327,7 +337,7 @@ func (tkn *TokenNode) IsTimestamp(s string) (bool, time.Time) {
 		return true, t
 	}
 	// 兼容 空格分隔 日期时间: 2026-06-11 12:00:00
-	_, err = time.Parse("2006-01-02 15:04:05", s)
+	t, err = time.Parse("2006-01-02 15:04:05", s)
 	if err == nil {
 		return true, t
 	}
@@ -336,20 +346,56 @@ func (tkn *TokenNode) IsTimestamp(s string) (bool, time.Time) {
 	return err == nil, t
 }
 
+func (tkn *TokenNode) IsDuration(s string) (bool, time.Duration) {
+	if hasCRLF(s) {
+		return false, 0
+	}
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return false, 0
+	}
+	d, err := time.ParseDuration(s)
+	return err == nil, d
+}
+
+func (tkn *TokenNode) parseExplicitStringTag(s string) (string, bool) {
+	s = strings.TrimSpace(s)
+	if s != "!!str" && !strings.HasPrefix(s, "!!str ") {
+		return "", false
+	}
+	value := strings.TrimSpace(strings.TrimPrefix(s, "!!str"))
+	if value == "" {
+		return "", true
+	}
+	if strings.HasPrefix(value, "'") || strings.HasPrefix(value, "\"") {
+		lex := NewLexer(value)
+		tok := lex.NextToken()
+		if tok.Type == TokenString {
+			return tok.Value, true
+		}
+	}
+	return value, true
+}
+
 func (tkn *TokenNode) parseScalar(s string) any {
 	s = strings.TrimSpace(s)
+	if value, ok := tkn.parseExplicitStringTag(s); ok {
+		tkn.nodeType = NODE_TYPE_STRING
+		return value
+	}
 	if tkn.IsNull(s) {
+		tkn.nodeType = NODE_TYPE_NULL
 		return nil
 	}
 	if tkn.IsBool(s) {
 		lower := strings.ToLower(s)
+		tkn.nodeType = NODE_TYPE_BOOL
 		switch lower {
 		case "true", "yes", "on":
 			return true
 		case "false", "no", "off":
 			return false
 		}
-		tkn.nodeType = NODE_TYPE_BOOL
 	}
 	if tkn.IsInteger(s) {
 		var res int
@@ -364,12 +410,12 @@ func (tkn *TokenNode) parseScalar(s string) any {
 		return res
 	}
 	if isTime, t := tkn.IsTimestamp(s); isTime {
-		tkn.nodeType = NODE_TYPE_FLOAT
+		tkn.nodeType = NODE_TYPE_TIMESTAMP
 		return t
 	}
-	if tkn.IsNull(s) {
-		tkn.nodeType = NODE_TYPE_NULL
-		return nil
+	if isDuration, d := tkn.IsDuration(s); isDuration {
+		tkn.nodeType = NODE_TYPE_DURATION
+		return d
 	}
 	tkn.nodeType = NODE_TYPE_STRING
 	return s
@@ -440,6 +486,20 @@ func (p *Parser) parseValue(ctx context.Context, tkn *TokenNode) (any, error) {
 		p.next()
 		return arr, nil
 	case TokenString:
+		if p.tok.Value == "!!str" {
+			p.next()
+			if p.tok.Type == TokenEOF {
+				tkn.nodeType = NODE_TYPE_STRING
+				return "", nil
+			}
+			if p.tok.Type != TokenString {
+				return nil, fmt.Errorf("!!str 后必须是字符串值")
+			}
+			val := p.tok.Value
+			tkn.nodeType = NODE_TYPE_STRING
+			p.next()
+			return val, nil
+		}
 		val := tkn.parseScalar(p.tok.Value)
 		p.next()
 		return val, nil
@@ -450,7 +510,25 @@ func (p *Parser) parseValue(ctx context.Context, tkn *TokenNode) (any, error) {
 }
 
 func (tkn *TokenNode) TokenParse(ctx context.Context) error {
-	lex := NewLexer(tkn.value)
+	if tkn.rawStr {
+		tkn.nodeType = NODE_TYPE_STRING
+		tkn.Obj = tkn.value
+		return nil
+	}
+
+	value := strings.TrimSpace(tkn.value)
+	if value == "" {
+		return nil
+	}
+	if !strings.HasPrefix(value, "{") &&
+		!strings.HasPrefix(value, "[") &&
+		!strings.HasPrefix(value, "'") &&
+		!strings.HasPrefix(value, "\"") {
+		tkn.Obj = tkn.parseScalar(value)
+		return nil
+	}
+
+	lex := NewLexer(value)
 	parser := NewParser(lex)
 	obj, err := parser.parseValue(ctx, tkn)
 	tkn.Obj = obj
