@@ -1,0 +1,458 @@
+package gconfig_v2
+
+import (
+	"context"
+	"fmt"
+	"strings"
+	"time"
+)
+
+type TokenType int
+
+const (
+	TokenEOF      TokenType = iota // 0
+	TokenLBrace                    // 1 {
+	TokenRBrace                    // 2 }
+	TokenLBracket                  // 3 [
+	TokenRBracket                  // 4 ]
+	TokenColon                     // 5 :
+	TokenComma                     // 6 ,
+	TokenString                    // 7 字符串/标量
+)
+
+type TokenNode struct {
+	line     string
+	value    string
+	key      string
+	iv       any
+	nodeType int
+	indent   int
+	Obj      any
+}
+
+type Token struct {
+	Type  TokenType
+	Value string
+}
+
+type Lexer struct {
+	input string
+	pos   int
+	end   int
+}
+
+type Parser struct {
+	lex *Lexer
+	tok Token
+}
+
+func NewLexer(input string) *Lexer {
+	return &Lexer{
+		input: input,
+		pos:   0,
+		end:   len(input),
+	}
+}
+
+func (l *Lexer) current() byte {
+	if l.pos >= l.end {
+		return 0
+	}
+	return l.input[l.pos]
+}
+
+func (l *Lexer) advance() {
+	if l.pos < l.end {
+		l.pos++
+	}
+}
+
+func (l *Lexer) skipWhitespace() {
+	for l.pos < l.end && l.current() == ' ' {
+		l.advance()
+	}
+}
+
+func (l *Lexer) readString() string {
+	start := l.pos
+	for l.pos < l.end {
+		c := l.current()
+		switch c {
+		case '{', '}', '[', ']', ':', ',', ' ':
+			return l.input[start:l.pos]
+		}
+		l.advance()
+	}
+	return l.input[start:l.pos]
+}
+
+func (l *Lexer) readSingleQuote() string {
+	l.advance()
+	var buf strings.Builder
+	for l.pos < l.end {
+		c := l.current()
+		if c == '\'' {
+			l.advance()
+			if l.current() == '\'' {
+				buf.WriteByte('\'')
+				l.advance()
+				continue
+			}
+			return buf.String()
+		}
+		buf.WriteByte(c)
+		l.advance()
+	}
+	return buf.String()
+}
+
+func (l *Lexer) readDoubleQuote() string {
+	l.advance()
+	var buf strings.Builder
+	for l.pos < l.end {
+		c := l.current()
+		if c == '\\' {
+			l.advance()
+			buf.WriteByte(l.current())
+			l.advance()
+			continue
+		}
+		if c == '"' {
+			l.advance()
+			return buf.String()
+		}
+		buf.WriteByte(c)
+		l.advance()
+	}
+	return buf.String()
+}
+
+func (l *Lexer) NextToken() Token {
+	l.skipWhitespace()
+	if l.pos >= l.end {
+		return Token{Type: TokenEOF}
+	}
+
+	c := l.current()
+	switch c {
+	case '{':
+		l.advance()
+		return Token{Type: TokenLBrace, Value: "{"}
+	case '}':
+		l.advance()
+		return Token{Type: TokenRBrace, Value: "}"}
+	case '[':
+		l.advance()
+		return Token{Type: TokenLBracket, Value: "["}
+	case ']':
+		l.advance()
+		return Token{Type: TokenRBracket, Value: "]"}
+	case ':':
+		l.advance()
+		return Token{Type: TokenColon, Value: ":"}
+	case ',':
+		l.advance()
+		return Token{Type: TokenComma, Value: ","}
+	case '\'':
+		s := l.readSingleQuote()
+		return Token{Type: TokenString, Value: s}
+	case '"':
+		s := l.readDoubleQuote()
+		return Token{Type: TokenString, Value: s}
+	default:
+		s := l.readString()
+		return Token{Type: TokenString, Value: s}
+	}
+}
+
+func hasCRLF(s string) bool {
+	return strings.Contains(s, "\r") || strings.Contains(s, "\n")
+}
+
+func NewTokenNode(line, k, v string, indent int) *TokenNode {
+	tk := &TokenNode{
+		line:   line,
+		key:    k,
+		value:  v,
+		indent: indent,
+	}
+	return tk
+}
+
+func (tkn *TokenNode) NodeType2String(ctx context.Context) string {
+	switch tkn.nodeType {
+	//switch *asn.nt {
+	case NODE_TYPE_MAP:
+		return "MAP"
+	case NODE_TYPE_SLICE:
+		return "SLICE"
+	case NODE_TYPE_STRING:
+		return "STRING"
+	case NODE_TYPE_FLOAT:
+		return "FLOAT"
+	case NODE_TYPE_INT:
+		return "INT"
+	case NODE_TYPE_TIMESTAMP:
+		return "TIMESTAMP"
+	case NODE_TYPE_BOOL:
+		return "BOOL"
+	case NODE_TYPE_NULL:
+		return "NULL"
+	}
+	return ""
+}
+
+func (tkn *TokenNode) IsInteger(s string) bool {
+	if strings.Contains(s, "\r") || strings.Contains(s, "\n") {
+		return false
+	}
+
+	s = strings.TrimSpace(s)
+	n := len(s)
+	if n == 0 {
+		return false
+	}
+
+	idx := 0
+	if s[0] == '+' || s[0] == '-' {
+		idx++
+		if idx >= n {
+			return false
+		}
+	}
+
+	for ; idx < n; idx++ {
+		c := s[idx]
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+func (tkn *TokenNode) IsFloat(s string) bool {
+
+	if strings.Contains(s, "\r") || strings.Contains(s, "\n") {
+		return false
+	}
+
+	s = strings.TrimSpace(s)
+	n := len(s)
+	if n == 0 {
+		return false
+	}
+
+	var (
+		idx    = 0
+		hasDot = false
+		hasExp = false
+	)
+
+	// 处理开头正负号
+	if s[0] == '+' || s[0] == '-' {
+		idx++
+		if idx >= n {
+			return false
+		}
+	}
+
+	for ; idx < n; idx++ {
+		c := s[idx]
+		switch c {
+		case '.':
+			if hasDot || hasExp {
+				return false
+			}
+			hasDot = true
+
+		case 'e', 'E':
+			if hasExp {
+				return false
+			}
+			hasExp = true
+			idx++
+			if idx >= n {
+				return false
+			}
+			if s[idx] == '+' || s[idx] == '-' {
+				idx++
+				if idx >= n {
+					return false
+				}
+			}
+
+		default:
+			if c < '0' || c > '9' {
+				return false
+			}
+		}
+	}
+	// 必须包含小数点 或 指数符，才判定为浮点数
+	return hasDot || hasExp
+}
+
+func (tkn *TokenNode) IsBool(s string) bool {
+	if hasCRLF(s) {
+		return false
+	}
+	s = strings.TrimSpace(s)
+	lower := strings.ToLower(s)
+	switch lower {
+	case "true", "yes", "on",
+		"false", "no", "off":
+		return true
+	}
+	return false
+}
+
+func (tkn *TokenNode) IsNull(s string) bool {
+	if hasCRLF(s) {
+		return false
+	}
+	s = strings.TrimSpace(s)
+	lower := strings.ToLower(s)
+	return lower == "null" || s == "~"
+}
+
+func (tkn *TokenNode) IsTimestamp(s string) (bool, time.Time) {
+	var t time.Time
+	var err error = nil
+	if hasCRLF(s) {
+		return false, t
+	}
+	s = strings.TrimSpace(s)
+	// 优先尝试 RFC3339(ISO8601) YAML 主流时间格式
+	t, err = time.Parse(time.RFC3339, s)
+	if err == nil {
+		return true, t
+	}
+	// 兼容 空格分隔 日期时间: 2026-06-11 12:00:00
+	_, err = time.Parse("2006-01-02 15:04:05", s)
+	if err == nil {
+		return true, t
+	}
+	// 仅日期
+	t, err = time.Parse("2006-01-02", s)
+	return err == nil, t
+}
+
+func (tkn *TokenNode) parseScalar(s string) any {
+	s = strings.TrimSpace(s)
+	if tkn.IsNull(s) {
+		return nil
+	}
+	if tkn.IsBool(s) {
+		lower := strings.ToLower(s)
+		switch lower {
+		case "true", "yes", "on":
+			return true
+		case "false", "no", "off":
+			return false
+		}
+		tkn.nodeType = NODE_TYPE_BOOL
+	}
+	if tkn.IsInteger(s) {
+		var res int
+		fmt.Sscan(s, &res)
+		tkn.nodeType = NODE_TYPE_INT
+		return res
+	}
+	if tkn.IsFloat(s) {
+		var res float64
+		fmt.Sscan(s, &res)
+		tkn.nodeType = NODE_TYPE_FLOAT
+		return res
+	}
+	if isTime, t := tkn.IsTimestamp(s); isTime {
+		tkn.nodeType = NODE_TYPE_FLOAT
+		return t
+	}
+	if tkn.IsNull(s) {
+		tkn.nodeType = NODE_TYPE_NULL
+		return nil
+	}
+	tkn.nodeType = NODE_TYPE_STRING
+	return s
+}
+
+func NewParser(lex *Lexer) *Parser {
+	p := &Parser{lex: lex}
+	p.tok = p.lex.NextToken()
+	return p
+}
+
+func (p *Parser) next() {
+	p.tok = p.lex.NextToken()
+}
+
+func (p *Parser) parseValue(ctx context.Context, tkn *TokenNode) (any, error) {
+	switch p.tok.Type {
+	case TokenLBrace:
+		p.next()
+		m := make(map[string]any)
+		tkn.nodeType = NODE_TYPE_MAP
+		for p.tok.Type != TokenRBrace && p.tok.Type != TokenEOF {
+			if p.tok.Type != TokenString {
+				return nil, fmt.Errorf("需要字符串类型 key")
+			}
+			key := p.tok.Value
+			p.next()
+
+			if p.tok.Type != TokenColon {
+				return nil, fmt.Errorf("key 后必须有冒号")
+			}
+			p.next()
+
+			val, err := p.parseValue(ctx, tkn)
+			if err != nil {
+				return nil, err
+			}
+			m[key] = val
+
+			if p.tok.Type == TokenComma {
+				p.next()
+			}
+		}
+		if p.tok.Type != TokenRBrace {
+			return nil, fmt.Errorf("映射缺少闭合 }")
+		}
+		p.next()
+		return m, nil
+
+	case TokenLBracket:
+		p.next()
+		arr := make([]any, 0)
+		tkn.nodeType = NODE_TYPE_SLICE
+		for p.tok.Type != TokenRBracket && p.tok.Type != TokenEOF {
+			elem, err := p.parseValue(ctx, tkn)
+			if err != nil {
+				return nil, err
+			}
+			arr = append(arr, elem)
+
+			if p.tok.Type == TokenComma {
+				p.next()
+			}
+		}
+		if p.tok.Type != TokenRBracket {
+			return nil, fmt.Errorf("数组缺少闭合 ]")
+		}
+		p.next()
+		return arr, nil
+	case TokenString:
+		val := tkn.parseScalar(p.tok.Value)
+		p.next()
+		return val, nil
+
+	default:
+		return nil, fmt.Errorf("非法 Token: %d", p.tok.Type)
+	}
+}
+
+func (tkn *TokenNode) TokenParse(ctx context.Context) error {
+	lex := NewLexer(tkn.value)
+	parser := NewParser(lex)
+	obj, err := parser.parseValue(ctx, tkn)
+	tkn.Obj = obj
+	return err
+}
