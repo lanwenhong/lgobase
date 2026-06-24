@@ -3,6 +3,7 @@ package gconfig_v2
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -40,6 +41,7 @@ type Lexer struct {
 	input string
 	pos   int
 	end   int
+	err   error
 }
 
 type Parser struct {
@@ -104,6 +106,7 @@ func (l *Lexer) readSingleQuote() string {
 		buf.WriteByte(c)
 		l.advance()
 	}
+	l.err = fmt.Errorf("字符串缺少闭合 '")
 	return buf.String()
 }
 
@@ -114,6 +117,10 @@ func (l *Lexer) readDoubleQuote() string {
 		c := l.current()
 		if c == '\\' {
 			l.advance()
+			if l.pos >= l.end {
+				l.err = fmt.Errorf("字符串转义缺少字符")
+				return buf.String()
+			}
 			buf.WriteByte(l.current())
 			l.advance()
 			continue
@@ -125,6 +132,7 @@ func (l *Lexer) readDoubleQuote() string {
 		buf.WriteByte(c)
 		l.advance()
 	}
+	l.err = fmt.Errorf("字符串缺少闭合 \"")
 	return buf.String()
 }
 
@@ -168,6 +176,26 @@ func (l *Lexer) NextToken() Token {
 
 func hasCRLF(s string) bool {
 	return strings.Contains(s, "\r") || strings.Contains(s, "\n")
+}
+
+func unsupportedPlainScalar(s string) (string, bool) {
+	s = strings.TrimSpace(s)
+	if s == "" || strings.HasPrefix(s, "!!str") {
+		return "", false
+	}
+	switch {
+	case strings.HasPrefix(s, "&"):
+		return "anchor", true
+	case strings.HasPrefix(s, "*"):
+		return "alias", true
+	case strings.HasPrefix(s, "!"):
+		return "tag", true
+	}
+	return "", false
+}
+
+func errUnsupportedYAMLFeature(feature string) error {
+	return fmt.Errorf("unsupported yaml feature: %s", feature)
 }
 
 func NewTokenNode(line, k, v string, indent int) *TokenNode {
@@ -377,48 +405,52 @@ func (tkn *TokenNode) parseExplicitStringTag(s string) (string, bool) {
 	return value, true
 }
 
-func (tkn *TokenNode) parseScalar(s string) any {
+func (tkn *TokenNode) parseScalar(s string) (any, error) {
 	s = strings.TrimSpace(s)
 	if value, ok := tkn.parseExplicitStringTag(s); ok {
 		tkn.nodeType = NODE_TYPE_STRING
-		return value
+		return value, nil
 	}
 	if tkn.IsNull(s) {
 		tkn.nodeType = NODE_TYPE_NULL
-		return nil
+		return nil, nil
 	}
 	if tkn.IsBool(s) {
 		lower := strings.ToLower(s)
 		tkn.nodeType = NODE_TYPE_BOOL
 		switch lower {
 		case "true", "yes", "on":
-			return true
+			return true, nil
 		case "false", "no", "off":
-			return false
+			return false, nil
 		}
 	}
 	if tkn.IsInteger(s) {
-		var res int
-		fmt.Sscan(s, &res)
+		res, err := strconv.ParseInt(s, 10, 0)
+		if err != nil {
+			return nil, fmt.Errorf("invalid integer %q: %w", s, err)
+		}
 		tkn.nodeType = NODE_TYPE_INT
-		return res
+		return int(res), nil
 	}
 	if tkn.IsFloat(s) {
-		var res float64
-		fmt.Sscan(s, &res)
+		res, err := strconv.ParseFloat(s, 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid float %q: %w", s, err)
+		}
 		tkn.nodeType = NODE_TYPE_FLOAT
-		return res
+		return res, nil
 	}
 	if isTime, t := tkn.IsTimestamp(s); isTime {
 		tkn.nodeType = NODE_TYPE_TIMESTAMP
-		return t
+		return t, nil
 	}
 	if isDuration, d := tkn.IsDuration(s); isDuration {
 		tkn.nodeType = NODE_TYPE_DURATION
-		return d
+		return d, nil
 	}
 	tkn.nodeType = NODE_TYPE_STRING
-	return s
+	return s, nil
 }
 
 func NewParser(lex *Lexer) *Parser {
@@ -442,6 +474,9 @@ func (p *Parser) parseValue(ctx context.Context, tkn *TokenNode) (any, error) {
 				return nil, fmt.Errorf("需要字符串类型 key")
 			}
 			key := p.tok.Value
+			if _, ok := m[key]; ok {
+				return nil, fmt.Errorf("duplicate key %s", key)
+			}
 			p.next()
 
 			if p.tok.Type != TokenColon {
@@ -457,6 +492,10 @@ func (p *Parser) parseValue(ctx context.Context, tkn *TokenNode) (any, error) {
 
 			if p.tok.Type == TokenComma {
 				p.next()
+			} else if p.tok.Type == TokenEOF {
+				continue
+			} else if p.tok.Type != TokenRBrace {
+				return nil, fmt.Errorf("映射元素后必须是逗号或 }")
 			}
 		}
 		if p.tok.Type != TokenRBrace {
@@ -478,6 +517,10 @@ func (p *Parser) parseValue(ctx context.Context, tkn *TokenNode) (any, error) {
 
 			if p.tok.Type == TokenComma {
 				p.next()
+			} else if p.tok.Type == TokenEOF {
+				continue
+			} else if p.tok.Type != TokenRBracket {
+				return nil, fmt.Errorf("数组元素后必须是逗号或 ]")
 			}
 		}
 		if p.tok.Type != TokenRBracket {
@@ -500,7 +543,13 @@ func (p *Parser) parseValue(ctx context.Context, tkn *TokenNode) (any, error) {
 			p.next()
 			return val, nil
 		}
-		val := tkn.parseScalar(p.tok.Value)
+		if feature, ok := unsupportedPlainScalar(p.tok.Value); ok {
+			return nil, errUnsupportedYAMLFeature(feature)
+		}
+		val, err := tkn.parseScalar(p.tok.Value)
+		if err != nil {
+			return nil, err
+		}
 		p.next()
 		return val, nil
 
@@ -520,17 +569,33 @@ func (tkn *TokenNode) TokenParse(ctx context.Context) error {
 	if value == "" {
 		return nil
 	}
+	if feature, ok := unsupportedPlainScalar(value); ok {
+		return errUnsupportedYAMLFeature(feature)
+	}
 	if !strings.HasPrefix(value, "{") &&
 		!strings.HasPrefix(value, "[") &&
 		!strings.HasPrefix(value, "'") &&
 		!strings.HasPrefix(value, "\"") {
-		tkn.Obj = tkn.parseScalar(value)
+		obj, err := tkn.parseScalar(value)
+		if err != nil {
+			return err
+		}
+		tkn.Obj = obj
 		return nil
 	}
 
 	lex := NewLexer(value)
 	parser := NewParser(lex)
 	obj, err := parser.parseValue(ctx, tkn)
+	if err != nil {
+		return err
+	}
+	if parser.lex.err != nil {
+		return parser.lex.err
+	}
+	if parser.tok.Type != TokenEOF {
+		return fmt.Errorf("unexpected token after value: %s", parser.tok.Value)
+	}
 	tkn.Obj = obj
-	return err
+	return nil
 }

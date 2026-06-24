@@ -117,19 +117,109 @@ func (py *ParseYaml) errLine(line string) error {
 	return err
 }
 
-func (py *ParseYaml) isSliceFlag(line string) bool {
-	if line[0] == '-' && line[1] == ' ' {
-		return true
-	}
-	return false
+func (py *ParseYaml) errDuplicateKey(line, key string) error {
+	return fmt.Errorf("line %s duplicate key %s", line, key)
 }
 
-func (py *ParseYaml) matchMap(ctx context.Context, line string) (string, string, bool) {
-	k, v, ok := strings.Cut(line, ":")
-	if !ok {
-		return "", "", false
+func (py *ParseYaml) errMixedNode(line string) error {
+	return fmt.Errorf("line %s can not mix map and slice items", line)
+}
+
+func (py *ParseYaml) errUnexpectedIndent(line string) error {
+	return fmt.Errorf("line %s unexpected indent", line)
+}
+
+func (py *ParseYaml) lineIndent(line string) (int, error) {
+	indent := 0
+	for _, c := range line {
+		switch c {
+		case ' ':
+			indent++
+		case '\t':
+			return 0, fmt.Errorf("line %s tab indentation not supported", line)
+		default:
+			return indent, nil
+		}
 	}
-	return strings.TrimSpace(k), strings.TrimSpace(v), true
+	return indent, nil
+}
+
+func (py *ParseYaml) isSliceFlag(line string) bool {
+	return strings.HasPrefix(line, "- ")
+}
+
+func (py *ParseYaml) splitMapLine(line string) (string, string, bool, error) {
+	inSingle := false
+	inDouble := false
+	for i := 0; i < len(line); i++ {
+		c := line[i]
+		switch {
+		case inSingle:
+			if c == '\'' {
+				if i+1 < len(line) && line[i+1] == '\'' {
+					i++
+					continue
+				}
+				inSingle = false
+			}
+		case inDouble:
+			if c == '\\' {
+				i++
+				continue
+			}
+			if c == '"' {
+				inDouble = false
+			}
+		default:
+			switch c {
+			case '\'':
+				inSingle = true
+			case '"':
+				inDouble = true
+			case ':':
+				return line[:i], line[i+1:], true, nil
+			}
+		}
+	}
+	if inSingle || inDouble {
+		return "", "", false, fmt.Errorf("line %s key quote not closed", line)
+	}
+	return "", "", false, nil
+}
+
+func (py *ParseYaml) normalizeMapKey(k string) (string, error) {
+	k = strings.TrimSpace(k)
+	if k == "" {
+		return "", nil
+	}
+	if strings.HasPrefix(k, "'") || strings.HasPrefix(k, "\"") {
+		lex := NewLexer(k)
+		tok := lex.NextToken()
+		if lex.err != nil {
+			return "", lex.err
+		}
+		lex.skipWhitespace()
+		if tok.Type != TokenString || lex.pos != lex.end {
+			return "", fmt.Errorf("invalid quoted key %s", k)
+		}
+		k = tok.Value
+	}
+	if strings.TrimSpace(k) == "" {
+		return "", nil
+	}
+	return k, nil
+}
+
+func (py *ParseYaml) matchMap(ctx context.Context, line string) (string, string, bool, error) {
+	k, v, ok, err := py.splitMapLine(line)
+	if err != nil || !ok {
+		return "", "", ok, err
+	}
+	k, err = py.normalizeMapKey(k)
+	if err != nil {
+		return "", "", true, err
+	}
+	return k, strings.TrimSpace(v), true, nil
 }
 
 func (py *ParseYaml) matchSlice(ctx context.Context, line string) ([]string, bool) {
@@ -152,31 +242,89 @@ func (py *ParseYaml) countIndent(line string) int {
 	return indent
 }
 
-func (py *ParseYaml) parseBlockScalarHeader(value string) (byte, byte, bool) {
+func (py *ParseYaml) parseBlockScalarHeader(value string) (byte, byte, int, bool) {
 	value = strings.TrimSpace(value)
 	if strings.HasPrefix(value, "!!str ") {
 		value = strings.TrimSpace(strings.TrimPrefix(value, "!!str"))
 	}
 	if value == "" {
-		return 0, 0, false
+		return 0, 0, 0, false
 	}
 	style := value[0]
 	if style != '|' && style != '>' {
-		return 0, 0, false
+		return 0, 0, 0, false
 	}
 
 	chomp := byte(0)
+	indentIndicator := 0
 	for i := 1; i < len(value); i++ {
 		switch c := value[i]; {
 		case c == '-' || c == '+':
+			if chomp != 0 {
+				return 0, 0, 0, false
+			}
 			chomp = c
-		case c >= '0' && c <= '9':
-			continue
+		case c >= '1' && c <= '9':
+			if indentIndicator != 0 {
+				return 0, 0, 0, false
+			}
+			indentIndicator = int(c - '0')
 		default:
-			return 0, 0, false
+			return 0, 0, 0, false
 		}
 	}
-	return style, chomp, true
+	return style, chomp, indentIndicator, true
+}
+
+func (py *ParseYaml) isInvalidBlockScalarHeader(value string) bool {
+	value = strings.TrimSpace(value)
+	if strings.HasPrefix(value, "!!str ") {
+		value = strings.TrimSpace(strings.TrimPrefix(value, "!!str"))
+	}
+	if value == "" || (value[0] != '|' && value[0] != '>') {
+		return false
+	}
+	_, _, _, ok := py.parseBlockScalarHeader(value)
+	return !ok
+}
+
+func (py *ParseYaml) errBlockScalarHeader(line string) error {
+	return fmt.Errorf("line %s invalid block scalar header", line)
+}
+
+func (py *ParseYaml) unsupportedLineFeature(trimmed string) (string, bool) {
+	switch {
+	case trimmed == "---":
+		return "document start", true
+	case trimmed == "...":
+		return "document end", true
+	case strings.HasPrefix(trimmed, "? "):
+		return "complex key", true
+	}
+	return "", false
+}
+
+func (py *ParseYaml) unsupportedMapKey(k string) (string, bool) {
+	k = strings.TrimSpace(k)
+	switch {
+	case k == "<<":
+		return "merge key", true
+	case strings.HasPrefix(k, "&"):
+		return "anchor", true
+	case strings.HasPrefix(k, "*"):
+		return "alias", true
+	case strings.HasPrefix(k, "!"):
+		return "tag", true
+	}
+	return "", false
+}
+
+func (py *ParseYaml) putMapItem(line, key string, m map[string]interface{}, value interface{}) error {
+	if _, ok := m[key]; ok {
+		return py.errDuplicateKey(line, key)
+	}
+	m[key] = value
+	return nil
 }
 
 func (py *ParseYaml) normalizeBlockLines(lines []string, minIndent int) []string {
@@ -235,7 +383,7 @@ func (py *ParseYaml) renderBlockScalar(lines []string, style byte, chomp byte) s
 	return py.applyBlockChomp(b.String(), chomp)
 }
 
-func (py *ParseYaml) collectBlockScalar(lines []string, start int, parentIndent int, style byte, chomp byte) (string, int) {
+func (py *ParseYaml) collectBlockScalar(lines []string, start int, parentIndent int, style byte, chomp byte, indentIndicator int) (string, int) {
 	blockLines := make([]string, 0)
 	minIndent := -1
 	next := start + 1
@@ -254,6 +402,9 @@ func (py *ParseYaml) collectBlockScalar(lines []string, start int, parentIndent 
 	}
 	if minIndent == -1 {
 		minIndent = parentIndent + 1
+	}
+	if indentIndicator > 0 {
+		minIndent = parentIndent + indentIndicator
 	}
 	return py.renderBlockScalar(py.normalizeBlockLines(blockLines, minIndent), style, chomp), next
 }
@@ -275,6 +426,8 @@ func (py *ParseYaml) newParsedToken(ctx context.Context, line, k, v string, inde
 func (py *ParseYaml) feedSliceScalar(ctx context.Context, line, v string, pNode *AstNode, indent int, rawStr bool) error {
 	if pNode.nodeType == NODE_TYPE_UNKNOWN {
 		pNode.nodeType = NODE_TYPE_SLICE
+	} else if pNode.nodeType != NODE_TYPE_SLICE {
+		return py.errMixedNode(line)
 	}
 	token, err := py.newParsedToken(ctx, line, "", v, indent, rawStr)
 	if err != nil {
@@ -300,6 +453,16 @@ func (py *ParseYaml) feedSlice(ctx context.Context, line string, group []string,
 
 	if pNode.nodeType == NODE_TYPE_UNKNOWN {
 		pNode.nodeType = NODE_TYPE_SLICE
+	} else if pNode.nodeType != NODE_TYPE_SLICE {
+		return py.errMixedNode(line)
+	}
+	if len(pNode.s) > 0 {
+		switch last := pNode.s[len(pNode.s)-1].(type) {
+		case *TokenNode:
+			if indent > last.indent {
+				return py.errUnexpectedIndent(line)
+			}
+		}
 	}
 
 	logger.Debug(ctx, "gconfig_v2", "k", k, "v", v)
@@ -355,9 +518,9 @@ func (py *ParseYaml) feedMapValue(ctx context.Context, line, k, v string, pNode 
 	case NODE_TYPE_UNKNOWN:
 		pNode.nodeType = NODE_TYPE_MAP
 		logger.Debug(ctx, "gconfig_v2", "line", line, "pline", pNode.line, "pNode", pNode.nodeType)
-		pNode.m[k] = token
+		return py.putMapItem(line, k, pNode.m, token)
 	case NODE_TYPE_MAP:
-		pNode.m[k] = token
+		return py.putMapItem(line, k, pNode.m, token)
 	case NODE_TYPE_SLICE:
 		slen := len(pNode.s)
 		if slen == 0 {
@@ -365,9 +528,12 @@ func (py *ParseYaml) feedMapValue(ctx context.Context, line, k, v string, pNode 
 		}
 		sNode, ok := pNode.s[slen-1].(*AstNode)
 		if !ok {
-			return py.errLine(line)
+			return py.errMixedNode(line)
 		}
-		sNode.m[k] = token
+		if indent <= sNode.indent {
+			return py.errMixedNode(line)
+		}
+		return py.putMapItem(line, k, sNode.m, token)
 	default:
 		return py.errLine(line)
 	}
@@ -378,6 +544,9 @@ func (py *ParseYaml) feedMap(ctx context.Context, line, k, v string, pNode *AstN
 	if k == "" {
 		errMsg := fmt.Sprintf("parse line:%s key is empty", line)
 		return errors.New(errMsg)
+	}
+	if feature, ok := py.unsupportedMapKey(k); ok {
+		return errUnsupportedYAMLFeature(feature)
 	}
 	var err error = nil
 	k = strings.TrimSpace(k)
@@ -392,8 +561,31 @@ func (py *ParseYaml) feedMap(ctx context.Context, line, k, v string, pNode *AstN
 			nodeName: k,
 			nodeType: NODE_TYPE_UNKNOWN,
 		}
-		py.stack = append(py.stack, node)
-		pNode.m[k] = node
+		switch pNode.nodeType {
+		case NODE_TYPE_UNKNOWN:
+			pNode.nodeType = NODE_TYPE_MAP
+			err = py.putMapItem(line, k, pNode.m, node)
+		case NODE_TYPE_MAP:
+			err = py.putMapItem(line, k, pNode.m, node)
+		case NODE_TYPE_SLICE:
+			slen := len(pNode.s)
+			if slen == 0 {
+				return py.errLine(line)
+			}
+			sNode, ok := pNode.s[slen-1].(*AstNode)
+			if !ok {
+				return py.errMixedNode(line)
+			}
+			if indent <= sNode.indent {
+				return py.errMixedNode(line)
+			}
+			err = py.putMapItem(line, k, sNode.m, node)
+		default:
+			err = py.errLine(line)
+		}
+		if err == nil {
+			py.stack = append(py.stack, node)
+		}
 	} else if k != "" && v != "" {
 		err = py.feedMapValue(ctx, line, k, v, pNode, indent, false)
 	} else {
@@ -406,6 +598,44 @@ func (py *ParseYaml) splitYamlLines(content []byte) []string {
 	s := strings.ReplaceAll(string(content), "\r\n", "\n")
 	s = strings.ReplaceAll(s, "\r", "\n")
 	return strings.Split(s, "\n")
+}
+
+func (py *ParseYaml) stripInlineComment(line string) string {
+	inSingle := false
+	inDouble := false
+	for i := 0; i < len(line); i++ {
+		c := line[i]
+		switch {
+		case inSingle:
+			if c == '\'' {
+				if i+1 < len(line) && line[i+1] == '\'' {
+					i++
+					continue
+				}
+				inSingle = false
+			}
+		case inDouble:
+			if c == '\\' {
+				i++
+				continue
+			}
+			if c == '"' {
+				inDouble = false
+			}
+		default:
+			switch c {
+			case '\'':
+				inSingle = true
+			case '"':
+				inDouble = true
+			case '#':
+				if i == 0 || line[i-1] == ' ' || line[i-1] == '\t' {
+					return strings.TrimRight(line[:i], " \t")
+				}
+			}
+		}
+	}
+	return line
 }
 
 func (py *ParseYaml) parse(ctx context.Context) (map[string]interface{}, error) {
@@ -423,13 +653,28 @@ func (py *ParseYaml) parse(ctx context.Context) (map[string]interface{}, error) 
 	py.stack = []*AstNode{rootNode}
 
 	var err error = nil
+	lastIndent := -1
+	lastMayNest := false
 	for i := 0; i < len(lines); i++ {
-		line := lines[i]
+		line := py.stripInlineComment(lines[i])
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
 			continue
 		}
-		indent := py.countIndent(line)
+		if feature, ok := py.unsupportedLineFeature(trimmed); ok {
+			return nil, errUnsupportedYAMLFeature(feature)
+		}
+		indent, err := py.lineIndent(line)
+		if err != nil {
+			return nil, err
+		}
+		if lastIndent < 0 && indent > 0 {
+			return nil, py.errUnexpectedIndent(line)
+		}
+		if lastIndent >= 0 && indent > lastIndent && !lastMayNest {
+			return nil, py.errUnexpectedIndent(line)
+		}
+		currentMayNest := false
 
 		//find node
 		for len(py.stack) > 0 && py.stack[len(py.stack)-1].indent >= indent {
@@ -437,15 +682,26 @@ func (py *ParseYaml) parse(ctx context.Context) (map[string]interface{}, error) 
 		}
 		parentNode := py.stack[len(py.stack)-1]
 		if !py.isSliceFlag(trimmed) {
-			lk, lv, match := py.matchMap(ctx, line)
+			lk, lv, match, matchErr := py.matchMap(ctx, line)
+			if matchErr != nil {
+				return nil, matchErr
+			}
 			if match {
 				logger.Debug(ctx, "gconfig_v2", "line", line, "indent", indent)
-				if style, chomp, ok := py.parseBlockScalarHeader(lv); ok {
-					value, next := py.collectBlockScalar(lines, i, indent, style, chomp)
+				if feature, ok := py.unsupportedMapKey(lk); ok {
+					err = errUnsupportedYAMLFeature(feature)
+				} else if feature, ok := unsupportedPlainScalar(lv); ok {
+					err = errUnsupportedYAMLFeature(feature)
+				} else if style, chomp, indentIndicator, ok := py.parseBlockScalarHeader(lv); ok {
+					value, next := py.collectBlockScalar(lines, i, indent, style, chomp, indentIndicator)
 					err = py.feedMapValue(ctx, line, lk, value, parentNode, indent, true)
 					i = next - 1
+					currentMayNest = false
+				} else if py.isInvalidBlockScalarHeader(lv) {
+					err = py.errBlockScalarHeader(line)
 				} else {
 					err = py.feedMap(ctx, line, lk, lv, parentNode, indent)
+					currentMayNest = strings.TrimSpace(lv) == ""
 				}
 			} else {
 				err = py.errLine(line)
@@ -453,47 +709,65 @@ func (py *ParseYaml) parse(ctx context.Context) (map[string]interface{}, error) 
 			}
 		} else {
 			body := strings.TrimSpace(strings.TrimPrefix(trimmed, "- "))
-			if style, chomp, ok := py.parseBlockScalarHeader(body); ok {
-				value, next := py.collectBlockScalar(lines, i, indent, style, chomp)
+			if style, chomp, indentIndicator, ok := py.parseBlockScalarHeader(body); ok {
+				value, next := py.collectBlockScalar(lines, i, indent, style, chomp, indentIndicator)
 				err = py.feedSliceScalar(ctx, line, value, parentNode, indent, true)
 				i = next - 1
+				lastIndent = indent
+				lastMayNest = false
 				continue
 			}
-			group, match := py.matchSlice(ctx, trimmed)
-			if match {
-				if style, chomp, ok := py.parseBlockScalarHeader(strings.TrimSpace(group[4])); ok {
-					value, next := py.collectBlockScalar(lines, i, indent, style, chomp)
-					group = append([]string(nil), group...)
-					group[4] = value
-					if parentNode.nodeType == NODE_TYPE_UNKNOWN {
-						parentNode.nodeType = NODE_TYPE_SLICE
-					}
-					token, tokenErr := py.newParsedToken(ctx, line, strings.Trim(group[2], " "), value, indent+2, true)
-					if tokenErr != nil {
-						return nil, tokenErr
-					}
-					node := &AstNode{
-						line:     line,
-						m:        make(map[string]interface{}),
-						s:        make([]interface{}, 0, 10),
-						indent:   indent,
-						nodeName: strings.Trim(group[2], " "),
-						nodeType: NODE_TYPE_MAP,
-					}
-					node.m[strings.Trim(group[2], " ")] = token
-					parentNode.s = append(parentNode.s, node)
-					i = next - 1
-				} else {
-					err = py.feedSlice(ctx, line, group, parentNode, indent)
-				}
+			if py.isInvalidBlockScalarHeader(body) {
+				err = py.errBlockScalarHeader(line)
+			} else if feature, ok := unsupportedPlainScalar(body); ok {
+				err = errUnsupportedYAMLFeature(feature)
 			} else {
-				err = py.errLine(line)
-				logger.Warn(ctx, "gconfig_v2", "err", err.Error())
+				group, match := py.matchSlice(ctx, trimmed)
+				if match {
+					if feature, ok := py.unsupportedMapKey(strings.TrimSpace(group[2])); ok {
+						err = errUnsupportedYAMLFeature(feature)
+					} else if feature, ok := unsupportedPlainScalar(strings.TrimSpace(group[4])); ok {
+						err = errUnsupportedYAMLFeature(feature)
+					} else if style, chomp, indentIndicator, ok := py.parseBlockScalarHeader(strings.TrimSpace(group[4])); ok {
+						value, next := py.collectBlockScalar(lines, i, indent, style, chomp, indentIndicator)
+						group = append([]string(nil), group...)
+						group[4] = value
+						if parentNode.nodeType == NODE_TYPE_UNKNOWN {
+							parentNode.nodeType = NODE_TYPE_SLICE
+						}
+						token, tokenErr := py.newParsedToken(ctx, line, strings.Trim(group[2], " "), value, indent+2, true)
+						if tokenErr != nil {
+							return nil, tokenErr
+						}
+						node := &AstNode{
+							line:     line,
+							m:        make(map[string]interface{}),
+							s:        make([]interface{}, 0, 10),
+							indent:   indent,
+							nodeName: strings.Trim(group[2], " "),
+							nodeType: NODE_TYPE_MAP,
+						}
+						node.m[strings.Trim(group[2], " ")] = token
+						parentNode.s = append(parentNode.s, node)
+						i = next - 1
+						currentMayNest = false
+					} else if py.isInvalidBlockScalarHeader(strings.TrimSpace(group[4])) {
+						err = py.errBlockScalarHeader(line)
+					} else {
+						err = py.feedSlice(ctx, line, group, parentNode, indent)
+						currentMayNest = strings.TrimSpace(group[3]) == ":"
+					}
+				} else {
+					err = py.errLine(line)
+					logger.Warn(ctx, "gconfig_v2", "err", err.Error())
+				}
 			}
 		}
 		if err != nil {
 			return nil, err
 		}
+		lastIndent = indent
+		lastMayNest = currentMayNest
 	}
 	return root, err
 }

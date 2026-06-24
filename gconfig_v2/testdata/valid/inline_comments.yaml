@@ -1,0 +1,13 @@
+# top-level comment
+name: api # service name
+url: "http://localhost/#fragment" # quoted hash must stay
+password: abc#123 # plain hash without leading space must stay
+methods: [GET, POST] # flow list comment
+flow_map_comment: {a: "b # c"} # flow map comment
+flow_list_comment: [a, "b # c"] # flow list comment
+script: | # block scalar header comment
+  echo "# keep"
+  echo done # keep inside block
+quoted_keys:
+  "host:port": "localhost:8080" # quoted key with colon
+  'single:key': value

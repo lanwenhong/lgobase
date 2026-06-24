@@ -2,6 +2,7 @@ package gconfig_v2_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -42,6 +43,16 @@ func requireDuration(t *testing.T, v any) time.Duration {
 		t.Fatalf("want time.Duration, got %T", v)
 	}
 	return d
+}
+
+func requireErrorContains(t *testing.T, err error, want string) {
+	t.Helper()
+	if err == nil {
+		t.Fatalf("want error containing %q, got nil", want)
+	}
+	if !strings.Contains(err.Error(), want) {
+		t.Fatalf("want error containing %q, got %q", want, err.Error())
+	}
 }
 
 func TestLoadConfFile(t *testing.T) {
@@ -364,6 +375,389 @@ func TestUnmarshalScalarTypes(t *testing.T) {
 		stringsMap["single_quote"] != "it's ok" ||
 		stringsMap["plain_version"] != "1.0.0" {
 		t.Fatalf("strings = %v", stringsMap)
+	}
+}
+
+func TestUnmarshalInvalidYAML(t *testing.T) {
+	ctx := context.Background()
+	tests := []struct {
+		name    string
+		file    string
+		wantErr string
+	}{
+		{
+			name:    "missing colon",
+			file:    "testdata/invalid/missing_colon.yaml",
+			wantErr: "format not surport",
+		},
+		{
+			name:    "empty key",
+			file:    "testdata/invalid/empty_key.yaml",
+			wantErr: "key is empty",
+		},
+		{
+			name:    "bare dash",
+			file:    "testdata/invalid/bare_dash.yaml",
+			wantErr: "format not surport",
+		},
+		{
+			name:    "tab indentation",
+			file:    "testdata/invalid/tab_indentation.yaml",
+			wantErr: "tab indentation not supported",
+		},
+		{
+			name:    "unexpected root indent",
+			file:    "testdata/invalid/unexpected_root_indent.yaml",
+			wantErr: "unexpected indent",
+		},
+		{
+			name:    "indent under scalar",
+			file:    "testdata/invalid/indent_under_scalar.yaml",
+			wantErr: "unexpected indent",
+		},
+		{
+			name:    "nested list under scalar item",
+			file:    "testdata/invalid/nested_list_under_scalar_item.yaml",
+			wantErr: "unexpected indent",
+		},
+		{
+			name:    "top level list",
+			file:    "testdata/invalid/top_level_list.yaml",
+			wantErr: "can not mix map and slice items",
+		},
+		{
+			name:    "blank quoted key",
+			file:    "testdata/invalid/blank_quoted_key.yaml",
+			wantErr: "key is empty",
+		},
+		{
+			name:    "unclosed quoted key",
+			file:    "testdata/invalid/unclosed_quoted_key.yaml",
+			wantErr: "key quote not closed",
+		},
+		{
+			name:    "inline map missing close",
+			file:    "testdata/invalid/inline_map_missing_close.yaml",
+			wantErr: "映射缺少闭合 }",
+		},
+		{
+			name:    "inline list missing close",
+			file:    "testdata/invalid/inline_list_missing_close.yaml",
+			wantErr: "数组缺少闭合 ]",
+		},
+		{
+			name:    "inline map missing key",
+			file:    "testdata/invalid/inline_map_missing_key.yaml",
+			wantErr: "需要字符串类型 key",
+		},
+		{
+			name:    "inline map missing colon",
+			file:    "testdata/invalid/inline_map_missing_colon.yaml",
+			wantErr: "key 后必须有冒号",
+		},
+		{
+			name:    "inline map missing value",
+			file:    "testdata/invalid/inline_map_missing_value.yaml",
+			wantErr: "非法 Token",
+		},
+		{
+			name:    "duplicate key",
+			file:    "testdata/invalid/duplicate_key.yaml",
+			wantErr: "duplicate key name",
+		},
+		{
+			name:    "duplicate nested key",
+			file:    "testdata/invalid/duplicate_nested_key.yaml",
+			wantErr: "duplicate key host",
+		},
+		{
+			name:    "inline map duplicate key",
+			file:    "testdata/invalid/inline_map_duplicate_key.yaml",
+			wantErr: "duplicate key host",
+		},
+		{
+			name:    "inline map missing comma",
+			file:    "testdata/invalid/inline_map_missing_comma.yaml",
+			wantErr: "映射元素后必须是逗号或 }",
+		},
+		{
+			name:    "inline list missing comma",
+			file:    "testdata/invalid/inline_list_missing_comma.yaml",
+			wantErr: "数组元素后必须是逗号或 ]",
+		},
+		{
+			name:    "inline value trailing token",
+			file:    "testdata/invalid/inline_value_trailing_token.yaml",
+			wantErr: "unexpected token after value",
+		},
+		{
+			name:    "unclosed double quote",
+			file:    "testdata/invalid/unclosed_double_quote.yaml",
+			wantErr: "字符串缺少闭合",
+		},
+		{
+			name:    "unclosed single quote",
+			file:    "testdata/invalid/unclosed_single_quote.yaml",
+			wantErr: "字符串缺少闭合",
+		},
+		{
+			name:    "double quote escape missing char",
+			file:    "testdata/invalid/double_quote_escape_missing_char.yaml",
+			wantErr: "字符串转义缺少字符",
+		},
+		{
+			name:    "invalid block scalar header",
+			file:    "testdata/invalid/invalid_block_scalar_header.yaml",
+			wantErr: "invalid block scalar header",
+		},
+		{
+			name:    "invalid folded scalar header",
+			file:    "testdata/invalid/invalid_folded_scalar_header.yaml",
+			wantErr: "invalid block scalar header",
+		},
+		{
+			name:    "invalid slice block scalar header",
+			file:    "testdata/invalid/invalid_slice_block_scalar_header.yaml",
+			wantErr: "invalid block scalar header",
+		},
+		{
+			name:    "invalid named slice block scalar header",
+			file:    "testdata/invalid/invalid_named_slice_block_scalar_header.yaml",
+			wantErr: "invalid block scalar header",
+		},
+		{
+			name:    "invalid block scalar indent zero",
+			file:    "testdata/invalid/invalid_block_scalar_indent_zero.yaml",
+			wantErr: "invalid block scalar header",
+		},
+		{
+			name:    "invalid block scalar indent multi digit",
+			file:    "testdata/invalid/invalid_block_scalar_indent_multi_digit.yaml",
+			wantErr: "invalid block scalar header",
+		},
+		{
+			name:    "invalid block scalar duplicate chomp",
+			file:    "testdata/invalid/invalid_block_scalar_duplicate_chomp.yaml",
+			wantErr: "invalid block scalar header",
+		},
+		{
+			name:    "nested flow list missing close",
+			file:    "testdata/invalid/nested_flow_list_missing_close.yaml",
+			wantErr: "数组元素后必须是逗号或 ]",
+		},
+		{
+			name:    "nested flow map missing close",
+			file:    "testdata/invalid/nested_flow_map_missing_close.yaml",
+			wantErr: "映射元素后必须是逗号或 }",
+		},
+		{
+			name:    "mixed map then list",
+			file:    "testdata/invalid/mixed_map_then_list.yaml",
+			wantErr: "can not mix map and slice items",
+		},
+		{
+			name:    "mixed list then map",
+			file:    "testdata/invalid/mixed_list_then_map.yaml",
+			wantErr: "can not mix map and slice items",
+		},
+		{
+			name:    "document start",
+			file:    "testdata/invalid/document_start.yaml",
+			wantErr: "unsupported yaml feature: document start",
+		},
+		{
+			name:    "document end",
+			file:    "testdata/invalid/document_end.yaml",
+			wantErr: "unsupported yaml feature: document end",
+		},
+		{
+			name:    "anchor value",
+			file:    "testdata/invalid/anchor_value.yaml",
+			wantErr: "unsupported yaml feature: anchor",
+		},
+		{
+			name:    "alias value",
+			file:    "testdata/invalid/alias_value.yaml",
+			wantErr: "unsupported yaml feature: alias",
+		},
+		{
+			name:    "merge key",
+			file:    "testdata/invalid/merge_key.yaml",
+			wantErr: "unsupported yaml feature: merge key",
+		},
+		{
+			name:    "unsupported tag",
+			file:    "testdata/invalid/unsupported_tag.yaml",
+			wantErr: "unsupported yaml feature: tag",
+		},
+		{
+			name:    "complex key",
+			file:    "testdata/invalid/complex_key.yaml",
+			wantErr: "unsupported yaml feature: complex key",
+		},
+		{
+			name:    "integer overflow",
+			file:    "testdata/invalid/integer_overflow.yaml",
+			wantErr: "invalid integer",
+		},
+		{
+			name:    "float overflow",
+			file:    "testdata/invalid/float_overflow.yaml",
+			wantErr: "invalid float",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := make(map[string]any)
+			err := gconfig_v2.UnmarshalFile(ctx, tt.file, &m)
+			requireErrorContains(t, err, tt.wantErr)
+		})
+	}
+}
+
+func TestUnmarshalStructDecodeErrors(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("string into int", func(t *testing.T) {
+		var cfg struct {
+			Port int `yaml:"port"`
+		}
+		err := gconfig_v2.UnmarshalFile(ctx, "testdata/decode_errors/string_into_int.yaml", &cfg)
+		requireErrorContains(t, err, "want integer")
+	})
+
+	t.Run("duration into int", func(t *testing.T) {
+		var cfg struct {
+			Port int `yaml:"port"`
+		}
+		err := gconfig_v2.UnmarshalFile(ctx, "testdata/decode_errors/duration_into_int.yaml", &cfg)
+		requireErrorContains(t, err, "got time.Duration")
+	})
+
+	t.Run("scalar into nested struct", func(t *testing.T) {
+		var cfg struct {
+			Server struct {
+				Host string `yaml:"host"`
+			} `yaml:"server"`
+		}
+		err := gconfig_v2.UnmarshalFile(ctx, "testdata/decode_errors/scalar_into_nested_struct.yaml", &cfg)
+		requireErrorContains(t, err, "want struct map")
+	})
+
+	t.Run("int8 overflow", func(t *testing.T) {
+		var cfg struct {
+			Value int8 `yaml:"value"`
+		}
+		err := gconfig_v2.UnmarshalFile(ctx, "testdata/decode_errors/int8_overflow.yaml", &cfg)
+		requireErrorContains(t, err, "overflows int8")
+	})
+
+	t.Run("uint negative", func(t *testing.T) {
+		var cfg struct {
+			Value uint `yaml:"value"`
+		}
+		err := gconfig_v2.UnmarshalFile(ctx, "testdata/decode_errors/uint_negative.yaml", &cfg)
+		requireErrorContains(t, err, "overflows uint")
+	})
+
+	t.Run("array too long", func(t *testing.T) {
+		var cfg struct {
+			Items [2]int `yaml:"items"`
+		}
+		err := gconfig_v2.UnmarshalFile(ctx, "testdata/decode_errors/array_too_long.yaml", &cfg)
+		requireErrorContains(t, err, "array len 2 is smaller")
+	})
+
+	t.Run("map key not string", func(t *testing.T) {
+		var cfg map[int]string
+		err := gconfig_v2.UnmarshalFile(ctx, "testdata/decode_errors/map_key_not_string.yaml", &cfg)
+		requireErrorContains(t, err, "map key must be string")
+	})
+
+	t.Run("slice element type mismatch", func(t *testing.T) {
+		var cfg struct {
+			Items []int `yaml:"items"`
+		}
+		err := gconfig_v2.UnmarshalFile(ctx, "testdata/decode_errors/slice_element_type_mismatch.yaml", &cfg)
+		requireErrorContains(t, err, "want integer")
+	})
+
+	t.Run("scalar into map", func(t *testing.T) {
+		var cfg struct {
+			Settings map[string]string `yaml:"settings"`
+		}
+		err := gconfig_v2.UnmarshalFile(ctx, "testdata/decode_errors/scalar_into_map.yaml", &cfg)
+		requireErrorContains(t, err, "want map")
+	})
+
+	t.Run("bool into string", func(t *testing.T) {
+		var cfg struct {
+			Name string `yaml:"name"`
+		}
+		err := gconfig_v2.UnmarshalFile(ctx, "testdata/decode_errors/bool_into_string.yaml", &cfg)
+		requireErrorContains(t, err, "want string")
+	})
+
+	t.Run("invalid time into time", func(t *testing.T) {
+		var cfg struct {
+			When time.Time `yaml:"when"`
+		}
+		err := gconfig_v2.UnmarshalFile(ctx, "testdata/decode_errors/invalid_time.yaml", &cfg)
+		requireErrorContains(t, err, "want time.Time")
+	})
+}
+
+func TestUnmarshalInlineCommentsAndQuotedKeys(t *testing.T) {
+	ctx := context.Background()
+	m := make(map[string]any)
+	if err := gconfig_v2.UnmarshalFile(ctx, "testdata/valid/inline_comments.yaml", &m); err != nil {
+		t.Fatal(err)
+	}
+	if m["name"] != "api" ||
+		m["url"] != "http://localhost/#fragment" ||
+		m["password"] != "abc#123" {
+		t.Fatalf("m = %v", m)
+	}
+	methods := requireSlice(t, m["methods"])
+	if len(methods) != 2 || methods[0] != "GET" || methods[1] != "POST" {
+		t.Fatalf("methods = %v", methods)
+	}
+	flowMap := requireMap(t, m["flow_map_comment"])
+	if flowMap["a"] != "b # c" {
+		t.Fatalf("flow_map_comment = %v", flowMap)
+	}
+	flowList := requireSlice(t, m["flow_list_comment"])
+	if len(flowList) != 2 || flowList[0] != "a" || flowList[1] != "b # c" {
+		t.Fatalf("flow_list_comment = %v", flowList)
+	}
+	if m["script"] != "echo \"# keep\"\necho done # keep inside block\n" {
+		t.Fatalf("script = %q", m["script"])
+	}
+	quotedKeys := requireMap(t, m["quoted_keys"])
+	if quotedKeys["host:port"] != "localhost:8080" ||
+		quotedKeys["single:key"] != "value" {
+		t.Fatalf("quoted_keys = %v", quotedKeys)
+	}
+}
+
+func TestUnmarshalBlockScalarOptions(t *testing.T) {
+	ctx := context.Background()
+	m := make(map[string]any)
+	if err := gconfig_v2.UnmarshalFile(ctx, "testdata/valid/block_scalar_options.yaml", &m); err != nil {
+		t.Fatal(err)
+	}
+	if m["literal_indent"] != "  keep two leading spaces\n  here\n" {
+		t.Fatalf("literal_indent = %q", m["literal_indent"])
+	}
+	if m["literal_strip_indent"] != "  no trailing newline" {
+		t.Fatalf("literal_strip_indent = %q", m["literal_strip_indent"])
+	}
+	if m["folded_keep"] != "hello world\n\n" {
+		t.Fatalf("folded_keep = %q", m["folded_keep"])
+	}
+	if m["after"] != "done" {
+		t.Fatalf("after = %v", m["after"])
 	}
 }
 

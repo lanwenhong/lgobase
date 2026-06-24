@@ -1,0 +1,10 @@
+literal_indent: |2
+    keep two leading spaces
+    here
+literal_strip_indent: |-2
+    no trailing newline
+folded_keep: >+
+  hello
+  world
+
+after: done
