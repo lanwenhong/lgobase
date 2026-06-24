@@ -142,8 +142,14 @@ func TestUnmarshalComplexConfig(t *testing.T) {
 	if err := gconfig_v2.UnmarshalFile(ctx, "config_complex.yaml", &m); err != nil {
 		t.Fatal(err)
 	}
+	if len(m) != 3 {
+		t.Fatalf("top-level keys = %v", m)
+	}
 
 	app := requireMap(t, m["app"])
+	if len(app) != 7 {
+		t.Fatalf("app keys = %v", app)
+	}
 	if app["name"] != "payment-api" || app["enabled"] != true || app["version"] != 2.5 {
 		t.Fatalf("app = %v", app)
 	}
@@ -155,10 +161,13 @@ func TestUnmarshalComplexConfig(t *testing.T) {
 		t.Fatalf("app.launch_date = %v", launchDate)
 	}
 	tags := requireSlice(t, app["tags"])
-	if len(tags) != 3 || tags[0] != "core" || tags[2] != "v2" {
+	if len(tags) != 3 || tags[0] != "core" || tags[1] != "payment" || tags[2] != "v2" {
 		t.Fatalf("app.tags = %v", tags)
 	}
 	thresholds := requireMap(t, app["thresholds"])
+	if len(thresholds) != 3 {
+		t.Fatalf("app.thresholds keys = %v", thresholds)
+	}
 	if thresholds["qps"] != 1200 || thresholds["ratio"] != 0.75 {
 		t.Fatalf("app.thresholds = %v", thresholds)
 	}
@@ -168,11 +177,20 @@ func TestUnmarshalComplexConfig(t *testing.T) {
 	}
 
 	database := requireMap(t, m["database"])
+	if len(database) != 2 {
+		t.Fatalf("database keys = %v", database)
+	}
 	primary := requireMap(t, database["primary"])
+	if len(primary) != 3 {
+		t.Fatalf("database.primary keys = %v", primary)
+	}
 	if primary["host"] != "db.local" || primary["port"] != 3306 {
 		t.Fatalf("database.primary = %v", primary)
 	}
 	flags := requireMap(t, primary["flags"])
+	if len(flags) != 3 {
+		t.Fatalf("database.primary.flags keys = %v", flags)
+	}
 	if flags["ssl"] != true || flags["pool"] != 20 || flags["mode"] != "rw" {
 		t.Fatalf("database.primary.flags = %v", flags)
 	}
@@ -182,8 +200,9 @@ func TestUnmarshalComplexConfig(t *testing.T) {
 	}
 	firstReplica := requireMap(t, replicas[0])
 	secondReplica := requireMap(t, replicas[1])
-	if firstReplica["name"] != "r1" || firstReplica["weight"] != 10 ||
-		secondReplica["name"] != "r2" || secondReplica["weight"] != 20 {
+	if len(firstReplica) != 3 || len(secondReplica) != 3 ||
+		firstReplica["name"] != "r1" || firstReplica["host"] != "db-r1.local" || firstReplica["weight"] != 10 ||
+		secondReplica["name"] != "r2" || secondReplica["host"] != "db-r2.local" || secondReplica["weight"] != 20 {
 		t.Fatalf("database.replicas = %v", replicas)
 	}
 
@@ -193,13 +212,15 @@ func TestUnmarshalComplexConfig(t *testing.T) {
 	}
 	loginRoute := requireMap(t, requireMap(t, routes[0])["login"])
 	loginMethods := requireSlice(t, loginRoute["methods"])
-	if loginRoute["path"] != "/login" || loginRoute["auth"] != true ||
+	if len(loginRoute) != 3 ||
+		loginRoute["path"] != "/login" || loginRoute["auth"] != true ||
 		len(loginMethods) != 2 || loginMethods[0] != "GET" || loginMethods[1] != "POST" {
 		t.Fatalf("routes[0].login = %v", loginRoute)
 	}
 	healthRoute := requireMap(t, requireMap(t, routes[1])["health"])
 	healthMethods := requireSlice(t, healthRoute["methods"])
-	if healthRoute["path"] != "/health" || healthRoute["auth"] != false ||
+	if len(healthRoute) != 3 ||
+		healthRoute["path"] != "/health" || healthRoute["auth"] != false ||
 		len(healthMethods) != 1 || healthMethods[0] != "GET" {
 		t.Fatalf("routes[1].health = %v", healthRoute)
 	}
@@ -211,8 +232,14 @@ func TestUnmarshalScalarTypes(t *testing.T) {
 	if err := gconfig_v2.UnmarshalFile(ctx, "config_scalar_types.yaml", &m); err != nil {
 		t.Fatal(err)
 	}
+	if len(m) != 8 {
+		t.Fatalf("top-level keys = %v", m)
+	}
 
 	numbers := requireMap(t, m["numbers"])
+	if len(numbers) != 2 {
+		t.Fatalf("numbers keys = %v", numbers)
+	}
 	ints := requireSlice(t, numbers["ints"])
 	if len(ints) != 3 || ints[0] != 1 || ints[1] != 2 || ints[2] != -3 {
 		t.Fatalf("numbers.ints = %v", ints)
@@ -223,17 +250,26 @@ func TestUnmarshalScalarTypes(t *testing.T) {
 	}
 
 	booleans := requireMap(t, m["booleans"])
+	if len(booleans) != 4 {
+		t.Fatalf("booleans keys = %v", booleans)
+	}
 	if booleans["yes_value"] != true || booleans["no_value"] != false ||
 		booleans["on_value"] != true || booleans["off_value"] != false {
 		t.Fatalf("booleans = %v", booleans)
 	}
 
 	nulls := requireMap(t, m["nulls"])
+	if len(nulls) != 2 {
+		t.Fatalf("nulls keys = %v", nulls)
+	}
 	if nulls["null_value"] != nil || nulls["tilde_value"] != nil {
 		t.Fatalf("nulls = %v", nulls)
 	}
 
 	times := requireMap(t, m["times"])
+	if len(times) != 3 {
+		t.Fatalf("times keys = %v", times)
+	}
 	if !requireTime(t, times["rfc3339"]).Equal(time.Date(2026, 6, 24, 8, 30, 0, 0, time.UTC)) {
 		t.Fatalf("times.rfc3339 = %v", times["rfc3339"])
 	}
@@ -245,6 +281,9 @@ func TestUnmarshalScalarTypes(t *testing.T) {
 	}
 
 	durations := requireMap(t, m["durations"])
+	if len(durations) != 5 {
+		t.Fatalf("durations keys = %v", durations)
+	}
 	if requireDuration(t, durations["connect_timeout"]) != time.Millisecond {
 		t.Fatalf("durations.connect_timeout = %v", durations["connect_timeout"])
 	}
@@ -267,6 +306,9 @@ func TestUnmarshalScalarTypes(t *testing.T) {
 	}
 
 	explicitStrings := requireMap(t, m["explicit_strings"])
+	if len(explicitStrings) != 7 {
+		t.Fatalf("explicit_strings keys = %v", explicitStrings)
+	}
 	if explicitStrings["bool_text"] != "on" ||
 		explicitStrings["duration_text"] != "1ms" ||
 		explicitStrings["number_text"] != "123" ||
@@ -284,6 +326,9 @@ func TestUnmarshalScalarTypes(t *testing.T) {
 	}
 
 	multiline := requireMap(t, m["multiline"])
+	if len(multiline) != 6 {
+		t.Fatalf("multiline keys = %v", multiline)
+	}
 	if multiline["literal"] != "select *\nfrom users\nwhere id = ?\n" {
 		t.Fatalf("multiline.literal = %q", multiline["literal"])
 	}
@@ -312,6 +357,9 @@ func TestUnmarshalScalarTypes(t *testing.T) {
 	}
 
 	stringsMap := requireMap(t, m["strings"])
+	if len(stringsMap) != 3 {
+		t.Fatalf("strings keys = %v", stringsMap)
+	}
 	if stringsMap["quoted_colon"] != "host:3306" ||
 		stringsMap["single_quote"] != "it's ok" ||
 		stringsMap["plain_version"] != "1.0.0" {
@@ -388,6 +436,7 @@ func TestUnmarshalStruct(t *testing.T) {
 		Enabled    bool       `yaml:"enabled"`
 		Version    float64    `yaml:"version"`
 		LaunchDate time.Time  `yaml:"launch_date"`
+		EmptyValue any        `yaml:"empty_value"`
 		Tags       []string   `yaml:"tags"`
 		Thresholds Thresholds `yaml:"thresholds"`
 	}
@@ -410,9 +459,15 @@ func TestUnmarshalStruct(t *testing.T) {
 		Primary  *Primary  `yaml:"primary"`
 		Replicas []Replica `yaml:"replicas"`
 	}
+	type Route struct {
+		Path    string   `yaml:"path"`
+		Methods []string `yaml:"methods"`
+		Auth    bool     `yaml:"auth"`
+	}
 	type Config struct {
-		App      App      `yaml:"app"`
-		Database Database `yaml:"database"`
+		App      App                `yaml:"app"`
+		Database Database           `yaml:"database"`
+		Routes   []map[string]Route `yaml:"routes"`
 	}
 
 	ctx := context.Background()
@@ -427,7 +482,10 @@ func TestUnmarshalStruct(t *testing.T) {
 	if cfg.App.LaunchDate.Format("2006-01-02") != "2026-06-24" {
 		t.Fatalf("cfg.App.LaunchDate = %v", cfg.App.LaunchDate)
 	}
-	if len(cfg.App.Tags) != 3 || cfg.App.Tags[0] != "core" || cfg.App.Tags[2] != "v2" {
+	if cfg.App.EmptyValue != nil {
+		t.Fatalf("cfg.App.EmptyValue = %v", cfg.App.EmptyValue)
+	}
+	if len(cfg.App.Tags) != 3 || cfg.App.Tags[0] != "core" || cfg.App.Tags[1] != "payment" || cfg.App.Tags[2] != "v2" {
 		t.Fatalf("cfg.App.Tags = %v", cfg.App.Tags)
 	}
 	if cfg.App.Thresholds.QPS != 1200 ||
@@ -447,14 +505,59 @@ func TestUnmarshalStruct(t *testing.T) {
 	}
 	if len(cfg.Database.Replicas) != 2 ||
 		cfg.Database.Replicas[0].Name != "r1" ||
+		cfg.Database.Replicas[0].Host != "db-r1.local" ||
 		cfg.Database.Replicas[0].Weight != 10 ||
 		cfg.Database.Replicas[1].Name != "r2" ||
+		cfg.Database.Replicas[1].Host != "db-r2.local" ||
 		cfg.Database.Replicas[1].Weight != 20 {
 		t.Fatalf("cfg.Database.Replicas = %+v", cfg.Database.Replicas)
+	}
+	if len(cfg.Routes) != 2 {
+		t.Fatalf("len(cfg.Routes) = %d", len(cfg.Routes))
+	}
+	loginRoute, ok := cfg.Routes[0]["login"]
+	if !ok {
+		t.Fatalf("cfg.Routes[0] = %+v", cfg.Routes[0])
+	}
+	if loginRoute.Path != "/login" ||
+		len(loginRoute.Methods) != 2 ||
+		loginRoute.Methods[0] != "GET" ||
+		loginRoute.Methods[1] != "POST" ||
+		!loginRoute.Auth {
+		t.Fatalf("cfg.Routes[0].login = %+v", loginRoute)
+	}
+	healthRoute, ok := cfg.Routes[1]["health"]
+	if !ok {
+		t.Fatalf("cfg.Routes[1] = %+v", cfg.Routes[1])
+	}
+	if healthRoute.Path != "/health" ||
+		len(healthRoute.Methods) != 1 ||
+		healthRoute.Methods[0] != "GET" ||
+		healthRoute.Auth {
+		t.Fatalf("cfg.Routes[1].health = %+v", healthRoute)
 	}
 }
 
 func TestUnmarshalStructScalarTypes(t *testing.T) {
+	type Numbers struct {
+		Ints   []int     `yaml:"ints"`
+		Floats []float64 `yaml:"floats"`
+	}
+	type Booleans struct {
+		YesValue bool `yaml:"yes_value"`
+		NoValue  bool `yaml:"no_value"`
+		OnValue  bool `yaml:"on_value"`
+		OffValue bool `yaml:"off_value"`
+	}
+	type Nulls struct {
+		NullValue  *string `yaml:"null_value"`
+		TildeValue *string `yaml:"tilde_value"`
+	}
+	type Times struct {
+		RFC3339   time.Time `yaml:"rfc3339"`
+		SpaceTime time.Time `yaml:"space_time"`
+		DateOnly  time.Time `yaml:"date_only"`
+	}
 	type Durations struct {
 		ConnectTimeout time.Duration            `yaml:"connect_timeout"`
 		ReadTimeout    time.Duration            `yaml:"read_timeout"`
@@ -475,15 +578,27 @@ func TestUnmarshalStructScalarTypes(t *testing.T) {
 		Script string `yaml:"script"`
 	}
 	type Multiline struct {
-		Literal      string        `yaml:"literal"`
-		LiteralStrip string        `yaml:"literal_strip"`
-		Folded       string        `yaml:"folded"`
-		NamedList    []NamedScript `yaml:"named_list"`
+		Literal       string        `yaml:"literal"`
+		LiteralStrip  string        `yaml:"literal_strip"`
+		Folded        string        `yaml:"folded"`
+		TaggedLiteral string        `yaml:"tagged_literal"`
+		List          []string      `yaml:"list"`
+		NamedList     []NamedScript `yaml:"named_list"`
+	}
+	type Strings struct {
+		QuotedColon  string `yaml:"quoted_colon"`
+		SingleQuote  string `yaml:"single_quote"`
+		PlainVersion string `yaml:"plain_version"`
 	}
 	type Config struct {
+		Numbers         Numbers         `yaml:"numbers"`
+		Booleans        Booleans        `yaml:"booleans"`
+		Nulls           Nulls           `yaml:"nulls"`
+		Times           Times           `yaml:"times"`
 		Durations       Durations       `yaml:"durations"`
 		ExplicitStrings ExplicitStrings `yaml:"explicit_strings"`
 		Multiline       Multiline       `yaml:"multiline"`
+		Strings         Strings         `yaml:"strings"`
 	}
 
 	ctx := context.Background()
@@ -492,6 +607,30 @@ func TestUnmarshalStructScalarTypes(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if len(cfg.Numbers.Ints) != 3 ||
+		cfg.Numbers.Ints[0] != 1 ||
+		cfg.Numbers.Ints[1] != 2 ||
+		cfg.Numbers.Ints[2] != -3 ||
+		len(cfg.Numbers.Floats) != 3 ||
+		cfg.Numbers.Floats[0] != 1.25 ||
+		cfg.Numbers.Floats[1] != -2.5 ||
+		cfg.Numbers.Floats[2] != 300.0 {
+		t.Fatalf("cfg.Numbers = %+v", cfg.Numbers)
+	}
+	if !cfg.Booleans.YesValue ||
+		cfg.Booleans.NoValue ||
+		!cfg.Booleans.OnValue ||
+		cfg.Booleans.OffValue {
+		t.Fatalf("cfg.Booleans = %+v", cfg.Booleans)
+	}
+	if cfg.Nulls.NullValue != nil || cfg.Nulls.TildeValue != nil {
+		t.Fatalf("cfg.Nulls = %+v", cfg.Nulls)
+	}
+	if !cfg.Times.RFC3339.Equal(time.Date(2026, 6, 24, 8, 30, 0, 0, time.UTC)) ||
+		cfg.Times.SpaceTime.Format("2006-01-02 15:04:05") != "2026-06-24 10:20:30" ||
+		cfg.Times.DateOnly.Format("2006-01-02") != "2026-06-24" {
+		t.Fatalf("cfg.Times = %+v", cfg.Times)
+	}
 	if cfg.Durations.ConnectTimeout != time.Millisecond ||
 		cfg.Durations.ReadTimeout != 2400*time.Nanosecond ||
 		cfg.Durations.RetryBackoff != 3*time.Second {
@@ -523,11 +662,22 @@ func TestUnmarshalStructScalarTypes(t *testing.T) {
 	}
 	if cfg.Multiline.Literal != "select *\nfrom users\nwhere id = ?\n" ||
 		cfg.Multiline.LiteralStrip != "no trailing newline" ||
-		cfg.Multiline.Folded != "hello world\n" {
+		cfg.Multiline.Folded != "hello world\n" ||
+		cfg.Multiline.TaggedLiteral != "on\n1ms\n" {
 		t.Fatalf("cfg.Multiline = %+v", cfg.Multiline)
+	}
+	if len(cfg.Multiline.List) != 2 ||
+		cfg.Multiline.List[0] != "item line 1\nitem line 2\n" ||
+		cfg.Multiline.List[1] != "folded item\n" {
+		t.Fatalf("cfg.Multiline.List = %+v", cfg.Multiline.List)
 	}
 	if len(cfg.Multiline.NamedList) != 1 ||
 		cfg.Multiline.NamedList[0].Script != "echo hi\nexit 0\n" {
 		t.Fatalf("cfg.Multiline.NamedList = %+v", cfg.Multiline.NamedList)
+	}
+	if cfg.Strings.QuotedColon != "host:3306" ||
+		cfg.Strings.SingleQuote != "it's ok" ||
+		cfg.Strings.PlainVersion != "1.0.0" {
+		t.Fatalf("cfg.Strings = %+v", cfg.Strings)
 	}
 }
