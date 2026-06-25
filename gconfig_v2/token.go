@@ -77,13 +77,17 @@ func (l *Lexer) skipWhitespace() {
 	}
 }
 
-func (l *Lexer) readString() string {
+func (l *Lexer) readString(stopAtColon bool) string {
 	start := l.pos
 	for l.pos < l.end {
 		c := l.current()
 		switch c {
-		case '{', '}', '[', ']', ':', ',', ' ':
+		case '{', '}', '[', ']', ',', ' ':
 			return l.input[start:l.pos]
+		case ':':
+			if stopAtColon {
+				return l.input[start:l.pos]
+			}
 		}
 		l.advance()
 	}
@@ -137,7 +141,7 @@ func (l *Lexer) readDoubleQuote() string {
 	return buf.String()
 }
 
-func (l *Lexer) NextToken() Token {
+func (l *Lexer) nextToken(stopAtColon bool) Token {
 	l.skipWhitespace()
 	if l.pos >= l.end {
 		return Token{Type: TokenEOF}
@@ -170,9 +174,21 @@ func (l *Lexer) NextToken() Token {
 		s := l.readDoubleQuote()
 		return Token{Type: TokenString, Value: s, Quoted: true}
 	default:
-		s := l.readString()
+		s := l.readString(stopAtColon)
 		return Token{Type: TokenString, Value: s}
 	}
+}
+
+func (l *Lexer) NextToken() Token {
+	return l.nextToken(true)
+}
+
+func (l *Lexer) NextKeyToken() Token {
+	return l.nextToken(true)
+}
+
+func (l *Lexer) NextValueToken() Token {
+	return l.nextToken(false)
 }
 
 func hasCRLF(s string) bool {
@@ -456,18 +472,22 @@ func (tkn *TokenNode) parseScalar(s string) (any, error) {
 
 func NewParser(lex *Lexer) *Parser {
 	p := &Parser{lex: lex}
-	p.tok = p.lex.NextToken()
+	p.nextValue()
 	return p
 }
 
-func (p *Parser) next() {
-	p.tok = p.lex.NextToken()
+func (p *Parser) nextKey() {
+	p.tok = p.lex.NextKeyToken()
+}
+
+func (p *Parser) nextValue() {
+	p.tok = p.lex.NextValueToken()
 }
 
 func (p *Parser) parseValue(ctx context.Context, tkn *TokenNode, quotedAsString bool) (any, error) {
 	switch p.tok.Type {
 	case TokenLBrace:
-		p.next()
+		p.nextKey()
 		m := make(map[string]any)
 		tkn.nodeType = NODE_TYPE_MAP
 		for p.tok.Type != TokenRBrace && p.tok.Type != TokenEOF {
@@ -478,12 +498,12 @@ func (p *Parser) parseValue(ctx context.Context, tkn *TokenNode, quotedAsString 
 			if _, ok := m[key]; ok {
 				return nil, fmt.Errorf("duplicate key %s", key)
 			}
-			p.next()
+			p.nextValue()
 
 			if p.tok.Type != TokenColon {
 				return nil, fmt.Errorf("key 后必须有冒号")
 			}
-			p.next()
+			p.nextValue()
 
 			val, err := p.parseValue(ctx, tkn, true)
 			if err != nil {
@@ -492,7 +512,7 @@ func (p *Parser) parseValue(ctx context.Context, tkn *TokenNode, quotedAsString 
 			m[key] = val
 
 			if p.tok.Type == TokenComma {
-				p.next()
+				p.nextKey()
 			} else if p.tok.Type == TokenEOF {
 				continue
 			} else if p.tok.Type != TokenRBrace {
@@ -502,11 +522,11 @@ func (p *Parser) parseValue(ctx context.Context, tkn *TokenNode, quotedAsString 
 		if p.tok.Type != TokenRBrace {
 			return nil, fmt.Errorf("映射缺少闭合 }")
 		}
-		p.next()
+		p.nextValue()
 		return m, nil
 
 	case TokenLBracket:
-		p.next()
+		p.nextValue()
 		arr := make([]any, 0)
 		tkn.nodeType = NODE_TYPE_SLICE
 		for p.tok.Type != TokenRBracket && p.tok.Type != TokenEOF {
@@ -517,7 +537,7 @@ func (p *Parser) parseValue(ctx context.Context, tkn *TokenNode, quotedAsString 
 			arr = append(arr, elem)
 
 			if p.tok.Type == TokenComma {
-				p.next()
+				p.nextValue()
 			} else if p.tok.Type == TokenEOF {
 				continue
 			} else if p.tok.Type != TokenRBracket {
@@ -527,17 +547,17 @@ func (p *Parser) parseValue(ctx context.Context, tkn *TokenNode, quotedAsString 
 		if p.tok.Type != TokenRBracket {
 			return nil, fmt.Errorf("数组缺少闭合 ]")
 		}
-		p.next()
+		p.nextValue()
 		return arr, nil
 	case TokenString:
 		if p.tok.Quoted && quotedAsString {
 			val := p.tok.Value
 			tkn.nodeType = NODE_TYPE_STRING
-			p.next()
+			p.nextValue()
 			return val, nil
 		}
 		if p.tok.Value == "!!str" {
-			p.next()
+			p.nextValue()
 			if p.tok.Type == TokenEOF {
 				tkn.nodeType = NODE_TYPE_STRING
 				return "", nil
@@ -547,7 +567,7 @@ func (p *Parser) parseValue(ctx context.Context, tkn *TokenNode, quotedAsString 
 			}
 			val := p.tok.Value
 			tkn.nodeType = NODE_TYPE_STRING
-			p.next()
+			p.nextValue()
 			return val, nil
 		}
 		if !p.tok.Quoted {
@@ -559,7 +579,7 @@ func (p *Parser) parseValue(ctx context.Context, tkn *TokenNode, quotedAsString 
 		if err != nil {
 			return nil, err
 		}
-		p.next()
+		p.nextValue()
 		return val, nil
 
 	default:

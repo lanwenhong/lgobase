@@ -2,6 +2,7 @@ package gconfig_v2_test
 
 import (
 	"context"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -1073,5 +1074,78 @@ func TestUnmarshalStructScalarTypes(t *testing.T) {
 		cfg.Strings.SingleQuote != "it's ok" ||
 		cfg.Strings.PlainVersion != "1.0.0" {
 		t.Fatalf("cfg.Strings = %+v", cfg.Strings)
+	}
+}
+
+func TestUnmarshalStructMixedAnySlice(t *testing.T) {
+	type Config struct {
+		Values []any `yaml:"values"`
+	}
+
+	yaml := []byte(`
+values:
+  - 1
+  - 3.14
+  - "hello:world"
+  - true
+  - null
+  - 2026-06-25T08:30:00Z
+  - 15s
+  - [2, 2.5, "three"]
+  - {code: 200, msg: "ok"}
+`)
+
+	var cfg Config
+	if err := gconfig_v2.Unmarshal(context.Background(), yaml, &cfg); err != nil {
+		t.Fatal(err)
+	}
+
+	want := []any{
+		1,
+		3.14,
+		"hello:world",
+		true,
+		nil,
+		time.Date(2026, 6, 25, 8, 30, 0, 0, time.UTC),
+		15 * time.Second,
+		[]any{2, 2.5, "three"},
+		map[string]any{"code": 200, "msg": "ok"},
+	}
+	if !reflect.DeepEqual(cfg.Values, want) {
+		t.Fatalf("cfg.Values = %#v, want %#v", cfg.Values, want)
+	}
+}
+
+func TestUnmarshalInlineTimestampWithColon(t *testing.T) {
+	type Meta struct {
+		CreatedAt time.Time   `yaml:"created_at"`
+		Times     []time.Time `yaml:"times"`
+	}
+	type Config struct {
+		Values []any `yaml:"values"`
+		Meta   Meta  `yaml:"meta"`
+	}
+
+	yaml := []byte(`
+values: [2026-06-25T08:30:00Z, 2026-06-26T09:45:30Z]
+meta: {created_at: 2026-06-25T08:30:00Z, times: [2026-06-25T08:30:00Z, 2026-06-26T09:45:30Z]}
+`)
+
+	var cfg Config
+	if err := gconfig_v2.Unmarshal(context.Background(), yaml, &cfg); err != nil {
+		t.Fatal(err)
+	}
+
+	first := time.Date(2026, 6, 25, 8, 30, 0, 0, time.UTC)
+	second := time.Date(2026, 6, 26, 9, 45, 30, 0, time.UTC)
+	wantValues := []any{first, second}
+	if !reflect.DeepEqual(cfg.Values, wantValues) {
+		t.Fatalf("cfg.Values = %#v, want %#v", cfg.Values, wantValues)
+	}
+	if !cfg.Meta.CreatedAt.Equal(first) {
+		t.Fatalf("cfg.Meta.CreatedAt = %s, want %s", cfg.Meta.CreatedAt, first)
+	}
+	if !reflect.DeepEqual(cfg.Meta.Times, []time.Time{first, second}) {
+		t.Fatalf("cfg.Meta.Times = %#v", cfg.Meta.Times)
 	}
 }

@@ -228,6 +228,7 @@ func (py *ParseYaml) matchSlice(ctx context.Context, line string) ([]string, boo
 
 	inSingle := false
 	inDouble := false
+	flowDepth := 0
 	for i := 0; i < len(body); i++ {
 		c := body[i]
 		switch {
@@ -253,8 +254,14 @@ func (py *ParseYaml) matchSlice(ctx context.Context, line string) ([]string, boo
 				inSingle = true
 			case '"':
 				inDouble = true
+			case '{', '[':
+				flowDepth++
+			case '}', ']':
+				if flowDepth > 0 {
+					flowDepth--
+				}
 			case ':':
-				if i+1 == len(body) || body[i+1] == ' ' || body[i+1] == '\t' {
+				if flowDepth == 0 && (i+1 == len(body) || body[i+1] == ' ' || body[i+1] == '\t') {
 					return []string{line, "- ", body[:i], ":", strings.TrimSpace(body[i+1:])}, true
 				}
 			}
@@ -527,13 +534,10 @@ func (py *ParseYaml) feedSlice(ctx context.Context, line string, group []string,
 		pNode.s = append(pNode.s, node)
 	} else if k != "" && v == "" && split == "" {
 		logger.Debug(ctx, "gconfig_v2", "k", k)
-		token := &TokenNode{
-			line: line,
-			key:  k,
-			//nodeType: NODE_TYPE_STRING,
-			indent: indent,
+		token, tokenErr := py.newParsedToken(ctx, line, "", k, indent, false)
+		if tokenErr != nil {
+			return tokenErr
 		}
-		token.TokenParse(ctx)
 		pNode.s = append(pNode.s, token)
 	} else {
 		err = py.errLine(line)
