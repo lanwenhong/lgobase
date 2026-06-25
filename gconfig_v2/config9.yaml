@@ -1,0 +1,9 @@
+app:
+  name: myapp
+  port: 8080
+  debug: true
+servers:
+  - host: 127.0.0.1
+    port: 3000
+  - host: 192.168.1.1
+    port: 3001

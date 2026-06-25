@@ -33,8 +33,9 @@ type TokenNode struct {
 }
 
 type Token struct {
-	Type  TokenType
-	Value string
+	Type   TokenType
+	Value  string
+	Quoted bool
 }
 
 type Lexer struct {
@@ -164,10 +165,10 @@ func (l *Lexer) NextToken() Token {
 		return Token{Type: TokenComma, Value: ","}
 	case '\'':
 		s := l.readSingleQuote()
-		return Token{Type: TokenString, Value: s}
+		return Token{Type: TokenString, Value: s, Quoted: true}
 	case '"':
 		s := l.readDoubleQuote()
-		return Token{Type: TokenString, Value: s}
+		return Token{Type: TokenString, Value: s, Quoted: true}
 	default:
 		s := l.readString()
 		return Token{Type: TokenString, Value: s}
@@ -463,7 +464,7 @@ func (p *Parser) next() {
 	p.tok = p.lex.NextToken()
 }
 
-func (p *Parser) parseValue(ctx context.Context, tkn *TokenNode) (any, error) {
+func (p *Parser) parseValue(ctx context.Context, tkn *TokenNode, quotedAsString bool) (any, error) {
 	switch p.tok.Type {
 	case TokenLBrace:
 		p.next()
@@ -484,7 +485,7 @@ func (p *Parser) parseValue(ctx context.Context, tkn *TokenNode) (any, error) {
 			}
 			p.next()
 
-			val, err := p.parseValue(ctx, tkn)
+			val, err := p.parseValue(ctx, tkn, true)
 			if err != nil {
 				return nil, err
 			}
@@ -509,7 +510,7 @@ func (p *Parser) parseValue(ctx context.Context, tkn *TokenNode) (any, error) {
 		arr := make([]any, 0)
 		tkn.nodeType = NODE_TYPE_SLICE
 		for p.tok.Type != TokenRBracket && p.tok.Type != TokenEOF {
-			elem, err := p.parseValue(ctx, tkn)
+			elem, err := p.parseValue(ctx, tkn, true)
 			if err != nil {
 				return nil, err
 			}
@@ -529,6 +530,12 @@ func (p *Parser) parseValue(ctx context.Context, tkn *TokenNode) (any, error) {
 		p.next()
 		return arr, nil
 	case TokenString:
+		if p.tok.Quoted && quotedAsString {
+			val := p.tok.Value
+			tkn.nodeType = NODE_TYPE_STRING
+			p.next()
+			return val, nil
+		}
 		if p.tok.Value == "!!str" {
 			p.next()
 			if p.tok.Type == TokenEOF {
@@ -543,8 +550,10 @@ func (p *Parser) parseValue(ctx context.Context, tkn *TokenNode) (any, error) {
 			p.next()
 			return val, nil
 		}
-		if feature, ok := unsupportedPlainScalar(p.tok.Value); ok {
-			return nil, errUnsupportedYAMLFeature(feature)
+		if !p.tok.Quoted {
+			if feature, ok := unsupportedPlainScalar(p.tok.Value); ok {
+				return nil, errUnsupportedYAMLFeature(feature)
+			}
 		}
 		val, err := tkn.parseScalar(p.tok.Value)
 		if err != nil {
@@ -586,7 +595,7 @@ func (tkn *TokenNode) TokenParse(ctx context.Context) error {
 
 	lex := NewLexer(value)
 	parser := NewParser(lex)
-	obj, err := parser.parseValue(ctx, tkn)
+	obj, err := parser.parseValue(ctx, tkn, false)
 	if err != nil {
 		return err
 	}
@@ -595,6 +604,12 @@ func (tkn *TokenNode) TokenParse(ctx context.Context) error {
 	}
 	if parser.tok.Type != TokenEOF {
 		return fmt.Errorf("unexpected token after value: %s", parser.tok.Value)
+	}
+	switch obj.(type) {
+	case map[string]any:
+		tkn.nodeType = NODE_TYPE_MAP
+	case []any:
+		tkn.nodeType = NODE_TYPE_SLICE
 	}
 	tkn.Obj = obj
 	return nil

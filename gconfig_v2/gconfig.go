@@ -223,11 +223,49 @@ func (py *ParseYaml) matchMap(ctx context.Context, line string) (string, string,
 }
 
 func (py *ParseYaml) matchSlice(ctx context.Context, line string) ([]string, bool) {
-	groups := py.reSlice.FindStringSubmatch(line)
-	if len(groups) < 5 {
+	if !strings.HasPrefix(line, "- ") {
 		return []string{}, false
 	}
-	return groups, true
+	body := strings.TrimSpace(strings.TrimPrefix(line, "- "))
+	if body == "" {
+		return []string{}, false
+	}
+
+	inSingle := false
+	inDouble := false
+	for i := 0; i < len(body); i++ {
+		c := body[i]
+		switch {
+		case inSingle:
+			if c == '\'' {
+				if i+1 < len(body) && body[i+1] == '\'' {
+					i++
+					continue
+				}
+				inSingle = false
+			}
+		case inDouble:
+			if c == '\\' {
+				i++
+				continue
+			}
+			if c == '"' {
+				inDouble = false
+			}
+		default:
+			switch c {
+			case '\'':
+				inSingle = true
+			case '"':
+				inDouble = true
+			case ':':
+				if i+1 == len(body) || body[i+1] == ' ' || body[i+1] == '\t' {
+					return []string{line, "- ", body[:i], ":", strings.TrimSpace(body[i+1:])}, true
+				}
+			}
+		}
+	}
+	return []string{line, "- ", body, "", ""}, true
 }
 
 func (py *ParseYaml) countIndent(line string) int {
@@ -779,13 +817,12 @@ func PrintAstTree(ctx context.Context, rootNode *AstNode) {
 			switch v.(type) {
 			case *TokenNode:
 				token := v.(*TokenNode)
-				space := ""
-				for i := 0; i < token.indent; i++ {
-					space += " "
-				}
+				space := strings.Repeat(" ", token.indent)
 				t := token.NodeType2String(ctx)
-				fmt.Println(fmt.Sprintf("%s%s", space, t))
 				fmt.Println(fmt.Sprintf("%s%s: %s", space, token.key, token.value))
+				if t != "" {
+					fmt.Println(fmt.Sprintf("%s%s", space, t))
+				}
 			case *AstNode:
 				astNode := v.(*AstNode)
 				space := ""
@@ -803,19 +840,20 @@ func PrintAstTree(ctx context.Context, rootNode *AstNode) {
 			switch v.(type) {
 			case *TokenNode:
 				token := v.(*TokenNode)
-				space := ""
-				for i := 0; i < token.indent; i++ {
-					space += " "
-				}
-				space += token.key
+				indent := strings.Repeat(" ", token.indent)
+				text := token.key
 				if token.value != "" {
-					space += ": "
-					space += token.value
+					if token.key != "" {
+						text = fmt.Sprintf("%s: %s", token.key, token.value)
+					} else {
+						text = token.value
+					}
 				}
 				t := token.NodeType2String(ctx)
-				//logger.Debug(ctx, "gconfig_v2", "nodeType", t)
-				fmt.Println(fmt.Sprintf("%s%s", space, t))
-				fmt.Println(fmt.Sprintf("%s", space))
+				fmt.Println(fmt.Sprintf("%s%s", indent, text))
+				if t != "" {
+					fmt.Println(fmt.Sprintf("%s%s", indent, t))
+				}
 			case *AstNode:
 				astNode := v.(*AstNode)
 				space := ""
