@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"reflect"
-	"regexp"
 	"strings"
 	"time"
 
@@ -47,8 +46,6 @@ type ParseYaml struct {
 	confFile string
 	content  []byte
 	stack    []*AstNode
-	reMap    *regexp.Regexp
-	reSlice  *regexp.Regexp
 }
 
 var (
@@ -106,8 +103,6 @@ func newParseYaml(file string, content []byte) *ParseYaml {
 	return &ParseYaml{
 		confFile: file,
 		content:  content,
-		reMap:    regexp.MustCompile(`^(.*):(.*)$`),
-		reSlice:  regexp.MustCompile(`^(- )([^:\s]+)(:?)(.*)$`),
 	}
 }
 
