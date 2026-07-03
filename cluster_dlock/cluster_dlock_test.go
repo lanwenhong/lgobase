@@ -1,4 +1,4 @@
-package cluster_dlock
+package cluster_dlock_test
 
 import (
 	"context"

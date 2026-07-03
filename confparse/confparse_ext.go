@@ -108,7 +108,7 @@ func (ec *ExtendConf) MapToStruct(data map[string]string, obj interface{}) error
 		}
 		// 自动类型转换并赋值
 		if err := ec.setFieldValue(field, strVal); err != nil {
-			return errors.New(fmt.Sprintf("字段 %s 解析失败: %w", sField.Name, err))
+			return fmt.Errorf("字段 %s 解析失败: %w", sField.Name, err)
 		}
 	}
 	return nil
@@ -120,12 +120,12 @@ func (ec *ExtendConf) ParseExtStru(ctx context.Context, stru interface{}, cfg *c
 		if vlist, ok := v[ec.Key]; ok {
 			if ec.Index >= len(vlist) {
 				logger.Warn(ctx, "confparse extend error", "ec.Index", ec.Index, "vlist len", len(vlist))
-				return errors.New(fmt.Sprintf("Index: %d vlen: %d", ec.Index, len(vlist)))
+				return fmt.Errorf("Index: %d vlen: %d", ec.Index, len(vlist))
 
 			}
 			return ec.MapToStruct(vlist[ec.Index], stru)
 		}
-		return errors.New(fmt.Sprintf("not found %s", ec.Key))
+		return fmt.Errorf("not found %s", ec.Key)
 	}
-	return errors.New(fmt.Sprintf("not found %s", ec.Sk))
+	return fmt.Errorf("not found %s", ec.Sk)
 }

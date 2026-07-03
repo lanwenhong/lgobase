@@ -1,4 +1,4 @@
-package network
+package network_test
 
 import (
 	"context"

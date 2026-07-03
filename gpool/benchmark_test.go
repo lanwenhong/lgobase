@@ -1,4 +1,4 @@
-package gpool
+package gpool_test
 
 import (
 	"context"
@@ -12,14 +12,14 @@ import (
 	"github.com/lanwenhong/lgobase/logger"
 )
 
-func NewRequestID() string {
+func benchmarkRequestID() string {
 	return strings.Replace(uuid.New().String(), "-", "", -1)
 }
 
-type EchoServer struct {
+type benchmarkEchoServer struct {
 }
 
-func (e *EchoServer) Echo(ctx context.Context, req *echo.EchoReq) (*echo.EchoRes, error) {
+func (e *benchmarkEchoServer) Echo(ctx context.Context, req *echo.EchoReq) (*echo.EchoRes, error) {
 	//fmt.Printf("message from client: %v\n", req.GetMsg())
 
 	res := &echo.EchoRes{
@@ -82,7 +82,7 @@ func (e *EchoServer) Echo(ctx context.Context, req *echo.EchoReq) (*echo.EchoRes
 }*/
 
 /*func Benchmark3BufferClient(b *testing.B) {
-	ctx := context.WithValue(context.Background(), "trace_id", NewRequestID())
+	ctx := context.WithValue(context.Background(), "trace_id", benchmarkRequestID())
 
 	gp := &gpool.Gpool[echo.EchoClient]{}
 	gp.GpoolInit("127.0.0.1", 9898, 3, 100, 50, gpool.CreateThriftBufferConn[echo.EchoClient], echo.NewEchoClientFactory)

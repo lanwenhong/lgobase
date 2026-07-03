@@ -1,4 +1,4 @@
-package redispool
+package redispool_test
 
 import (
 	"context"

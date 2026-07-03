@@ -1,0 +1,30 @@
+payservers:
+  - addr: 192.168.100.103:1000/1000
+    rule: |-
+      trade.busicd == "1000" && trade.txamt == 2000
+    Salience: 16
+    MaxConns: 100
+    MaxIdleConns: 10
+    MaxConnLife: 3600
+    PingTicker: 10
+    proto: thrift_ext
+
+  - addr: 192.168.100.106:1000/1000
+    rule: |-
+      trade.busicd == "802801"
+    Salience: 16
+    MaxConns: 100
+    MaxIdleConns: 10
+    MaxConnLife: 3600
+    PingTicker: 10
+    proto: thrift_ext
+
+  - addr: 192.168.100.104:1000/1000
+    rule: |-
+      1 == 1
+    Salience: 0
+    MaxConns: 100
+    MaxIdleConns: 10
+    MaxConnLife: 3600
+    PingTicker: 10
+    proto: thrift_ext

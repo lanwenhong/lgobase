@@ -1,0 +1,3 @@
+base:
+  host: localhost
+<<: *base

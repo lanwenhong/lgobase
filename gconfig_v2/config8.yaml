@@ -1,0 +1,18 @@
+enable: true
+ratio: 0.75
+log:
+  level: info
+  max_age: 7
+service:
+  - name: gateway
+    port: 8090
+    tags: [web, api]
+    redis:
+      addr: 127.0.0.1:6379
+      db: 0
+      password: 123456
+      timeout: 2.5
+    servers:
+      - addr: 10.0.0.1:6379
+        db: 1
+        timeout: 1.2

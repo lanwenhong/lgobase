@@ -1,3 +1,5 @@
+//go:build gpool_add_server
+
 package main
 
 import (

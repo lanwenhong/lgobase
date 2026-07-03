@@ -1,0 +1,9 @@
+servers:
+  - test1:
+    - k: 1
+      v: 2
+    - k1: 1
+      v1: 2
+  - test2:
+    k: 3
+
