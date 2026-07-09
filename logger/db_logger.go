@@ -64,6 +64,45 @@ func FileWithShortLineNumV2(fullPathWithLine string) string {
 	return shortFileName + lineNum
 }
 
+func formatDBLogArgs(msg string, data ...interface{}) (string, []interface{}) {
+	if len(data) == 0 {
+		return msg, nil
+	}
+	if !hasPrintfVerb(msg) && isSlogKeyValueArgs(data) {
+		return msg, data
+	}
+	return fmt.Sprintf(msg, data...), nil
+}
+
+func hasPrintfVerb(msg string) bool {
+	for i := 0; i < len(msg); i++ {
+		if msg[i] != '%' {
+			continue
+		}
+		i++
+		if i >= len(msg) {
+			return true
+		}
+		if msg[i] == '%' {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
+func isSlogKeyValueArgs(data []interface{}) bool {
+	if len(data)%2 != 0 {
+		return false
+	}
+	for i := 0; i < len(data); i += 2 {
+		if _, ok := data[i].(string); !ok {
+			return false
+		}
+	}
+	return true
+}
+
 func New(glog *Glog, config dlog.Config) dlog.Interface {
 	if glog != nil && glog.LogObj != nil {
 		return &MyDBlogger{
@@ -78,7 +117,7 @@ func New(glog *Glog, config dlog.Config) dlog.Interface {
 			traceErrStr:  traceErrStr,
 		}
 	} else {
-		w := NewCustomLogger(os.Stdout, glog.LogObj.logfile, nil, log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile)
+		w := NewCustomLogger(os.Stdout, nil, nil, log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile)
 		slog.SetDefault(w)
 		return &MyDBlogger{
 			glog:         nil,
@@ -108,8 +147,8 @@ func (l *MyDBlogger) LogMode(level dlog.LogLevel) dlog.Interface {
 func (l MyDBlogger) Info(ctx context.Context, msg string, data ...interface{}) {
 	//cmd := []interface{}{}
 	srcFileLineNum := FileWithShortLineNumV2(utils.FileWithLineNum())
-	data = append(data, "source_db")
-	data = append(data, srcFileLineNum)
+	msg, data = formatDBLogArgs(msg, data...)
+	data = append(data, "source_db", srcFileLineNum)
 	if l.glog != nil && l.glog.LogObj != nil {
 		l.glog.fileCheck()
 	}
@@ -121,8 +160,8 @@ func (l MyDBlogger) Info(ctx context.Context, msg string, data ...interface{}) {
 
 func (l MyDBlogger) Warn(ctx context.Context, msg string, data ...interface{}) {
 	srcFileLineNum := FileWithShortLineNumV2(utils.FileWithLineNum())
-	data = append(data, "source_db")
-	data = append(data, srcFileLineNum)
+	msg, data = formatDBLogArgs(msg, data...)
+	data = append(data, "source_db", srcFileLineNum)
 
 	if l.glog != nil && l.glog.LogObj != nil {
 		l.glog.fileCheck()
@@ -138,8 +177,8 @@ func (l MyDBlogger) Warn(ctx context.Context, msg string, data ...interface{}) {
 
 func (l MyDBlogger) Error(ctx context.Context, msg string, data ...interface{}) {
 	srcFileLineNum := FileWithShortLineNumV2(utils.FileWithLineNum())
-	data = append(data, "source_db")
-	data = append(data, srcFileLineNum)
+	msg, data = formatDBLogArgs(msg, data...)
+	data = append(data, "source_db", srcFileLineNum)
 	if l.glog != nil && l.glog.LogObj != nil {
 		l.glog.fileCheck()
 	}

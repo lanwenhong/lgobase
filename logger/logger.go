@@ -165,14 +165,7 @@ func Newglog(fileDir string, fileName string, fileNameErr string, glog_conf *Glo
 		IgnoreRecordNotFoundError: true,               // 忽略ErrRecordNotFound（记录未找到）错误
 		Colorful:                  glog_conf.Colorful, // 禁用彩色打印
 	}
-	switch glog_conf.Loglevel {
-	case DEBUG, INFO:
-		dconfig.LogLevel = dlog.Info
-	case WARN:
-		dconfig.LogLevel = dlog.Warn
-	case ERROR:
-		dconfig.LogLevel = dlog.Error
-	}
+	dconfig.LogLevel = gormLogLevel(glog_conf.Loglevel)
 	if glog_conf.CtxValueKey == "" {
 		glog_conf.CtxValueKey = "trace_id,request_id,client_service,trace_depth"
 	}
@@ -198,8 +191,31 @@ func SetConsole(isConsole bool) {
 	consoleAppender = isConsole
 }
 
+func gormLogLevel(level LEVEL) dlog.LogLevel {
+	switch level {
+	case DEBUG, INFO:
+		return dlog.Info
+	case WARN:
+		return dlog.Warn
+	case ERROR:
+		return dlog.Error
+	default:
+		return dlog.Info
+	}
+}
+
 func SetLevel(_level LEVEL) {
 	logLevel = _level
+	if Gfilelog == nil || Gfilelog.Logconf == nil {
+		return
+	}
+	Gfilelog.Logconf.Loglevel = _level
+	if Gfilelog.LogormConf != nil {
+		Gfilelog.LogormConf.LogLevel = gormLogLevel(_level)
+	}
+	if Gfilelog.LogObj != nil {
+		Gfilelog.setSlog(Gfilelog.LogObj.logfile_err)
+	}
 }
 
 func (glog *Glog) loadDesensitizeField() {
@@ -250,10 +266,10 @@ func (glog *Glog) getSlogLevel() slog.Level {
 
 func (glog *Glog) setSlog(errFile *os.File) {
 	if glog.Logconf.Format == TEXT_FORMAT {
-		glog.LogObj.lg = NewCustomLogger(os.Stdout, glog.LogObj.logfile, errFile, log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile)
+		glog.LogObj.lg = newCustomLogger(os.Stdout, glog.LogObj, glog.LogObj.logfile, errFile, glog.LogObj.mu, log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile)
 		slog.SetDefault(glog.LogObj.lg)
 	} else {
-		glog.LogObj.lg = slog.New(NewMyModifyHandler(os.Stdout, glog.LogObj.logfile, errFile))
+		glog.LogObj.lg = slog.New(newMyModifyHandlerWithLevel(os.Stdout, glog.LogObj, glog.LogObj.logfile, errFile, glog.getSlogLevel()))
 		slog.SetDefault(glog.LogObj.lg)
 	}
 }
@@ -368,22 +384,10 @@ func Debug(ctx context.Context, msg string, v ...any) {
 }
 
 func Debugf(ctx context.Context, fmtstr string, v ...interface{}) {
-	p_fmt := ""
-	values := make([]interface{}, 0, 100)
-	if Gfilelog.Logconf.Format == TEXT_FORMAT {
-		trace_id := getIdsInLog(ctx)
-		if trace_id != "" {
-			values = append(values, trace_id)
-		} else {
-			p_fmt = "[DEBUG] " + fmtstr
-		}
-	} else {
-		p_fmt = fmtstr
-	}
 	if Gfilelog != nil && Gfilelog.LogObj != nil {
 		Gfilelog.fileCheck()
 		if Gfilelog.Logconf.Loglevel <= DEBUG {
-			slog.Default().DebugContext(ctx, fmt.Sprintf(p_fmt, append(values, v...)...))
+			slog.Default().DebugContext(ctx, fmt.Sprintf(fmtstr, v...))
 		}
 	}
 }
@@ -396,23 +400,10 @@ func Info(ctx context.Context, msg string, v ...interface{}) {
 }
 
 func Infof(ctx context.Context, fmtstr string, v ...interface{}) {
-	p_fmt := ""
-	values := make([]interface{}, 0, 100)
-	if Gfilelog.Logconf.Format == TEXT_FORMAT {
-		trace_id := getIdsInLog(ctx)
-		if trace_id != "" {
-			p_fmt = "%s [INFO] " + fmtstr
-			values = append(values, trace_id)
-		} else {
-			p_fmt = "[INFO] " + fmtstr
-		}
-	} else {
-		p_fmt = fmtstr
-	}
 	if Gfilelog != nil && Gfilelog.LogObj != nil {
 		Gfilelog.fileCheck()
 		if Gfilelog.Logconf.Loglevel <= INFO {
-			slog.Default().InfoContext(ctx, fmt.Sprintf(p_fmt, append(values, v...)...))
+			slog.Default().InfoContext(ctx, fmt.Sprintf(fmtstr, v...))
 		}
 	}
 }
@@ -425,24 +416,10 @@ func Warn(ctx context.Context, msg string, v ...interface{}) {
 }
 
 func Warnf(ctx context.Context, fmtstr string, v ...interface{}) {
-	trace_id := getIdsInLog(ctx)
-	p_fmt := ""
-	values := make([]interface{}, 0, 100)
-	if Gfilelog.Logconf.Format == TEXT_FORMAT {
-		if trace_id != "" {
-			p_fmt = "%s [WARN] " + fmtstr
-			values = append(values, trace_id)
-		} else {
-			p_fmt = "[WARN] " + fmtstr
-		}
-	} else {
-		p_fmt = fmtstr
-	}
-
 	if Gfilelog != nil && Gfilelog.LogObj != nil {
 		Gfilelog.fileCheck()
 		if Gfilelog.Logconf.Loglevel <= WARN {
-			slog.Default().WarnContext(ctx, fmt.Sprintf(p_fmt, append(values, v...)...))
+			slog.Default().WarnContext(ctx, fmt.Sprintf(fmtstr, v...))
 		}
 	}
 
@@ -456,24 +433,10 @@ func Error(ctx context.Context, msg string, v ...interface{}) {
 }
 
 func Errorf(ctx context.Context, fmtstr string, v ...interface{}) {
-	trace_id := getIdsInLog(ctx)
-	p_fmt := ""
-	values := make([]interface{}, 0, 100)
-
-	if Gfilelog.Logconf.Format == TEXT_FORMAT {
-		if trace_id != "" {
-			p_fmt = "%s [ERROR] " + fmtstr
-			values = append(values, trace_id)
-		} else {
-			p_fmt = "[ERROR] " + fmtstr
-		}
-	} else {
-		p_fmt = fmtstr
-	}
 	if Gfilelog != nil && Gfilelog.LogObj != nil {
 		Gfilelog.fileCheck()
 		if Gfilelog.Logconf.Loglevel <= ERROR {
-			slog.Default().ErrorContext(ctx, fmt.Sprintf(p_fmt, append(values, v...)...))
+			slog.Default().ErrorContext(ctx, fmt.Sprintf(fmtstr, v...))
 		}
 	}
 
@@ -522,7 +485,7 @@ func (glog *Glog) rename() {
 			}
 			err := os.Rename(filepath.Join(f.dir, f.filename), fn)
 			if err != nil {
-				slog.Error("rename err: %s", err.Error())
+				log.Println("rename err", err)
 			}
 			err = os.Rename(filepath.Join(f.dir, f.filename_err), fn_err)
 			t, _ := time.Parse(DATEFORMAT, time.Now().Format(DATEFORMAT))
