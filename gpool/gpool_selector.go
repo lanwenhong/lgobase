@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -21,14 +22,17 @@ type GPoolConfig[T any] struct {
 	Addrs           string
 	MaxConns        int
 	MaxIdleConns    int
+	MaxWaiters      int
 	MaxConnLife     int64
 	MaxIdleConnLife int64
-	PurgeRate       float64
-	Cfunc           CreateConn[T]
-	Nc              NewThriftClient[T]
-	Ping            PingSvr
-	PingTicker      int64
-	TlsConf         *tls.Config
+	// PurgeRate is retained for compatibility; Gpool's idle ring treats
+	// MaxIdleConns as a hard limit.
+	PurgeRate  float64
+	Cfunc      CreateConn[T]
+	Nc         NewThriftClient[T]
+	Ping       PingSvr
+	PingTicker int64
+	TlsConf    *tls.Config
 }
 
 type RpcSvr[T any] struct {
@@ -69,9 +73,9 @@ func (rps *RpcPoolSelector[T]) RoundRobin(ctx context.Context) interface{} {
 	if j == 0 {
 		return nil
 	}
-	logger.Debugf(ctx, "item: %v j: %d itemn_len: %d", item, j, len(item))
+	logger.Debug(ctx, "round robin candidates", "candidates", item, "valid_count", j, "candidate_count", len(item))
 	atomic_pos := atomic.LoadInt32(&rps.Pos)
-	logger.Debugf(ctx, "=========atomic_pos: %d", atomic_pos)
+	logger.Debug(ctx, "round robin position", "position", atomic_pos)
 	addr := item[atomic_pos%j]
 	atomic_pos = (atomic_pos + 1) % (int32(len(rps.Slist)))
 	atomic.StoreInt32(&rps.Pos, atomic_pos)
@@ -115,17 +119,16 @@ func (rps *RpcPoolSelector[T]) RpcPoolInit(ctx context.Context, g_conf *GPoolCon
 					err := rps_pool.Gp.ThriftCall2(ctx, g_conf.Ping)
 					if err == nil {
 						rps_pool.SetStat(selector.SVR_VALID)
-						//logger.Infof(ctx, "addr=%s:%d|state=recover", rps_pool.GetAddr(), rps_pool.GetPort())
 						logger.Info(ctx, "gpool", "addr", rps_pool.GetAddr(), "state", "recover")
 					} else {
 						/*if ticker == nil {
 							ticker = time.NewTicker(time.Duration(g_conf.PingTicker) * time.Second)
 						}*/
 						ticker.Reset(time.Duration(g_conf.PingTicker) * time.Second)
-						logger.Warnf(ctx, "ping err: %s", err.Error())
+						logger.Warn(ctx, "rpc server ping failed", "addr", rps_pool.GetAddr(), "port", rps_pool.GetPort(), "err", err)
 					}
 				case <-ticker.C:
-					logger.Debugf(ctx, "ping process")
+					logger.Debug(ctx, "rpc server ping", "event", "tick")
 					valids := 0
 					for i := 0; i < len(rps.Slist); i++ {
 						rps_pool := rps.Slist[i].(*RpcSvr[T])
@@ -133,10 +136,9 @@ func (rps *RpcPoolSelector[T]) RpcPoolInit(ctx context.Context, g_conf *GPoolCon
 							err := rps_pool.Gp.ThriftCall2(ctx, g_conf.Ping)
 							if err == nil {
 								rps_pool.SetStat(selector.SVR_VALID)
-								//logger.Infof(ctx, "addr=%s:%d|state=recover", rps_pool.GetAddr(), rps_pool.GetPort())
 								logger.Info(ctx, "gpool", "addr", rps_pool.GetAddr(), "state", "recover")
 							} else {
-								logger.Warnf(ctx, "ping err: %s", err.Error())
+								logger.Warn(ctx, "rpc server ping failed", "addr", rps_pool.GetAddr(), "port", rps_pool.GetPort(), "err", err)
 							}
 
 						} else {
@@ -157,22 +159,22 @@ func (rps *RpcPoolSelector[T]) RpcPoolInit(ctx context.Context, g_conf *GPoolCon
 func (rps *RpcPoolSelector[T]) ThriftCall(ctx context.Context, process func(client interface{}) (string, error)) error {
 	isvr := rps.RoundRobin(ctx)
 	if isvr == nil {
-		logger.Warnf(ctx, "no server select")
+		logger.Warn(ctx, "select rpc server failed", "reason", "no_valid_server")
 		return errors.New("no server")
 	}
 	rps_pool := isvr.(*RpcSvr[T])
-	logger.Debugf(ctx, "select adds: %s port %d", rps_pool.GetAddr(), rps_pool.GetPort())
+	logger.Debug(ctx, "selected rpc server", "addr", rps_pool.GetAddr(), "port", rps_pool.GetPort())
 	//return rps_pool.Gp.ThriftCall2(ctx, process)
 	err := rps_pool.Gp.ThriftCall2(ctx, process)
 	if rps.Gpconf.Ping != nil && err != nil {
 
 		switch err.(type) {
 		case thrift.TTransportException, thrift.TProtocolException:
-			logger.Warnf(ctx, "%s:%d down", rps_pool.GetAddr(), rps_pool.GetPort())
+			logger.Warn(ctx, "rpc server unavailable", "addr", rps_pool.GetAddr(), "port", rps_pool.GetPort(), "err", err)
 			rps_pool.SetStat(selector.SVR_NOTVALID)
 			rps.NotValid <- rps_pool
 		default:
-			logger.Warnf(ctx, "rpc: %s", err.Error())
+			logger.Warn(ctx, "rpc call failed", "addr", rps_pool.GetAddr(), "port", rps_pool.GetPort(), "err", err)
 		}
 	}
 	return err
@@ -181,22 +183,22 @@ func (rps *RpcPoolSelector[T]) ThriftCall(ctx context.Context, process func(clie
 func (rps *RpcPoolSelector[T]) ThriftWithTimeOutCall(ctx context.Context, timeout time.Duration, process func(client interface{}) (string, error)) error {
 	isvr := rps.RoundRobin(ctx)
 	if isvr == nil {
-		logger.Warnf(ctx, "no server select")
+		logger.Warn(ctx, "select rpc server failed", "reason", "no_valid_server")
 		return errors.New("no server")
 	}
 	rps_pool := isvr.(*RpcSvr[T])
-	logger.Debugf(ctx, "select adds: %s port %d", rps_pool.GetAddr(), rps_pool.GetPort())
+	logger.Debug(ctx, "selected rpc server", "addr", rps_pool.GetAddr(), "port", rps_pool.GetPort())
 	//return rps_pool.Gp.ThriftCall2(ctx, process)
 	err := rps_pool.Gp.ThriftWithTimeOutCall2(ctx, timeout, process)
 	if rps.Gpconf.Ping != nil && err != nil {
 
 		switch err.(type) {
 		case thrift.TTransportException, thrift.TProtocolException:
-			logger.Warnf(ctx, "%s:%d down", rps_pool.GetAddr(), rps_pool.GetPort())
+			logger.Warn(ctx, "rpc server unavailable", "addr", rps_pool.GetAddr(), "port", rps_pool.GetPort(), "err", err)
 			rps_pool.SetStat(selector.SVR_NOTVALID)
 			rps.NotValid <- rps_pool
 		default:
-			logger.Warnf(ctx, "rpc: %s", err.Error())
+			logger.Warn(ctx, "rpc call failed", "addr", rps_pool.GetAddr(), "port", rps_pool.GetPort(), "err", err)
 		}
 	}
 	return err
@@ -211,26 +213,26 @@ func (rps *RpcPoolSelector[T]) ThriftExtCall(ctx context.Context, process func(c
 		}
 		nCtx = eCtx
 	} else {
-		logger.Warnf(ctx, "ctx format error")
+		logger.Warn(ctx, "invalid thrift extension context", "context_type", fmt.Sprintf("%T", ctx))
 		return errors.New("ctx format error")
 	}
 	isvr := rps.RoundRobin(nCtx)
 	if isvr == nil {
-		logger.Warnf(nCtx, "no server select")
+		logger.Warn(nCtx, "select rpc server failed", "reason", "no_valid_server")
 		return errors.New("no server")
 	}
 	rps_pool := isvr.(*RpcSvr[T])
-	logger.Debugf(nCtx, "select adds: %s port %d", rps_pool.GetAddr(), rps_pool.GetPort())
+	logger.Debug(nCtx, "selected rpc server", "addr", rps_pool.GetAddr(), "port", rps_pool.GetPort())
 	err := rps_pool.Gp.ThriftExtCall2(nCtx, process)
 	if rps.Gpconf.Ping != nil && err != nil {
 
 		switch err.(type) {
 		case thrift.TTransportException, thrift.TProtocolException:
-			logger.Warnf(nCtx, "%s:%d down", rps_pool.GetAddr(), rps_pool.GetPort())
+			logger.Warn(nCtx, "rpc server unavailable", "addr", rps_pool.GetAddr(), "port", rps_pool.GetPort(), "err", err)
 			rps_pool.SetStat(selector.SVR_NOTVALID)
 			rps.NotValid <- rps_pool
 		default:
-			logger.Warnf(nCtx, "rpc: %s", err.Error())
+			logger.Warn(nCtx, "rpc call failed", "addr", rps_pool.GetAddr(), "port", rps_pool.GetPort(), "err", err)
 		}
 	}
 	return err
@@ -246,26 +248,26 @@ func (rps *RpcPoolSelector[T]) ThriftWithTimeOutExtCall(ctx context.Context, tim
 		}
 		nCtx = eCtx
 	} else {
-		logger.Warnf(ctx, "ctx format error")
+		logger.Warn(ctx, "invalid thrift extension context", "context_type", fmt.Sprintf("%T", ctx))
 		return errors.New("ctx format error")
 	}
 	isvr := rps.RoundRobin(nCtx)
 	if isvr == nil {
-		logger.Warnf(nCtx, "no server select")
+		logger.Warn(nCtx, "select rpc server failed", "reason", "no_valid_server")
 		return errors.New("no server")
 	}
 	rps_pool := isvr.(*RpcSvr[T])
-	logger.Debugf(nCtx, "select adds: %s port %d", rps_pool.GetAddr(), rps_pool.GetPort())
+	logger.Debug(nCtx, "selected rpc server", "addr", rps_pool.GetAddr(), "port", rps_pool.GetPort())
 	err := rps_pool.Gp.ThriftWithTimeOutExtCall2(nCtx, timeout, process)
 	if rps.Gpconf.Ping != nil && err != nil {
 
 		switch err.(type) {
 		case thrift.TTransportException, thrift.TProtocolException:
-			logger.Warnf(nCtx, "%s:%d down", rps_pool.GetAddr(), rps_pool.GetPort())
+			logger.Warn(nCtx, "rpc server unavailable", "addr", rps_pool.GetAddr(), "port", rps_pool.GetPort(), "err", err)
 			rps_pool.SetStat(selector.SVR_NOTVALID)
 			rps.NotValid <- rps_pool
 		default:
-			logger.Warnf(nCtx, "rpc: %s", err.Error())
+			logger.Warn(nCtx, "rpc call failed", "addr", rps_pool.GetAddr(), "port", rps_pool.GetPort(), "err", err)
 		}
 	}
 	return err

@@ -262,7 +262,7 @@ func TestGpoolList(t *testing.T) {
 		t.Log("<<<<<<>>>>>", i)
 	}
 
-	if gp.FreeList.Len() != 5 {
+	if gp.IdleCount() != 5 {
 		t.Fatal("free len error")
 	}
 }
@@ -412,7 +412,7 @@ func TestPingWait(t *testing.T) {
 
 				if err != nil {
 					//t.Log(err)
-					logger.Warnf(ctx, "rps.ThriftCall err: %v", err)
+					logger.Warn(ctx, "rpc pool thrift call failed", "err", err)
 				}
 				if r != nil {
 					t.Log("rpc get: ", r.Msg)

@@ -28,7 +28,7 @@ func (e *EchoServer) Echo(ctx context.Context, req *echo.EchoReq) (*echo.EchoRes
 	res := &echo.EchoRes{
 		Msg: "success",
 	}
-	logger.Info(cctx, "succ")
+	logger.Info(cctx, "echo request completed", "status", "success")
 
 	//time.Sleep(4 * time.Second)
 	return res, nil

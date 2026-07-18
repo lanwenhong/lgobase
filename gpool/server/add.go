@@ -4,7 +4,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/apache/thrift/lib/go/thrift"
@@ -21,35 +20,26 @@ type SvrHandler struct {
 
 func (sh *SvrHandler) Add(ctx context.Context, a int32, b int32) (int32, error) {
 	//rid := gpool.GetRequestID(ctx)
-	//logger.Debugf(ctx, "rid: %s", rid)
-	//logger.Debugf(ctx, "Rp: %p rquestID: %s rid: %s", sh.Rp, sh.Rp.RequestID, rid)
-	//logger.Debugf(ctx, "Rp: %p rquestID: %s", sh.Rp, rid)
 	//ctx = context.WithValue(ctx, "trace_id", util.NewRequestID())
 	c := a + b
-	//logger.Debugf(ctx, "c: %d", c)
 	starttime := time.Now()
-	logger.Debug(ctx, "AddServer", "func", "Add", "ret", c, "time", fmt.Sprintf("%v", time.Since(starttime)))
+	logger.Debug(ctx, "add server request", "func", "Add", "result", c, "cost", time.Since(starttime))
 	//time.Sleep(2 * time.Second)
 	return c, nil
 }
 
 func (sh *SvrHandler) Add1(ctx context.Context, magic int16, ver int16, ext map[string]string, a int32, b int32) (int32, error) {
 	rid := gpool.GetRequestID(ctx)
-	logger.Debugf(ctx, "rid: %s", rid)
-	//logger.Debugf(ctx, "Rp: %p rquestID: %s rid: %s", sh.Rp, sh.Rp.RequestID, rid)
-	//logger.Debugf(ctx, "Rp: %p rquestID: %s", sh.Rp, rid)
+	logger.Debug(ctx, "add server request", "func", "Add1", "request_id", rid, "magic", magic, "version", ver, "extension_count", len(ext))
 	c := a + b
-	logger.Debugf(ctx, "c: %d", c)
+	logger.Debug(ctx, "add server response", "func", "Add1", "result", c)
 	return c, nil
 
 }
 
 func (sh *SvrHandler) PostUser(ctx context.Context, req *server.GetUserRequest) (int32, error) {
 	rid := gpool.GetRequestID(ctx)
-	logger.Debugf(ctx, "rid: %s", rid)
-	//logger.Debugf(ctx, "Rp: %p rquestID: %s rid: %s", sh.Rp, sh.Rp.RequestID, rid)
-	//logger.Debugf(ctx, "Rp: %p rquestID: %s", sh.Rp, rid)
-	logger.Debugf(ctx, "req: %v", req)
+	logger.Debug(ctx, "post user request", "request_id", rid, "request", req)
 	return 0, nil
 }
 
@@ -90,7 +80,7 @@ func main() {
 		rawProtoFactory,
 	)
 
-	logger.Debugf(ctx, "服务启动，监听端口 9090（Framed 协议）")
+	logger.Debug(ctx, "start thrift server", "port", 9090, "transport", "buffered", "protocol", "binary", "extension", true)
 	if err := server.Serve(); err != nil {
 		panic(err)
 	}

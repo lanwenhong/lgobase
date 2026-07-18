@@ -45,7 +45,7 @@ func main() {
 		transportFactory,
 		protocolFactory,
 	)
-	logger.Debugf(ctx, "server go")
+	logger.Debug(ctx, "start thrift server", "port", 9899, "transport", "framed", "protocol", "binary")
 	if err = server.Serve(); err != nil {
 		fmt.Println(err.Error())
 	}
