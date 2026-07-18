@@ -129,9 +129,9 @@ func BenchmarkThriftExt(b *testing.B) {
 			c := client.(*server.ServerTestClient)
 			r, err := c.Add(ctx, 1, 1)
 			if err != nil {
-				logger.Warnf(ctx, "err: %s", err.Error())
+				logger.Warn(ctx, "benchmark rpc failed", "method", "Add", "err", err)
 			}
-			logger.Debugf(ctx, "r: %d", r)
+			logger.Debug(ctx, "benchmark rpc completed", "method", "Add", "result", r)
 			return "add", err
 		}
 		//nCtx = nCtx.SetReqExtData(ctx, "request_id", uuid.New().String())

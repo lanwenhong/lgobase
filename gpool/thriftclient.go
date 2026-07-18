@@ -101,7 +101,7 @@ func (tc *TConn[T]) Open() error {
 }
 
 func (tc *TConn[T]) SetTimeOut(ctx context.Context, timeout time.Duration) {
-	logger.Debugf(ctx, "socket: %v", tc.TSock)
+	logger.Debug(ctx, "set thrift socket timeout", "socket", tc.TSock, "timeout", timeout)
 	tc.TSock.SetSocketTimeout(timeout)
 }
 
@@ -116,11 +116,13 @@ func (tc *TConn[T]) NewThClient(nc NewThriftClient[T]) {
 
 func (tc *TConn[T]) Close() error {
 	if tc.Protocol == TH_PRO_FRAMED {
-		tc.Tft.Close()
+		err := tc.Tft.Close()
 		tc.isOpen = tc.Tft.IsOpen()
+		return err
 	} else if tc.Protocol == TH_PRO_BUFFER {
-		tc.Tbt.Close()
+		err := tc.Tbt.Close()
 		tc.isOpen = tc.Tbt.IsOpen()
+		return err
 	}
 	return errors.New("not support")
 }
@@ -160,11 +162,11 @@ func CreateThriftFramedConnThriftExt[T any](ctx context.Context, addr string, po
 }
 
 func CreateThriftBufferConn[T any](ctx context.Context, addr string, port int, timeout int) (c Conn[T], err error) {
-	logger.Debugf(ctx, "in CreateThriftBufferConn")
+	logger.Debug(ctx, "create thrift buffer connection", "stage", "start", "addr", addr, "port", port, "timeout_ms", timeout)
 	conn := NewTConn[T](addr, port, timeout, TH_PRO_BUFFER)
-	logger.Debugf(ctx, "conn created: %v", conn)
+	logger.Debug(ctx, "create thrift buffer connection", "stage", "created", "conn", conn)
 	err = conn.Open()
-	logger.Debugf(ctx, "conn opened")
+	logger.Debug(ctx, "create thrift buffer connection", "stage", "opened", "err", err)
 	c = conn
 	return c, err
 }
@@ -189,13 +191,15 @@ func ThriftCall[T any](ctx context.Context, pc *PoolConn[T], method string, argu
 	//defer pc.Close(ctx, err)
 	defer func() {
 		endTime := time.Now().UnixNano()
-		errStr := ""
-		if err != nil {
-			errStr = err.Error()
-		}
-		address := fmt.Sprintf("%s:%d", tconn.Addr, tconn.Port)
-		logger.Infof(ctx, "func=ThriftCallFramed|module=%s|method=%s|addr=%s:%d|time=%d|err=%s",
-			c.Elem().Type().Name(), method, address, time.Duration(tconn.TimeOut)*1000, (endTime-starttime)/1000, errStr)
+		logger.Info(ctx, "thrift rpc call",
+			"func", "ThriftCallFramed",
+			"module", c.Elem().Type().Name(),
+			"method", method,
+			"addr", tconn.Addr,
+			"port", tconn.Port,
+			"timeout_ms", tconn.TimeOut,
+			"cost_us", (endTime-starttime)/1000,
+			"err", err)
 	}()
 	function := c.MethodByName(method)
 	if !function.IsValid() || function.IsNil() {
@@ -240,13 +244,14 @@ func ThriftCall2[T any](ctx context.Context, pc *PoolConn[T], fn interface{}, pa
 	//defer pc.Close(ctx, err)
 	defer func() {
 		endTime := time.Now().UnixNano()
-		errStr := ""
-		if err != nil {
-			errStr = err.Error()
-		}
-		address := fmt.Sprintf("%s:%d", tconn.Addr, tconn.Port)
-		logger.Infof(ctx, "func=ThriftCall|method=%v|addr=%s:%d|time=%d|err=%s",
-			fn, address, time.Duration(tconn.TimeOut)*1000, (endTime-starttime)/1000, errStr)
+		logger.Info(ctx, "thrift rpc call",
+			"func", "ThriftCall",
+			"method", fn,
+			"addr", tconn.Addr,
+			"port", tconn.Port,
+			"timeout_ms", tconn.TimeOut,
+			"cost_us", (endTime-starttime)/1000,
+			"err", err)
 	}()
 
 	v := reflect.ValueOf(fn)
@@ -263,7 +268,7 @@ func ThriftCall2[T any](ctx context.Context, pc *PoolConn[T], fn interface{}, pa
 		in = append(in, reflect.ValueOf(param))
 	}
 
-	logger.Debug(ctx, "====%d", len(in))
+	logger.Debug(ctx, "prepare thrift rpc arguments", "count", len(in))
 	var rets []interface{}
 	for _, arg := range v.Call(in) {
 		rets = append(rets, arg.Interface())

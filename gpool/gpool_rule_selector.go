@@ -30,6 +30,7 @@ type RpcServerConf struct {
 	Salience        int     `yaml:"Salience"`
 	MaxConns        int     `yaml:"MaxConns"`
 	MaxIdleConns    int     `yaml:"MaxIdleConns"`
+	MaxWaiters      int     `yaml:"MaxWaiters"`
 	MaxConnLife     int64   `yaml:"MaxConnLife"`
 	MaxIdleConnLife int64   `yaml:"MaxIdleConnLife"`
 	PurgeRate       float64 `yaml:"PurgeRate"`
@@ -79,6 +80,7 @@ func (rrps *RpcPoolRuleSelector[T]) AddSvr(ctx context.Context, conf *RpcServerC
 		Addrs:           conf.Addr,
 		MaxConns:        conf.MaxConns,
 		MaxIdleConns:    conf.MaxIdleConns,
+		MaxWaiters:      conf.MaxWaiters,
 		MaxConnLife:     conf.MaxConnLife,
 		MaxIdleConnLife: conf.MaxIdleConnLife,
 		PurgeRate:       conf.PurgeRate,
@@ -144,7 +146,7 @@ func (rrps *RpcPoolRuleSelector[T]) ParseRule(ctx context.Context) error {
 
 	Rdata, errJ := pkg.ParseJSONRuleset([]byte(jRuleSet))
 	if errJ != nil {
-		logger.Warnf(ctx, "errJ: %s", errJ.Error())
+		logger.Warn(ctx, "parse rule set failed", "err", errJ)
 		return errJ
 	}
 	kl := ast.NewKnowledgeLibrary()
@@ -152,7 +154,7 @@ func (rrps *RpcPoolRuleSelector[T]) ParseRule(ctx context.Context) error {
 	rFlag := "gconf_" + "servers"
 	err := rb.BuildRuleFromResource(rFlag, "0.0.1", pkg.NewBytesResource([]byte(Rdata)))
 	if err != nil {
-		logger.Warnf(ctx, "err: %s", err.Error())
+		logger.Warn(ctx, "build rule set failed", "rule", rFlag, "err", err)
 		return err
 	}
 	rrps.Kl = kl
@@ -160,7 +162,7 @@ func (rrps *RpcPoolRuleSelector[T]) ParseRule(ctx context.Context) error {
 		New: func() interface{} {
 			res, err := kl.NewKnowledgeBaseInstance(rFlag, "0.0.1")
 			if err != nil {
-				logger.Debugf(ctx, "err: %s", err.Error())
+				logger.Debug(ctx, "create rule knowledge base failed", "rule", rFlag, "err", err)
 				panic(err)
 			}
 			return res
@@ -188,10 +190,10 @@ func (rrps *RpcPoolRuleSelector[T]) SvrSelectFromJson(ctx context.Context, jData
 	eng := engine.NewGruleEngine()
 	err := eng.Execute(dataContext, kb)
 	if err != nil {
-		logger.Debugf(ctx, "exec err %s", err.Error())
+		logger.Debug(ctx, "execute rule failed", "err", err)
 		return nil, err
 	}
-	logger.Debugf(ctx, "ret: %v", rRet)
+	logger.Debug(ctx, "execute rule completed", "result", rRet)
 	return rrps.rulePoolByRet(rRet)
 }
 
@@ -209,10 +211,10 @@ func (cr *RpcPoolRuleSelector[T]) SvrSelectFromDataCtx(ctx context.Context, data
 	eng := engine.NewGruleEngine()
 	err := eng.Execute(dataContext, kb)
 	if err != nil {
-		logger.Debugf(ctx, "exec err %s", err.Error())
+		logger.Debug(ctx, "execute rule failed", "err", err)
 		return nil, err
 	}
-	logger.Debugf(ctx, "ret: %v", rRet)
+	logger.Debug(ctx, "execute rule completed", "result", rRet)
 	return cr.rulePoolByRet(rRet)
 }
 

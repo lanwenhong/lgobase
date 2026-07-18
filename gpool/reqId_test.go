@@ -24,7 +24,6 @@ func TestAdd1(t *testing.T) {
 		//CtxValueKey:  "trace_id,request_id,client_service,depth",
 	}
 	logger.Newglog("./", "test.log", "test.log.err", myconf)
-	//logger.Debugf(ctx, "run")
 
 	g_conf := &gpool.GPoolConfig[server.ServerTestClient]{
 		Addrs: "127.0.0.1:9090/30000",
@@ -47,7 +46,6 @@ func TestAdd1(t *testing.T) {
 			//ctx := context.WithValue(ctx, "trace_id", util.NewRequestID())
 			//request_id := util.NewRequestID()
 			pid := util.NewProcessID()
-			//logger.Debugf(ctx, "trade_id: %s", pid)
 			ctx := context.WithValue(ctx, "trace_id", pid)
 			defer wg.Done()
 			for i := 0; i < 1; i++ {
@@ -61,9 +59,9 @@ func TestAdd1(t *testing.T) {
 					//r, err := c.Add(ctx, magic, ver, ext, 1, 1)
 					r, err := c.Add(ctx, 1, 1)
 					if err != nil {
-						logger.Warnf(ctx, "err: %s", err.Error())
+						logger.Warn(ctx, "request id rpc failed", "method", "Add", "err", err)
 					}
-					logger.Debugf(ctx, "r: %d", r)
+					logger.Debug(ctx, "request id rpc completed", "method", "Add", "result", r)
 					return "add", err
 				}
 				ctx := context.WithValue(ctx, "request_id", util.NewRequestID())
@@ -128,9 +126,9 @@ func TestReqId(t *testing.T) {
 					c := client.(*server.ServerTestClient)
 					r, err := c.Add(ctx, 1, 1)
 					if err != nil {
-						logger.Warnf(ctx, "err: %s", err.Error())
+						logger.Warn(ctx, "request id rpc failed", "method", "Add", "err", err)
 					}
-					logger.Debugf(ctx, "r: %d", r)
+					logger.Debug(ctx, "request id rpc completed", "method", "Add", "result", r)
 					return "add", err
 				}
 
@@ -168,9 +166,9 @@ func TestReqId(t *testing.T) {
 					c := client.(*server.ServerTestClient)
 					r, err := c.PostUser(ctx, req)
 					if err != nil {
-						logger.Warnf(ctx, "err: %s", err.Error())
+						logger.Warn(ctx, "request id rpc failed", "method", "Add", "err", err)
 					}
-					logger.Debugf(ctx, "r: %d", r)
+					logger.Debug(ctx, "request id rpc completed", "method", "Add", "result", r)
 					return "add", err
 				}
 
@@ -207,9 +205,9 @@ func TestGetConnTimeOut(t *testing.T) {
 					c := client.(*server.ServerTestClient)
 					r, err := c.Add(ctx, 1, 1)
 					if err != nil {
-						logger.Warnf(ctx, "err: %s", err.Error())
+						logger.Warn(ctx, "request id rpc failed", "method", "Add", "err", err)
 					}
-					logger.Debugf(ctx, "r: %d", r)
+					logger.Debug(ctx, "request id rpc completed", "method", "Add", "result", r)
 					return "add", err
 				}
 				nCtx := gpool.NewExtContext(ctx)
@@ -230,9 +228,9 @@ func TestGetConnTimeOut(t *testing.T) {
 					c := client.(*server.ServerTestClient)
 					r, err := c.Add(ctx, 1, 1)
 					if err != nil {
-						logger.Warnf(ctx, "err: %s", err.Error())
+						logger.Warn(ctx, "request id rpc failed", "method", "Add", "err", err)
 					}
-					logger.Debugf(ctx, "r: %d", r)
+					logger.Debug(ctx, "request id rpc completed", "method", "Add", "result", r)
 					return "add", err
 				}
 				nCtx := gpool.NewExtContext(ctx)

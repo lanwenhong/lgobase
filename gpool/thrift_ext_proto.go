@@ -125,34 +125,33 @@ func (p *ThriftExtProtocolClient) WriteMessageBegin(ctx context.Context, name st
 	//err := p.WriteI16(ctx, THRIFT_EXT_META_MAGIC)
 	err := p.WriteI32(ctx, THRIFT_EXT_META_MAGIC)
 	if err != nil {
-		logger.Warnf(ctx, "write magic err: %v", err)
+		logger.Warn(ctx, "write thrift extension failed", "field", "magic", "err", err)
 		return err
 	}
 	//ver
 	err = p.WriteI16(ctx, THRIFT_EXT_META_VERSION)
 	if err != nil {
-		logger.Warnf(ctx, "write version err: %v", err)
+		logger.Warn(ctx, "write thrift extension failed", "field", "version", "err", err)
 		return err
 	}
 	//ext data
 	nCtx := ctx.(*ExtContext)
 	err = p.WriteMapBegin(ctx, thrift.STRING, thrift.STRING, len(nCtx.ReqExtData))
 	if err != nil {
-		logger.Warnf(ctx, "write map begin err: %", err)
+		logger.Warn(ctx, "write thrift extension map failed", "stage", "begin", "err", err)
 		return err
 	}
 	for k, v := range nCtx.ReqExtData {
 		if err = p.WriteString(ctx, k); err != nil {
-			logger.Warnf(ctx, "write map k: %s err: %v", k, err)
+			logger.Warn(ctx, "write thrift extension map failed", "stage", "key", "key", k, "err", err)
 			return err
 		}
 		if err = p.WriteString(ctx, v); err != nil {
-			logger.Warnf(ctx, "write map v: %s err: %v", v, err)
+			logger.Warn(ctx, "write thrift extension map failed", "stage", "value", "key", k, "value", v, "err", err)
 			return err
 		}
 	}
 	p.WriteMapEnd(ctx)
-	//logger.Infof(ctx, "func=WriteMessageBegin|time=%v", time.Since(starttime))
 	return p.TProtocol.WriteMessageBegin(ctx, name, typeId, seqId)
 }
 
@@ -188,7 +187,7 @@ func (p *ExtProcessor) ReadMetaVer(ctx context.Context, in, out thrift.TProtocol
 			return ver, false, thrift.NewTTransportException(thrift.INVALID_DATA, "invalid data")
 		}
 	}
-	logger.Debugf(ctx, "ver: %d", ver)
+	logger.Debug(ctx, "read thrift extension version", "version", ver)
 	return ver, true, nil
 }
 
@@ -197,27 +196,26 @@ func (p *ExtProcessor) ReadMetaMap(ctx context.Context, in, out thrift.TProtocol
 	//reqData := make(map[string]string)
 	_, _, size, err := in.ReadMapBegin(ctx)
 	if err != nil {
-		logger.Warnf(ctx, "read map header err: %v", err)
+		logger.Warn(ctx, "read thrift extension map failed", "stage", "header", "err", err)
 		//return ctx, reqData, err
 		return ctx, err
 	}
-	logger.Debugf(ctx, "size: %d", size)
+	logger.Debug(ctx, "read thrift extension map", "size", size)
 	var foundDepth bool = false
 	var callClientService string = ""
 	for i := 0; i < size; i++ {
 		k, err := in.ReadString(ctx)
 		if err != nil {
-			logger.Warnf(ctx, "read map key err: %v", err)
+			logger.Warn(ctx, "read thrift extension map failed", "stage", "key", "index", i, "err", err)
 			//return ctx, reqData, err
 			return ctx, err
 		}
 		v, err := in.ReadString(ctx)
 		if err != nil {
-			logger.Warnf(ctx, "read map v err: %v", err)
+			logger.Warn(ctx, "read thrift extension map failed", "stage", "value", "index", i, "err", err)
 			//return ctx, reqData, err
 			return ctx, err
 		}
-		//logger.Debugf(ctx, "k=%s v=%s", k, v)
 		//reqData[k] = v
 		if k == THRIFT_EXT_DEPTH {
 			iv, err := strconv.Atoi(v)
@@ -257,9 +255,9 @@ func (p *ExtProcessor) Process(ctx context.Context, in, out thrift.TProtocol) (b
 			return false, thrift.NewTTransportException(thrift.END_OF_FILE, "connection closed (EOF)")
 		} else {
 			if err.(thrift.TProtocolException).TypeId() != thrift.TIMED_OUT {
-				logger.Warnf(ctx, "read preBuf: %v", err)
+				logger.Warn(ctx, "read thrift protocol prefix failed", "err", err)
 			} else {
-				logger.Debugf(ctx, "read preBuf: %v", err)
+				logger.Debug(ctx, "read thrift protocol prefix timed out", "err", err)
 			}
 			return false, thrift.NewTTransportException(thrift.INVALID_DATA, "invalid data")
 		}
@@ -270,7 +268,7 @@ func (p *ExtProcessor) Process(ctx context.Context, in, out thrift.TProtocol) (b
 	//if magic == uint16(THRIFT_EXT_META_MAGIC) {
 	if magic == uint32(THRIFT_EXT_META_MAGIC) {
 		//if magic == THRIFT_EXT_META_MAGIC {
-		logger.Debugf(ctx, "use extend thrift proto")
+		logger.Debug(ctx, "select thrift protocol", "protocol", "extended")
 		//ver
 		_, flag, ex := p.ReadMetaVer(ctx, in, out)
 		if ex != nil {
@@ -283,7 +281,7 @@ func (p *ExtProcessor) Process(ctx context.Context, in, out thrift.TProtocol) (b
 			if errRM.(thrift.TProtocolException).TypeId() == thrift.END_OF_FILE {
 				return false, thrift.NewTTransportException(thrift.END_OF_FILE, "connection closed (EOF)")
 			} else {
-				logger.Warnf(ctx, "read preBuf: %v", errRM)
+				logger.Warn(ctx, "read thrift extension metadata failed", "err", errRM)
 				return false, thrift.NewTTransportException(thrift.INVALID_DATA, "invalid data")
 			}
 		}
@@ -292,7 +290,7 @@ func (p *ExtProcessor) Process(ctx context.Context, in, out thrift.TProtocol) (b
 		}*/
 
 	} else {
-		logger.Debugf(ctx, "use normal thrift proto")
+		logger.Debug(ctx, "select thrift protocol", "protocol", "standard")
 		multiReader := io.MultiReader(bytes.NewReader(preBuf), in.Transport())
 		newTransport := thrift.NewStreamTransportR(multiReader)
 		in = p.Pro.GetProtocol(newTransport)
