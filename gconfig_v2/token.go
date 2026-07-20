@@ -484,7 +484,7 @@ func (p *Parser) nextValue() {
 	p.tok = p.lex.NextValueToken()
 }
 
-func (p *Parser) parseValue(ctx context.Context, tkn *TokenNode, quotedAsString bool) (any, error) {
+func (p *Parser) parseValue(ctx context.Context, tkn *TokenNode) (any, error) {
 	switch p.tok.Type {
 	case TokenLBrace:
 		p.nextKey()
@@ -505,7 +505,7 @@ func (p *Parser) parseValue(ctx context.Context, tkn *TokenNode, quotedAsString 
 			}
 			p.nextValue()
 
-			val, err := p.parseValue(ctx, tkn, true)
+			val, err := p.parseValue(ctx, tkn)
 			if err != nil {
 				return nil, err
 			}
@@ -530,7 +530,7 @@ func (p *Parser) parseValue(ctx context.Context, tkn *TokenNode, quotedAsString 
 		arr := make([]any, 0)
 		tkn.nodeType = NODE_TYPE_SLICE
 		for p.tok.Type != TokenRBracket && p.tok.Type != TokenEOF {
-			elem, err := p.parseValue(ctx, tkn, true)
+			elem, err := p.parseValue(ctx, tkn)
 			if err != nil {
 				return nil, err
 			}
@@ -550,7 +550,7 @@ func (p *Parser) parseValue(ctx context.Context, tkn *TokenNode, quotedAsString 
 		p.nextValue()
 		return arr, nil
 	case TokenString:
-		if p.tok.Quoted && quotedAsString {
+		if p.tok.Quoted {
 			val := p.tok.Value
 			tkn.nodeType = NODE_TYPE_STRING
 			p.nextValue()
@@ -615,7 +615,7 @@ func (tkn *TokenNode) TokenParse(ctx context.Context) error {
 
 	lex := NewLexer(value)
 	parser := NewParser(lex)
-	obj, err := parser.parseValue(ctx, tkn, false)
+	obj, err := parser.parseValue(ctx, tkn)
 	if err != nil {
 		return err
 	}
