@@ -14,7 +14,7 @@ nulls:
 
 times:
   rfc3339: 2026-06-24T08:30:00Z
-  space_time: "2026-06-24 10:20:30"
+  space_time: 2026-06-24 10:20:30
   date_only: 2026-06-24
 
 durations:
