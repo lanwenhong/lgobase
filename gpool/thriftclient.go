@@ -164,7 +164,7 @@ func CreateThriftFramedConnThriftExt[T any](ctx context.Context, addr string, po
 func CreateThriftBufferConn[T any](ctx context.Context, addr string, port int, timeout int) (c Conn[T], err error) {
 	logger.Debug(ctx, "create thrift buffer connection", "stage", "start", "addr", addr, "port", port, "timeout_ms", timeout)
 	conn := NewTConn[T](addr, port, timeout, TH_PRO_BUFFER)
-	logger.Debug(ctx, "create thrift buffer connection", "stage", "created", "conn", conn)
+	logger.Debug(ctx, "create thrift buffer connection", "stage", "created", "addr", conn.Addr, "port", conn.Port, "timeout_ms", conn.TimeOut, "protocol", conn.Protocol)
 	err = conn.Open()
 	logger.Debug(ctx, "create thrift buffer connection", "stage", "opened", "err", err)
 	c = conn
