@@ -48,7 +48,7 @@ func TestDblog(t *testing.T) {
 	mylog.Warn(ctx, "info test", "db1", 1, "db2", 2, "db3", 3)
 	mylog.Error(ctx, "info test", "db1", 1, "db2", 2, "db3", 3)
 
-	logger.Debugf(ctx, "test test test")
+	logger.Debug(ctx, "database logger test completed")
 
 }
 
@@ -177,20 +177,20 @@ func TestLogfile(t *testing.T) {
 	ctx := context.WithValue(context.Background(), "trace_id", NewRequestID())
 
 	logger.Newglog("./", "test.log", "test.log.err", myconf)
-	logger.Debugf(ctx, "it is a test")
-	logger.Debugf(ctx, "it is a test")
-	logger.Infof(ctx, "it is a test")
-	logger.Infof(ctx, "it is a test")
+	logger.Debug(ctx, "file logger debug test", "sequence", 1)
+	logger.Debug(ctx, "file logger debug test", "sequence", 2)
+	logger.Info(ctx, "file logger info test", "sequence", 1)
+	logger.Info(ctx, "file logger info test", "sequence", 2)
 
 	go func() {
 		ctxx := context.WithValue(ctx, "trace_id", NewRequestID())
-		logger.Debugf(ctxx, "child log")
+		logger.Debug(ctxx, "file logger child goroutine test")
 	}()
 	time.Sleep(2 * time.Second)
-	logger.Warnf(ctx, "it is a test")
-	logger.Warnf(ctx, "it is a test")
-	logger.Errorf(ctx, "it is a error")
-	logger.Errorf(ctx, "d=%d", 1)
+	logger.Warn(ctx, "file logger warning test", "sequence", 1)
+	logger.Warn(ctx, "file logger warning test", "sequence", 2)
+	logger.Error(ctx, "file logger error test", "sequence", 1)
+	logger.Error(ctx, "file logger error test", "value", 1)
 }
 
 func TestLogRatate(t *testing.T) {

@@ -59,7 +59,7 @@ func TestSSlPool(t *testing.T) {
 				process := func(conn interface{}) (string, error) {
 					var err error = nil
 					c := conn.(*network.TcpSslConn)
-					logger.Debugf(ctx, "c: %v", c)
+					logger.Debug(ctx, "TCP pool test connection", "connection", c)
 
 					bcd := "0094600010000002003020058020C0900200200000000000055500002700210226003750100439999991007D0810120000000323701F31313431313131313138383030303334343333332020200124AA17EAB7BF18034B0061000331325800044941022000064942463945410003494303000349440100034945000003494600000349470000034948000010494C0000702940000850"
 					//bcd := "A0600010000008002020010000C000029200000004810226313134313131313131383830303033343433333320202000320010494C00007029400008500018505024504C414E4554245041594D454E5424"
@@ -74,13 +74,13 @@ func TestSSlPool(t *testing.T) {
 					}
 
 					slen := hex.EncodeToString(head)
-					logger.Debugf(ctx, "slen: %s", slen)
+					logger.Debug(ctx, "TCP pool test response length header", "header", slen)
 					blen, err := strconv.ParseUint(slen, 16, 32)
 					if err != nil {
-						logger.Warnf(ctx, "err: %s", err.Error())
+						logger.Warn(ctx, "TCP pool test parse response length failed", "err", err)
 						return "echo", err
 					}
-					logger.Debugf(ctx, "blen: %d", blen)
+					logger.Debug(ctx, "TCP pool test response length", "length", blen)
 					data, err := c.Readn(ctx, int(blen))
 
 					if err != nil {
@@ -91,7 +91,7 @@ func TestSSlPool(t *testing.T) {
 					return "echo", err
 				}
 				rps.Process(ctx, process)
-				logger.Debugf(ctx, "bcdData: %s", bcdData)
+				logger.Debug(ctx, "TCP pool test response", "data", bcdData)
 			}
 		}()
 	}

@@ -56,13 +56,13 @@ func (dbpool *Dbpool) SetormLog(ctx context.Context, gormConf *dlog.Config) {
 
 func (dbpool *Dbpool) Add(ctx context.Context, db string, url string, model int) error {
 	xdata := strings.Split(url, "?")
-	logger.Debugf(ctx, "xdata: %v", xdata)
+	logger.Debug(ctx, "parse database connection token", "parts", xdata)
 
 	if len(xdata) != 2 {
 		return errors.New("url err not have ? url=" + url)
 	}
 	params := xdata[1]
-	logger.Debugf(ctx, "params: %s", params)
+	logger.Debug(ctx, "parse database pool parameters", "parameters", params)
 
 	pdata := strings.Split(params, "&")
 
@@ -84,7 +84,7 @@ func (dbpool *Dbpool) Add(ctx context.Context, db string, url string, model int)
 			return errors.New("param err pamam=" + params)
 		}
 	}
-	logger.Debugf(ctx, "maxopen: %d maxidle: %d", maxopen, maxidle)
+	logger.Debug(ctx, "configured database pool limits", "max_open", maxopen, "max_idle", maxidle)
 	token_prefix := xdata[0]
 
 	tdata := strings.Split(token_prefix, "://")
@@ -92,10 +92,10 @@ func (dbpool *Dbpool) Add(ctx context.Context, db string, url string, model int)
 		return errors.New("token err token=" + token_prefix)
 	}
 	token := tdata[1]
-	logger.Debugf(ctx, "token: %s", token)
+	logger.Debug(ctx, "resolved database config token", "token", token)
 	dbc := dbpool.Tset.DbConfReadGroup(token)
 	dburl := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8&parseTime=true&loc=Local", dbc["user"], dbc["pswd"], dbc["host"], dbc["port"], dbc["dtbs"])
-	logger.Debugf(ctx, "db url: %s", dburl)
+	logger.Debug(ctx, "built database connection", "host", dbc["host"], "port", dbc["port"], "database", dbc["dtbs"])
 	if model == USE_SQLX {
 		dbpool.Pools[db], err = sqlx.Connect("mysql", dburl)
 

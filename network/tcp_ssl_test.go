@@ -41,7 +41,7 @@ func TestSSlSend1(t *testing.T) {
 	rTimeout := 30 * time.Second
 	wTimeout := 30 * time.Second
 
-	logger.Debugf(ctx, "cTimeout: %d", cTimeout)
+	logger.Debug(ctx, "TLS test connection timeout", "timeout", cTimeout)
 	c := network.NewTcpSslConn("terminal.uat.planetpayment.com:40860", cTimeout, rTimeout, wTimeout, tlsConfig)
 	err = c.Open(ctx)
 	if err != nil {
@@ -76,20 +76,20 @@ func TestSSlSend1(t *testing.T) {
 	}
 
 	slen := hex.EncodeToString(head)
-	logger.Debugf(ctx, "slen: %s", slen)
+	logger.Debug(ctx, "TLS test response length header", "header", slen)
 	blen, err := strconv.ParseUint(slen, 16, 32)
 	if err != nil {
-		logger.Warnf(ctx, "err: %s", err.Error())
+		logger.Warn(ctx, "TLS test parse response length failed", "err", err)
 		return
 	}
-	logger.Debugf(ctx, "blen: %d", blen)
+	logger.Debug(ctx, "TLS test response length", "length", blen)
 	data, err := c.Readn(ctx, int(blen))
 
 	if err != nil {
 		t.Fatal(err)
 	}
 	bcdData := hex.EncodeToString(data)
-	logger.Debugf(ctx, "bcdData: %s", bcdData)
+	logger.Debug(ctx, "TLS test response", "data", bcdData)
 	c.Close(ctx)
 	c.Close(ctx)
 	c.Close(ctx)
@@ -123,7 +123,7 @@ func TestSSlSendMulti(t *testing.T) {
 	rTimeout := 30 * time.Second
 	wTimeout := 30 * time.Second
 
-	logger.Debugf(ctx, "gogo")
+	logger.Debug(ctx, "TLS test server started")
 	for i := 0; i <= 4; i++ {
 		ctx := context.WithValue(context.Background(), "trace_id", util.GenXid())
 		go func() {
@@ -142,20 +142,20 @@ func TestSSlSendMulti(t *testing.T) {
 			}
 
 			slen := hex.EncodeToString(head)
-			logger.Debugf(ctx, "slen: %s", slen)
+			logger.Debug(ctx, "TLS test response length header", "header", slen)
 			blen, err := strconv.ParseUint(slen, 16, 32)
 			if err != nil {
-				logger.Warnf(ctx, "err: %s", err.Error())
+				logger.Warn(ctx, "TLS test parse response length failed", "err", err)
 				return
 			}
-			logger.Debugf(ctx, "blen: %d", blen)
+			logger.Debug(ctx, "TLS test response length", "length", blen)
 			data, err := c.Readn(ctx, int(blen))
 
 			if err != nil {
 				t.Fatal(err)
 			}
 			bcdData := hex.EncodeToString(data)
-			logger.Debugf(ctx, "bcdData: %s", bcdData)
+			logger.Debug(ctx, "TLS test response", "data", bcdData)
 		}()
 	}
 

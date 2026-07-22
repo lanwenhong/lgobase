@@ -113,27 +113,27 @@ func TestTokenDec(t *testing.T) {
 	//key := []byte("11111111111111111111111111111111")
 	decrypted, err := aes.AESDecryptCBCSb(ctx, token, key)
 	if err != nil {
-		logger.Warnf(ctx, "err: %s", err.Error())
+		logger.Warn(ctx, "utility test decrypt failed", "err", err)
 		return
 	}
-	logger.Debugf(ctx, "%v", decrypted)
+	logger.Debug(ctx, "utility test decrypted payload", "payload", decrypted)
 	ver := uint8(decrypted[0])
-	logger.Debugf(ctx, "ver: %d", ver)
+	logger.Debug(ctx, "utility test token version", "version", ver)
 	idc := uint8(decrypted[1])
-	logger.Debugf(ctx, "idc: %d", idc)
+	logger.Debug(ctx, "utility test token IDC", "idc", idc)
 	flag := uint8(decrypted[2])
-	logger.Debugf(ctx, "flag: %d", flag)
+	logger.Debug(ctx, "utility test token flag", "flag", flag)
 	//uid := binary.BigEndian.Uint32(decrypted[3:7])
 	uid := binary.LittleEndian.Uint32(decrypted[3:7])
-	logger.Debugf(ctx, "uid: %d", uid)
+	logger.Debug(ctx, "utility test token user ID", "user_id", uid)
 	opuid := binary.LittleEndian.Uint16(decrypted[7:9])
-	logger.Debugf(ctx, "opuid: %d", opuid)
+	logger.Debug(ctx, "utility test token operator user ID", "operator_user_id", opuid)
 	expire := binary.LittleEndian.Uint32(decrypted[9:13])
-	logger.Debugf(ctx, "expire: %d", expire)
+	logger.Debug(ctx, "utility test token expiration", "expire_at", expire)
 	deadline := binary.LittleEndian.Uint32(decrypted[13:17])
-	logger.Debugf(ctx, "deadline: %d", deadline)
+	logger.Debug(ctx, "utility test token deadline", "deadline", deadline)
 	udid_len := uint8(decrypted[17])
-	logger.Debugf(ctx, "udid_len: %d", udid_len)
+	logger.Debug(ctx, "utility test device ID length", "length", udid_len)
 
 	bUlen := len(decrypted[18:])
 	udid := ""
@@ -143,7 +143,7 @@ func TestTokenDec(t *testing.T) {
 		udid = string(decrypted[18:])
 	}
 	//udid := string(decrypted[18:])
-	logger.Debugf(ctx, "udid:%s", udid)
+	logger.Debug(ctx, "utility test device ID", "device_id", udid)
 }
 
 func TestPackToken(t *testing.T) {
@@ -166,12 +166,12 @@ func TestPackToken(t *testing.T) {
 	//var uid uint64 = 66666666666
 	var uid uint64 = 66666666
 	if uid > 0xFFFFFFFF {
-		logger.Debugf(ctx, "use uint64 pack")
+		logger.Debug(ctx, "utility test pack integer", "bits", 64)
 		b_uid := make([]byte, 8)
 		binary.LittleEndian.PutUint64(b_uid, uid)
 		tkSrc = append(tkSrc, b_uid...)
 	} else {
-		logger.Debugf(ctx, "use uint32 pack")
+		logger.Debug(ctx, "utility test pack integer", "bits", 32)
 		new_uid := uint32(uid)
 		b_uid := make([]byte, 4)
 		binary.LittleEndian.PutUint32(b_uid, new_uid)
@@ -179,7 +179,7 @@ func TestPackToken(t *testing.T) {
 	}
 
 	var opuid uint16 = 16
-	logger.Debugf(ctx, "use uint16 pack")
+	logger.Debug(ctx, "utility test pack integer", "bits", 16)
 	b_uid := make([]byte, 16)
 	binary.LittleEndian.PutUint16(b_uid, opuid)
 	tkSrc = append(tkSrc, b_uid...)
@@ -221,10 +221,10 @@ func TestPackToken(t *testing.T) {
 	//rand key
 	gkey, err := aescbc.AESEncryptCBC(ctx, []byte(randStr), randKey, iv)
 	if err != nil {
-		logger.Warnf(ctx, "err: %v", err)
+		logger.Warn(ctx, "utility test derive key failed", "err", err)
 		return
 	}
-	logger.Debugf(ctx, "gkey: %s", gkey)
+	logger.Debug(ctx, "utility test derived key", "key", gkey)
 
 	k := []byte{}
 	k1 := []byte(gkey)
@@ -232,33 +232,33 @@ func TestPackToken(t *testing.T) {
 	k = append(k, k1...)
 	k = append(k, k2...)
 
-	logger.Debugf(ctx, "k len: %d", len(k))
+	logger.Debug(ctx, "utility test key length", "length", len(k))
 	//ciphertextBase64, err := aescbc.AESEncryptCBC(ctx, tkSrc, k, iv)
 	//ciphertextBase64, err := aescbc.AESEncryptCBC(ctx, k, randKey, iv)
 
-	logger.Debugf(ctx, "tkSrc len: %d", len(tkSrc))
+	logger.Debug(ctx, "utility test token source length", "length", len(tkSrc))
 	tkBody, err := aescbc.AESEncryptCBCWithNoBase64(ctx, tkSrc, k, iv)
 	if err != nil {
-		logger.Warnf(ctx, "err: %v", err)
+		logger.Warn(ctx, "utility test encrypt token failed", "err", err)
 		return
 	}
 
-	logger.Debugf(ctx, "body len: %d", len(tkBody))
+	logger.Debug(ctx, "utility test token body length", "length", len(tkBody))
 	//header
 	var ver uint32 = 1
 	if uid > 0xFFFFFFFF {
 		flag := uint32(0x01)
 		flag = flag << 31
-		logger.Debugf(ctx, "flag: %x", flag)
+		logger.Debug(ctx, "utility test token flag", "flag", flag)
 		ver = ver | flag
 	}
 	if deadline > 0xFFFFFFFF {
 		flag := uint32(0x01)
 		flag = flag << 30
-		logger.Debugf(ctx, "flag: %x", flag)
+		logger.Debug(ctx, "utility test token flag", "flag", flag)
 		ver = ver | flag
 	}
-	logger.Debugf(ctx, "ver: %x", ver)
+	logger.Debug(ctx, "utility test token version", "version", ver)
 
 	b_ver := make([]byte, 4)
 	binary.LittleEndian.PutUint32(b_ver, ver)
@@ -270,9 +270,9 @@ func TestPackToken(t *testing.T) {
 	tkEnc = append(tkEnc, b_mac...)
 
 	randInt := binary.LittleEndian.Uint16([]byte(randStr))
-	logger.Debugf(ctx, "randInt: %x", randInt)
+	logger.Debug(ctx, "utility test random integer", "value", randInt)
 	ver = ver | (uint32(randInt) << 8)
-	logger.Debugf(ctx, "ver: %x", ver)
+	logger.Debug(ctx, "utility test token version", "version", ver)
 
 	if 1 == 1 {
 		rt := (ver & uint32(0x00FFFF00)) >> 8
@@ -280,12 +280,12 @@ func TestPackToken(t *testing.T) {
 		brt := make([]byte, 2)
 		binary.LittleEndian.PutUint16(brt, rt16)
 		srt := string(brt)
-		logger.Debugf(ctx, "srt: %s", srt)
+		logger.Debug(ctx, "utility test random string", "value", srt)
 	}
 
 	tkEnc = append(tkEnc, tkBody...)
-	logger.Debugf(ctx, "tkEnc len: %d", len(tkEnc))
+	logger.Debug(ctx, "utility test encrypted token length", "length", len(tkEnc))
 
 	ciphertextBase64 := base64.StdEncoding.EncodeToString(tkEnc)
-	logger.Debugf(ctx, "ciphertextBase64: %s", ciphertextBase64)
+	logger.Debug(ctx, "utility test encoded ciphertext", "ciphertext", ciphertextBase64)
 }

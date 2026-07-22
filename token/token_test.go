@@ -25,7 +25,7 @@ func TestTokenPack(t *testing.T) {
 	}
 
 	bytes, _ := json.Marshal(tk)
-	logger.Debugf(ctx, "c: %s", string(bytes))
+	logger.Debug(ctx, "token test replacement result", "value", string(bytes))
 	tk.Pack(ctx)
 }
 
@@ -40,10 +40,10 @@ func TestTokenUnPack(t *testing.T) {
 	}
 	err := tk.UnPack(ctx, bdata)
 	if err != nil {
-		logger.Warnf(ctx, "err: %s", err.Error())
+		logger.Warn(ctx, "token test unpack failed", "err", err)
 		t.Fatal(err)
 	}
-	logger.Debugf(ctx, "tk: %v", tk)
+	logger.Debug(ctx, "token test unpack result", "token", tk)
 }
 
 func TestTokenReplace(t *testing.T) {
@@ -55,10 +55,10 @@ func TestTokenReplace(t *testing.T) {
 	}
 	b := tk.PackReplace(ctx, a)
 
-	logger.Debugf(ctx, "b: %s len: %d", b, len(b))
+	logger.Debug(ctx, "token test packed value", "value", b, "length", len(b))
 
 	a = tk.UnpackReplace(ctx, b)
-	logger.Debugf(ctx, "a: %s len: %d", a, len(a))
+	logger.Debug(ctx, "token test unpacked value", "value", a, "length", len(a))
 }
 
 func TestUnpackReplace(t *testing.T) {
@@ -69,7 +69,7 @@ func TestUnpackReplace(t *testing.T) {
 	}
 
 	b := tk.UnpackReplace(ctx, a)
-	logger.Debugf(ctx, "b: %s", b)
+	logger.Debug(ctx, "token test packed value", "value", b)
 }
 
 func TestUnpackOld(t *testing.T) {

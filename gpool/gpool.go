@@ -180,6 +180,20 @@ func (gp *Gpool[T]) IdleCount() int {
 	return gp.idle.Len()
 }
 
+// InUseCount returns the number of connections currently borrowed by callers.
+func (gp *Gpool[T]) InUseCount() int {
+	gp.mutex.Lock()
+	defer gp.mutex.Unlock()
+	return gp.inUse
+}
+
+// WaiterCount returns the number of callers queued for a connection.
+func (gp *Gpool[T]) WaiterCount() int {
+	gp.mutex.Lock()
+	defer gp.mutex.Unlock()
+	return gp.waiters.Len()
+}
+
 // closeConnectionLocked synchronously closes a connection without holding the
 // pool mutex. The connection keeps occupying capacity until Close returns. The
 // function returns with gp.mutex locked.
@@ -223,7 +237,7 @@ func (gp *Gpool[T]) getConnFromIdle(ctx context.Context) (*PoolConn[T], error) {
 
 	if !pc.Gc.IsOpen() || isMaxConnLife || isMaxIdleConnLife {
 		// reterr = pc.Gc.Open()
-		logger.Info(ctx, "gpool", "func", "reopen", "ctime", pc.Ctime, "idle", pc.IdleTime, "connNow", connNow, "MaxConnLife", gp.MaxConnLife, "MaxIdleConnLife", gp.MaxIdleConnLife)
+		logger.Info(ctx, "reopen RPC pool connection", "created_at", pc.Ctime, "idle_since", pc.IdleTime, "now", connNow, "max_lifetime", gp.MaxConnLife, "max_idle_lifetime", gp.MaxIdleConnLife)
 		gp.closeConnectionLocked(ctx, pc)
 		//connNew, err := gp.getConnFromNew(ctx)
 		connNew, err := gp.getConnFromNewForUse(ctx)

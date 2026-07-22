@@ -142,7 +142,7 @@ func (rrps *RpcPoolRuleSelector[T]) ParseRule(ctx context.Context) error {
 		SortMapKeys: true,
 	}
 	jRuleSet, _ := config.Froze().Marshal(rrps.rlist)
-	logger.Debug(ctx, "rule config", "rule_set", json.RawMessage((string(jRuleSet))))
+	logger.Debug(ctx, "built RPC selector rule set", "rule_set", json.RawMessage((string(jRuleSet))))
 
 	Rdata, errJ := pkg.ParseJSONRuleset([]byte(jRuleSet))
 	if errJ != nil {

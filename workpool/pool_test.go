@@ -27,7 +27,7 @@ func TestConsumer(t *testing.T) {
 		}
 
 		ret, _ := task.WaitRet(ctx)
-		logger.Debugf(ctx, "ret: %v", ret)
+		logger.Debug(ctx, "work pool test result", "result", ret)
 	}
 
 	wp.Kill(ctx)

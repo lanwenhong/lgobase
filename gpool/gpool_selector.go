@@ -119,7 +119,7 @@ func (rps *RpcPoolSelector[T]) RpcPoolInit(ctx context.Context, g_conf *GPoolCon
 					err := rps_pool.Gp.ThriftCall2(ctx, g_conf.Ping)
 					if err == nil {
 						rps_pool.SetStat(selector.SVR_VALID)
-						logger.Info(ctx, "gpool", "addr", rps_pool.GetAddr(), "state", "recover")
+						logger.Info(ctx, "RPC server recovered", "addr", rps_pool.GetAddr(), "port", rps_pool.GetPort())
 					} else {
 						/*if ticker == nil {
 							ticker = time.NewTicker(time.Duration(g_conf.PingTicker) * time.Second)
@@ -136,7 +136,7 @@ func (rps *RpcPoolSelector[T]) RpcPoolInit(ctx context.Context, g_conf *GPoolCon
 							err := rps_pool.Gp.ThriftCall2(ctx, g_conf.Ping)
 							if err == nil {
 								rps_pool.SetStat(selector.SVR_VALID)
-								logger.Info(ctx, "gpool", "addr", rps_pool.GetAddr(), "state", "recover")
+								logger.Info(ctx, "RPC server recovered", "addr", rps_pool.GetAddr(), "port", rps_pool.GetPort())
 							} else {
 								logger.Warn(ctx, "rpc server ping failed", "addr", rps_pool.GetAddr(), "port", rps_pool.GetPort(), "err", err)
 							}

@@ -86,7 +86,7 @@ func (gcf *Gconf) getIkExd(line_key string, ex_key string, exd_line string, re *
 	if len(match) >= 3 {
 		k := strings.TrimSpace(match[1])
 		v := strings.TrimSpace(match[2])
-		logger.Debug(ctx, "gconfig", "key", k, "value", v)
+		logger.Debug(ctx, "loaded config entry", "key", k, "value", v)
 		if _, ok := gcf.GlineExtend[line_key][ex_key]; ok {
 			exDataLen := len(gcf.GlineExtend[line_key][ex_key])
 			if *newLineTag {
@@ -99,7 +99,7 @@ func (gcf *Gconf) getIkExd(line_key string, ex_key string, exd_line string, re *
 			}
 		} else {
 			if _, ok := gcf.GlineExtend[line_key]; ok {
-				logger.Debug(ctx, "gconfig", "k", gcf.GlineExtend[line_key])
+				logger.Debug(ctx, "loaded extended config entry", "key", line_key, "value", gcf.GlineExtend[line_key])
 				oneMap := make(map[string]string)
 				oneMap[k] = v
 				xval := make([]map[string]string, 0)
@@ -156,12 +156,12 @@ func (gcf *Gconf) DoConfParse(ctx context.Context, br *bufio.Reader) error {
 			//处理注释掉的行
 			if mk == "" {
 				//fmt.Printf("%s note\n", sline)
-				logger.Debugf(ctx, "%s note", sline)
+				logger.Debug(ctx, "skip config comment", "line", sline)
 				imap = nil
 			} else {
 				mkey = mk
 				//fmt.Printf("mk: %s\n", mkey)
-				logger.Debugf(ctx, "mk: %s", mkey)
+				logger.Debug(ctx, "parse config section", "section", mkey)
 				//imap = make(map[string]string)
 				imap = make(map[string][]string)
 				gcf.Gcf[mkey] = imap
@@ -170,7 +170,7 @@ func (gcf *Gconf) DoConfParse(ctx context.Context, br *bufio.Reader) error {
 			//parse line
 			if imap == nil {
 				//fmt.Printf("%s not found section\n", sline)
-				logger.Debugf(ctx, "%s not found section", sline)
+				logger.Debug(ctx, "config entry has no section", "line", sline)
 				continue
 			}
 			k, v, err := gcf.getIk(sline, ireg)
@@ -180,11 +180,11 @@ func (gcf *Gconf) DoConfParse(ctx context.Context, br *bufio.Reader) error {
 			//处理注释掉的行
 			if k == "" {
 				//fmt.Printf("%s note\n", sline)
-				logger.Debugf(ctx, "%s note", sline)
+				logger.Debug(ctx, "skip config comment", "line", sline)
 				continue
 			}
 			//fmt.Printf("k=%s v=%s\n", k, v)
-			logger.Debugf(ctx, "k=%s v=%s", k, v)
+			logger.Debug(ctx, "parse config key-value", "key", k, "value", v)
 			//imap[k] = v
 			imap[k] = append(imap[k], v)
 			line_key = k
@@ -197,7 +197,7 @@ func (gcf *Gconf) DoConfParse(ctx context.Context, br *bufio.Reader) error {
 
 		} else {
 			//fmt.Println("no match continue")
-			logger.Debugf(ctx, "no match continue")
+			logger.Debug(ctx, "skip unmatched config line", "line", sline)
 		}
 	}
 	//fmt.Println(gcf.Gcf)
@@ -212,7 +212,7 @@ func (gcf *Gconf) GconfParse() error {
 	fi, err := os.Open(gcf.file)
 	if err != nil {
 		//fmt.Printf("read err %s", err.Error())
-		logger.Warnf(ctx, "read err %s", err.Error())
+		logger.Warn(ctx, "read config file failed", "filename", gcf.file, "err", err)
 		return nil
 	}
 	defer fi.Close()

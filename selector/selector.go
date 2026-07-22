@@ -1,11 +1,13 @@
 package selector
 
 import (
+	"context"
 	"errors"
-	"fmt"
 	"strconv"
 	"strings"
 	"sync/atomic"
+
+	"github.com/lanwenhong/lgobase/logger"
 )
 
 const (
@@ -122,7 +124,7 @@ func (s *Selector) SparseAddr(pstr string) error {
 func (s *Selector) SparseRedisAddr(pstr []string) error {
 	s.Slist = make([]SvrAddr, len(pstr))
 	for i := 0; i < len(pstr); i++ {
-		fmt.Printf("url: %s\n", pstr[i])
+		logger.Debug(context.Background(), "configure Redis selector node", "url", pstr[i], "index", i)
 		//bs := NewSvr()
 		bs := &BaseSvr{}
 		bs.SetAddr(pstr[i])

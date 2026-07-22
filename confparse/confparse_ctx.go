@@ -48,10 +48,10 @@ func (cp *Cparse) parseBaseTagWithCtx(ctx context.Context, v reflect.StructField
 	cpos := v.Tag.Get(CP_TAG_POS)
 	if cpos == "" {
 		fmt_e := fmt.Sprintf("tag: %s not exist", CP_TAG_POS)
-		logger.Warnf(ctx, "err: %s", fmt_e)
+		logger.Warn(ctx, "parse config struct tag failed", "tag", CP_TAG_POS, "err", fmt_e)
 		return "", "", errors.New(fmt_e)
 	}
-	logger.Debugf(ctx, "cpos: %s", cpos)
+	logger.Debug(ctx, "parsed config position tag", "position", cpos)
 	//fmt.Printf("cpos: %s\n", cpos)
 	slist := strings.Split(cpos, ":")
 	return slist[0], slist[1], nil
@@ -61,10 +61,10 @@ func (cp *Cparse) parseMapTagWithCtx(ctx context.Context, v reflect.StructField)
 	cpos := v.Tag.Get(CP_TAG_POS)
 	if cpos == "" {
 		fmt_e := fmt.Sprintf("tag: %s not exist", CP_TAG_POS)
-		logger.Warnf(ctx, "err: %s", fmt_e)
+		logger.Warn(ctx, "parse config struct tag failed", "tag", CP_TAG_POS, "err", fmt_e)
 		return "", "", "", "", errors.New(fmt_e)
 	}
-	logger.Debugf(ctx, "cpos: %s", cpos)
+	logger.Debug(ctx, "parsed config position tag", "position", cpos)
 	//fmt.Printf("cpos: %s\n", cpos)
 	slist := strings.Split(cpos, ":")
 	se := slist[0]
@@ -73,14 +73,14 @@ func (cp *Cparse) parseMapTagWithCtx(ctx context.Context, v reflect.StructField)
 	is := v.Tag.Get(CP_TAG_ITEM_SPLIT)
 	if is == "" {
 		fmt_e := fmt.Sprintf("tag: %s not exist", CP_TAG_ITEM_SPLIT)
-		logger.Warnf(ctx, "err: %s", fmt_e)
+		logger.Warn(ctx, "parse config struct tag failed", "tag", CP_TAG_ITEM_SPLIT, "err", fmt_e)
 		return "", "", "", "", errors.New(fmt_e)
 	}
 
 	ks := v.Tag.Get(CP_TAG_KV_SPLIT)
 	if ks == "" {
 		fmt_e := fmt.Sprintf("tag: %s not exist", CP_TAG_KV_SPLIT)
-		logger.Warnf(ctx, "err: %s", fmt_e)
+		logger.Warn(ctx, "parse config struct tag failed", "tag", CP_TAG_KV_SPLIT, "err", fmt_e)
 		return "", "", "", "", errors.New(fmt_e)
 	}
 
@@ -91,10 +91,10 @@ func (cp *Cparse) parseSliceTagWithCtx(ctx context.Context, v reflect.StructFiel
 	cpos := v.Tag.Get(CP_TAG_POS)
 	if cpos == "" {
 		fmt_e := fmt.Sprintf("tag: %s not exist", CP_TAG_POS)
-		logger.Warnf(ctx, "err: %s", fmt_e)
+		logger.Warn(ctx, "parse config struct tag failed", "tag", CP_TAG_POS, "err", fmt_e)
 		return "", "", "", errors.New(fmt_e)
 	}
-	logger.Debugf(ctx, "cpos: %s", cpos)
+	logger.Debug(ctx, "parsed config position tag", "position", cpos)
 
 	//fmt.Printf("cpos: %s\n", cpos)
 	slist := strings.Split(cpos, ":")
@@ -104,7 +104,7 @@ func (cp *Cparse) parseSliceTagWithCtx(ctx context.Context, v reflect.StructFiel
 	is := v.Tag.Get(CP_TAG_ITEM_SPLIT)
 	if is == "" {
 		fmt_e := fmt.Sprintf("tag: %s not exist", CP_TAG_ITEM_SPLIT)
-		logger.Warnf(ctx, "err: %s", fmt_e)
+		logger.Warn(ctx, "parse config struct tag failed", "tag", CP_TAG_ITEM_SPLIT, "err", fmt_e)
 		return "", "", "", errors.New(fmt_e)
 	}
 	return se, k, is, nil
@@ -120,7 +120,7 @@ func (cp *Cparse) getDatafromIniWithCtx(ctx context.Context, section string, key
 		word, ok := item[key]
 		if !ok {
 			fmt_e := fmt.Sprintf("section %s key %s not exist", section, key)
-			logger.Warnf(ctx, fmt_e)
+			logger.Warn(ctx, "config key not found", "section", section, "key", key, "err", fmt_e)
 			return "", errors.New(fmt_e)
 		}
 		//return word, nil
@@ -145,7 +145,7 @@ func (cp *Cparse) parseIntWithCtx(ctx context.Context, v reflect.Value, tv refle
 		return err
 	}
 	//fmt.Printf("section: %s key: %s\n", section, key)
-	logger.Debugf(ctx, "section: %s key: %s", section, key)
+	logger.Debug(ctx, "parse config field", "section", section, "key", key)
 
 	word, err := cp.getDatafromIniWithCtx(ctx, section, key, cfg)
 	if err != nil {
@@ -168,7 +168,7 @@ func (cp *Cparse) parseUintWithCtx(ctx context.Context, v reflect.Value, tv refl
 	if err != nil {
 		return err
 	}
-	logger.Debugf(ctx, "section: %s key: %s", section, key)
+	logger.Debug(ctx, "parse config field", "section", section, "key", key)
 	//fmt.Printf("section: %s key: %s\n", section, key)
 	word, err := cp.getDatafromIniWithCtx(ctx, section, key, cfg)
 	if err != nil {
@@ -191,7 +191,7 @@ func (cp *Cparse) parseFloatWithCtx(ctx context.Context, v reflect.Value, tv ref
 	if err != nil {
 		return err
 	}
-	logger.Debugf(ctx, "section: %s key: %s", section, key)
+	logger.Debug(ctx, "parse config field", "section", section, "key", key)
 
 	//fmt.Printf("section: %s key: %s\n", section, key)
 	word, err := cp.getDatafromIniWithCtx(ctx, section, key, cfg)
@@ -207,7 +207,7 @@ func (cp *Cparse) parseDurationWithCtx(ctx context.Context, v reflect.Value, tv 
 		return err
 	}
 	//fmt.Printf("section: %s key: %s\n", section, key)
-	logger.Debugf(ctx, "section: %s key: %s", section, key)
+	logger.Debug(ctx, "parse config field", "section", section, "key", key)
 
 	word, err := cp.getDatafromIniWithCtx(ctx, section, key, cfg)
 	if err != nil {
@@ -236,7 +236,7 @@ func (cp *Cparse) parseStringWithCtx(ctx context.Context, v reflect.Value, tv re
 	}
 	//fmt.Printf("section: %s key: %s\n", section, key)
 
-	logger.Debugf(ctx, "section: %s key: %s", section, key)
+	logger.Debug(ctx, "parse config field", "section", section, "key", key)
 
 	word, err := cp.getDatafromIniWithCtx(ctx, section, key, cfg)
 	if err != nil {
@@ -259,7 +259,7 @@ func (cp *Cparse) parseBoolWithCtx(ctx context.Context, v reflect.Value, tv refl
 	if err != nil {
 		return err
 	}
-	logger.Debugf(ctx, "section: %s key: %s", section, key)
+	logger.Debug(ctx, "parse config field", "section", section, "key", key)
 
 	word, err := cp.getDatafromIniWithCtx(ctx, section, key, cfg)
 	if err != nil {
@@ -404,7 +404,7 @@ func (cp *Cparse) parseMapWithCtx(ctx context.Context, v reflect.Value, tv refle
 	//logger.Debufg(ctx, "section: %s key: %s", section, key)
 
 	//fmt.Printf("se: %s k: %s is: %s kvs: %s\n", se, k, is, kvs)
-	logger.Debugf(ctx, "se: %s k: %s is: %s kvs: %s", se, k, is, kvs)
+	logger.Debug(ctx, "parse config map field", "section", se, "key", k, "item_split", is, "kv_split", kvs)
 
 	word, err := cp.getDatafromIni(se, k, cfg)
 	if err != nil {
@@ -448,7 +448,7 @@ func (cp *Cparse) isUserSelfParseWithCtx(ctx context.Context, tv reflect.StructF
 		//fmt_e := fmt.Sprintf("tag: %s not exist", CP_TAG_DTYPE)
 		//logger.Warnf(ctx, "err: %s", fmt_e)
 		//return errors.New(fmt_e), false
-		logger.Debugf(ctx, "tag: %s not found", CP_TAG_DTYPE)
+		logger.Debug(ctx, "config data type tag not found", "tag", CP_TAG_DTYPE)
 		return nil, true
 	}
 
@@ -459,7 +459,7 @@ func (cp *Cparse) isUserSelfParseWithCtx(ctx context.Context, tv reflect.StructF
 		return nil, true
 	} else {
 		fmt_e := fmt.Sprintf("dtype val %s not exist", dtype)
-		logger.Warnf(ctx, "err: %s", fmt_e)
+		logger.Warn(ctx, "parse config field failed", "err", fmt_e)
 		return errors.New(fmt_e), false
 	}
 	return errors.New("unknown error"), false

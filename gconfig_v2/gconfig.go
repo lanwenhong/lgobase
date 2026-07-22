@@ -89,7 +89,7 @@ func (asn *AstNode) GetIndent(ctx context.Context) int {
 func NewParseYaml(file string) *ParseYaml {
 	content, err := os.ReadFile(file)
 	if err != nil {
-		fmt.Println("读取文件失败:", err)
+		logger.Warn(context.Background(), "read YAML config failed", "filename", file, "err", err)
 		return nil
 	}
 	return newParseYaml(file, content)
@@ -487,7 +487,7 @@ func (py *ParseYaml) feedSlice(ctx context.Context, line string, group []string,
 
 	if k == "" {
 		errMsg := fmt.Sprintf("parse line:%s key is empty", line)
-		logger.Warn(ctx, "gconfig_v2", "err", errMsg)
+		logger.Warn(ctx, "parse YAML slice failed", "line", line, "reason", "empty_key", "err", errMsg)
 		return errors.New(errMsg)
 	}
 
@@ -505,7 +505,7 @@ func (py *ParseYaml) feedSlice(ctx context.Context, line string, group []string,
 		}
 	}
 
-	logger.Debug(ctx, "gconfig_v2", "k", k, "v", v)
+	logger.Debug(ctx, "parse YAML slice entry", "key", k, "value", v, "indent", indent)
 	if k != "" && v == "" && split != "" {
 		node := &AstNode{
 			line:     line,
@@ -533,7 +533,7 @@ func (py *ParseYaml) feedSlice(ctx context.Context, line string, group []string,
 		node.m[k] = token
 		pNode.s = append(pNode.s, node)
 	} else if k != "" && v == "" && split == "" {
-		logger.Debug(ctx, "gconfig_v2", "k", k)
+		logger.Debug(ctx, "parse YAML scalar slice entry", "value", k, "indent", indent)
 		token, tokenErr := py.newParsedToken(ctx, line, "", k, indent, false)
 		if tokenErr != nil {
 			return tokenErr
@@ -541,7 +541,7 @@ func (py *ParseYaml) feedSlice(ctx context.Context, line string, group []string,
 		pNode.s = append(pNode.s, token)
 	} else {
 		err = py.errLine(line)
-		logger.Warn(ctx, "gconfig_v2", "err", err.Error())
+		logger.Warn(ctx, "parse YAML slice failed", "line", line, "err", err)
 	}
 	return err
 }
@@ -554,7 +554,7 @@ func (py *ParseYaml) feedMapValue(ctx context.Context, line, k, v string, pNode 
 	switch pNode.nodeType {
 	case NODE_TYPE_UNKNOWN:
 		pNode.nodeType = NODE_TYPE_MAP
-		logger.Debug(ctx, "gconfig_v2", "line", line, "pline", pNode.line, "pNode", pNode.nodeType)
+		logger.Debug(ctx, "initialize YAML map node", "line", line, "parent_line", pNode.line, "node_type", pNode.nodeType)
 		return py.putMapItem(line, k, pNode.m, token)
 	case NODE_TYPE_MAP:
 		return py.putMapItem(line, k, pNode.m, token)
@@ -724,7 +724,7 @@ func (py *ParseYaml) parse(ctx context.Context) (map[string]interface{}, error) 
 				return nil, matchErr
 			}
 			if match {
-				logger.Debug(ctx, "gconfig_v2", "line", line, "indent", indent)
+				logger.Debug(ctx, "parse YAML line", "line", line, "indent", indent)
 				if feature, ok := py.unsupportedMapKey(lk); ok {
 					err = errUnsupportedYAMLFeature(feature)
 				} else if feature, ok := unsupportedPlainScalar(lv); ok {
@@ -742,7 +742,7 @@ func (py *ParseYaml) parse(ctx context.Context) (map[string]interface{}, error) 
 				}
 			} else {
 				err = py.errLine(line)
-				logger.Warn(ctx, "gconfig_v2", "err", err.Error())
+				logger.Warn(ctx, "parse YAML line failed", "line", line, "err", err)
 			}
 		} else {
 			body := strings.TrimSpace(strings.TrimPrefix(trimmed, "- "))
@@ -796,7 +796,7 @@ func (py *ParseYaml) parse(ctx context.Context) (map[string]interface{}, error) 
 					}
 				} else {
 					err = py.errLine(line)
-					logger.Warn(ctx, "gconfig_v2", "err", err.Error())
+					logger.Warn(ctx, "parse YAML document failed", "err", err)
 				}
 			}
 		}

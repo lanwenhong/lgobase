@@ -30,13 +30,13 @@ func SvrSign(ctx context.Context, data map[string]string, key string) string {
 	}
 	sdata := strings.Join(dlist, "&") + key
 
-	logger.Debugf(ctx, "===server sign data: %s", sdata)
+	logger.Debug(ctx, "build server signature input", "data", sdata)
 	md5Ctx := md5.New()
 	md5Ctx.Write([]byte(sdata))
 	cipherStr := md5Ctx.Sum(nil)
 
 	sign := hex.EncodeToString(cipherStr)
-	logger.Debugf(ctx, "===server sign: %s", sign)
+	logger.Debug(ctx, "generated server signature", "signature", sign)
 	return sign
 }
 
@@ -57,14 +57,14 @@ func SvrVerify(ctx context.Context, data map[string]string, key string) error {
 	}
 	sdata := strings.Join(dlist, "&") + key
 
-	logger.Debugf(ctx, "===server check sign data: %s", sdata)
+	logger.Debug(ctx, "build server signature verification input", "data", sdata)
 
 	md5Ctx := md5.New()
 	md5Ctx.Write([]byte(sdata))
 	cipherStr := md5Ctx.Sum(nil)
 
 	s_sign := hex.EncodeToString(cipherStr)
-	logger.Debugf(ctx, "s_sign: %s c_sign: %s", s_sign, c_sign)
+	logger.Debug(ctx, "compare server signature", "server_signature", s_sign, "client_signature", c_sign)
 	if c_sign != s_sign {
 		return errors.New("sever verify error")
 	}
@@ -75,20 +75,20 @@ func AesCbcDec(ctx context.Context, key string, enc string, iv string) ([]byte, 
 	bkey := []byte(key)
 	benc, _ := hex.DecodeString(iv + enc)
 
-	logger.Debugf(ctx, "bkey: %s len: %d", bkey, len(bkey))
+	logger.Debug(ctx, "decode AES-CBC key", "key", bkey, "length", len(bkey))
 	block, err := aes.NewCipher(bkey)
 	if err != nil {
-		logger.Warnf(ctx, "aes key %s init: %s", key, err.Error())
+		logger.Warn(ctx, "initialize AES-CBC cipher failed", "key", key, "err", err)
 		return []byte(""), err
 	}
 	if len(benc) < aes.BlockSize {
-		logger.Warnf(ctx, "ciphertext too short")
+		logger.Warn(ctx, "decrypt AES-CBC payload failed", "reason", "ciphertext_too_short")
 		return []byte(""), errors.New("ciphertext too short")
 	}
 	ivc := benc[:aes.BlockSize]
 	benc = benc[aes.BlockSize:]
 	if len(benc)%aes.BlockSize != 0 {
-		logger.Warnf(ctx, "ciphertext is not a multiple of the block size")
+		logger.Warn(ctx, "decrypt AES-CBC payload failed", "reason", "invalid_block_size", "ciphertext_length", len(benc), "block_size", aes.BlockSize)
 		return []byte(""), errors.New("ciphertext is not a multiple of the block size")
 	}
 	mode := cipher.NewCBCDecrypter(block, ivc)
@@ -153,7 +153,7 @@ func (x *ecbDecrypter) CryptBlocks(dst, src []byte) {
 func AesEcbDecrypt(ctx context.Context, crypted, key []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		logger.Warnf(ctx, "err is:", err)
+		logger.Warn(ctx, "initialize AES-ECB cipher failed", "err", err)
 		return nil, err
 	}
 	blockMode := NewECBDecrypter(block)
@@ -173,7 +173,7 @@ func AesEcbEncrypt(ctx context.Context, src, key []byte) ([]byte, error) {
 	ecb := NewECBEncrypter(block)
 	content := []byte(src)
 	content = PKCS5Padding(content, block.BlockSize())
-	logger.Debugf(ctx, "content: %x\n", content)
+	logger.Debug(ctx, "encrypted AES-ECB payload", "content_hex", fmt.Sprintf("%x", content))
 	crypted := make([]byte, len(content))
 	ecb.CryptBlocks(crypted, content)
 	return crypted, nil
@@ -241,7 +241,7 @@ func (aescbc *AesCbc) AESEncryptCBC(ctx context.Context, plaintext []byte, key [
 		return "", err
 	}
 
-	logger.Debugf(ctx, "plaintext len: %d", len(plaintext))
+	logger.Debug(ctx, "encrypt AES-CBC payload", "plaintext_length", len(plaintext))
 	// 填充明文
 	plaintext = aescbc.PKCS7Padding(ctx, plaintext, block.BlockSize())
 
@@ -260,7 +260,7 @@ func (aescbc *AesCbc) AESEncryptCBC(ctx context.Context, plaintext []byte, key [
 	//mode.CryptBlocks(ciphertext[aes.BlockSize:], plaintext)
 	mode.CryptBlocks(ciphertext, plaintext)
 
-	logger.Debugf(ctx, "ciphertext len: %d", len(ciphertext))
+	logger.Debug(ctx, "encrypted AES-CBC payload", "ciphertext_length", len(ciphertext))
 	// 返回Base64编码的结果（IV+密文）
 	return base64.StdEncoding.EncodeToString(ciphertext), nil
 }
@@ -319,7 +319,7 @@ func (aescbc *AesCbc) AESDecryptCBCWithNoBase64(ctx context.Context, ciphertext 
 		return nil, err
 	}*/
 
-	logger.Debugf(ctx, "ciphertext len: %d", len(ciphertext))
+	logger.Debug(ctx, "decrypt AES-CBC payload", "ciphertext_length", len(ciphertext))
 	// 检查数据长度
 	if len(ciphertext) < aes.BlockSize {
 		return nil, fmt.Errorf("密文长度过短，至少需要 %d 字节", aes.BlockSize)
@@ -368,7 +368,7 @@ func (aescbc *AesCbc) AESDecryptCBCSb(ctx context.Context, ciphertextBase64 stri
 		return nil, err
 	}
 
-	logger.Debugf(ctx, "ciphertext len: %d", len(ciphertext))
+	logger.Debug(ctx, "decrypt AES-CBC payload", "ciphertext_length", len(ciphertext))
 	// 检查数据长度
 	if len(ciphertext) < aes.BlockSize {
 		return nil, fmt.Errorf("密文长度过短，至少需要 %d 字节", aes.BlockSize)
@@ -425,7 +425,7 @@ func (aescbc *AesCbc) AESDecryptCBC(ctx context.Context, ciphertextBase64 string
 		return nil, err
 	}
 
-	logger.Debugf(ctx, "ciphertext len: %d", len(ciphertext))
+	logger.Debug(ctx, "decrypt AES-CBC payload", "ciphertext_length", len(ciphertext))
 	// 检查数据长度
 	if len(ciphertext) < aes.BlockSize {
 		return nil, fmt.Errorf("密文长度过短，至少需要 %d 字节", aes.BlockSize)

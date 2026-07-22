@@ -4,7 +4,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 
 	//"github.com/lanwenhong/lgobase/gpool/gen-go/echo"
 	"github.com/lanwenhong/lgobase/gpool/gen-go/example"
@@ -33,7 +32,7 @@ func main() {
 	ctx := context.Background()
 	transport, err := thrift.NewTServerSocket(":9899")
 	if err != nil {
-		fmt.Println(err.Error())
+		logger.Error(ctx, "create example Thrift server socket failed", "addr", ":9899", "err", err)
 	}
 	handler := &ExampleServer{}
 	processor := example.NewExampleProcessor(handler)
@@ -47,6 +46,6 @@ func main() {
 	)
 	logger.Debug(ctx, "start thrift server", "port", 9899, "transport", "framed", "protocol", "binary")
 	if err = server.Serve(); err != nil {
-		fmt.Println(err.Error())
+		logger.Error(ctx, "serve example Thrift server failed", "addr", ":9899", "err", err)
 	}
 }

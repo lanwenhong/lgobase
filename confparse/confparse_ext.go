@@ -116,10 +116,10 @@ func (ec *ExtendConf) MapToStruct(data map[string]string, obj interface{}) error
 
 func (ec *ExtendConf) ParseExtStru(ctx context.Context, stru interface{}, cfg *config.Gconf) error {
 	if v, ok := cfg.GlineExtend[ec.Sk]; ok {
-		logger.Debug(ctx, "confparse extend", "v", v)
+		logger.Debug(ctx, "parse extended config", "section", ec.Sk, "key", ec.Key, "values", v)
 		if vlist, ok := v[ec.Key]; ok {
 			if ec.Index >= len(vlist) {
-				logger.Warn(ctx, "confparse extend error", "ec.Index", ec.Index, "vlist len", len(vlist))
+				logger.Warn(ctx, "parse extended config failed", "section", ec.Sk, "key", ec.Key, "index", ec.Index, "value_count", len(vlist), "reason", "index_out_of_range")
 				return fmt.Errorf("Index: %d vlen: %d", ec.Index, len(vlist))
 
 			}

@@ -17,10 +17,10 @@ func TestEcho(t *testing.T) {
 	ctx := context.WithValue(context.Background(), "trace_id", util.GenXid())
 	a := "sssssssssssssss"
 	alen := len(a)
-	logger.Debugf(ctx, "alen: %d", alen)
+	logger.Debug(ctx, "TCP test payload length", "length", alen)
 	slen := fmt.Sprintf("%04X", alen)
 
-	logger.Debugf(ctx, "slen: %s", slen)
+	logger.Debug(ctx, "TCP test length header", "header", slen)
 
 	header, _ := hex.DecodeString(slen)
 	b := []byte{}

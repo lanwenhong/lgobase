@@ -78,15 +78,14 @@ func TestGparse(t *testing.T) {
 }
 
 func buildRule(ctx context.Context, ex map[string]map[string][]map[string]string) error {
-	logger.Debugf(ctx, "ex: %v", ex)
+	logger.Debug(ctx, "config rule test extensions", "extensions", ex)
 
 	server := "test1"
 	c_test1 := ex[server]
 	lcr := []GConfRule{}
 	i := 0
 	for k, v := range c_test1 {
-		logger.Debugf(ctx, "k: %s", k)
-		logger.Debugf(ctx, "v: %s", v)
+		logger.Debug(ctx, "config rule test entry", "key", k, "value", v)
 		for _, iv := range v {
 			cr := GConfRule{}
 			cr.Name = fmt.Sprintf("%s%d", server, i)
@@ -96,7 +95,7 @@ func buildRule(ctx context.Context, ex map[string]map[string][]map[string]string
 			s, _ := strconv.Atoi(iv["Salience"])
 			cr.Salience = s
 			setRet := fmt.Sprintf("R.Set('%s')", k)
-			logger.Debugf(ctx, "setRet: %s", setRet)
+			logger.Debug(ctx, "config rule test action", "action", setRet)
 			cr.RuleThen = []string{
 				setRet,
 				`Complete()`,
@@ -112,20 +111,20 @@ func buildRule(ctx context.Context, ex map[string]map[string][]map[string]string
 		s, _ := strconv.Atoi(v[0][1])
 		cr.Salience = s
 		setRet := fmt.Sprintf("R.Set('%s')", k)
-		logger.Debugf(ctx, "setRet: %s", setRet)
+		logger.Debug(ctx, "config rule test action", "action", setRet)
 		cr.RuleThen = []string{
 			setRet,
 			`Complete()`,
 		}
 		lcr = append(lcr, cr)*/
 	}
-	logger.Debugf(ctx, "lcr: %v", lcr)
+	logger.Debug(ctx, "config rule test rules", "rules", lcr)
 
 	config := jsoniter.Config{
 		SortMapKeys: true,
 	}
 	jRuleSet, _ := config.Froze().Marshal(lcr)
-	logger.Debugf(ctx, "rule set: %s", jRuleSet)
+	logger.Debug(ctx, "config rule test rule set", "rule_set", string(jRuleSet))
 
 	trade := Trade{
 		Busicd: "1000",
@@ -133,7 +132,7 @@ func buildRule(ctx context.Context, ex map[string]map[string][]map[string]string
 	}
 
 	pTrade, _ := json.Marshal(trade)
-	logger.Debugf(ctx, "pTrade: %s", string(pTrade))
+	logger.Debug(ctx, "config rule test payload", "payload", string(pTrade))
 
 	dataContext := ast.NewDataContext()
 	dataContext.AddJSON("trade", []byte(pTrade))
@@ -142,7 +141,7 @@ func buildRule(ctx context.Context, ex map[string]map[string][]map[string]string
 
 	Rdata, errJ := pkg.ParseJSONRuleset([]byte(jRuleSet))
 	if errJ != nil {
-		logger.Warnf(ctx, "errJ: %s", errJ.Error())
+		logger.Warn(ctx, "config rule test parse failed", "err", errJ)
 		return errJ
 	}
 	kl := ast.NewKnowledgeLibrary()
@@ -151,7 +150,7 @@ func buildRule(ctx context.Context, ex map[string]map[string][]map[string]string
 	//rb.MustBuildRuleFromResource(gFlag, "0.0.1", pkg.NewBytesResource([]byte(Rdata)))
 	err := rb.BuildRuleFromResource(gFlag, "0.0.1", pkg.NewBytesResource([]byte(Rdata)))
 	if err != nil {
-		logger.Warnf(ctx, "err: %v", err)
+		logger.Warn(ctx, "config rule test build failed", "err", err)
 		return err
 	}
 	kb, err := kl.NewKnowledgeBaseInstance(gFlag, "0.0.1")
@@ -161,9 +160,9 @@ func buildRule(ctx context.Context, ex map[string]map[string][]map[string]string
 	if err != nil {
 		return err
 	}
-	logger.Debugf(ctx, "ret: %v", rRet)
+	logger.Debug(ctx, "config rule test result", "result", rRet)
 	/*for _, e := range ruleEntries {
-		logger.Debugf(ctx, "server select: %s", e.RuleDescription)
+		logger.Debug(ctx, "config rule test selected server", "description", e.RuleDescription)
 	}*/
 
 	//logger.Debugf(ctx, "when: %s", ex[0])
@@ -221,7 +220,7 @@ func TestGConfRule(t *testing.T) {
 	trade.STxamt = strconv.Itoa(trade.Txamt)
 
 	pTrade, _ := json.Marshal(trade)
-	logger.Debugf(ctx, "pTrade: %s", string(pTrade))
+	logger.Debug(ctx, "config rule test payload", "payload", string(pTrade))
 	gcr.SvrSelectFromJson(ctx, string(pTrade), "trade")
 }
 
@@ -286,7 +285,7 @@ func TestWithDataContext(t *testing.T) {
 	}`*/
 	//pTrade := `{"busicd": "802801"}`
 	pTrade, _ := json.Marshal(trade)
-	logger.Debugf(ctx, "pTrade: %s", string(pTrade))
+	logger.Debug(ctx, "config rule test payload", "payload", string(pTrade))
 	dataContext := ast.NewDataContext()
 	dataContext.AddJSON("trade", []byte(pTrade))
 	gcr.SvrSelectFromDataCtx(ctx, dataContext)

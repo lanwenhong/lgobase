@@ -60,7 +60,7 @@ func TestLoadConf(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	logger.Debugf(ctx, "conf: %v", tConf)
+	logger.Debug(ctx, "parsed config test result", "config", tConf)
 	dayuconf, _ := confparse.ParseExt(ctx, "section1", "pay_server", 0, cfg)
 	logger.Debug(ctx, "conf test", "dayuconf", dayuconf)
 	/*logger.Debugf(ctx, "payserver0: %v", tConf.Cfg.Gcf["section1"]["pay_server"][0])

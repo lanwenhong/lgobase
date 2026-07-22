@@ -103,7 +103,7 @@ func (tk *Token) TkMac(ctx context.Context, data []byte, randk []byte, iv []byte
 	mdata := make([]byte, data_len)
 	mdata = append(mdata, data...)
 	padding_len := 8 - data_len%8
-	logger.Debugf(ctx, "data: %v len: %d padding_len: %d", data, data_len, padding_len)
+	logger.Debug(ctx, "prepare token MAC input", "data", data, "data_length", data_len, "padding_length", padding_len)
 	for i := 0; i < padding_len; i++ {
 		mdata = append(mdata, []byte{0xFF}...)
 	}
@@ -127,10 +127,10 @@ func (tk *Token) TkMac(ctx context.Context, data []byte, randk []byte, iv []byte
 	aescbc := util.AesCbc{}
 	ret, err := aescbc.AESEncryptCBCWithNoBase64(ctx, tmp, randk, iv)
 	if err != nil {
-		logger.Warnf(ctx, "err: %s", err.Error())
+		logger.Warn(ctx, "encrypt token MAC input failed", "err", err)
 		return ret, err
 	}
-	logger.Debugf(ctx, "ret: %v", ret)
+	logger.Debug(ctx, "generated token MAC", "mac", ret)
 	mac, _ := tk.xor8Bytes(ctx, ret[0:8], ret[8:16])
 	return mac, nil
 }
@@ -143,7 +143,7 @@ func (tk *Token) UnPack(ctx context.Context, bdata string) error {
 	iv := []byte{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}
 	data, err := base64.StdEncoding.DecodeString(bdata)
 	if err != nil {
-		logger.Warnf(ctx, "err: %s", err.Error())
+		logger.Warn(ctx, "decode token failed", "err", err)
 		return err
 	}
 
@@ -154,28 +154,28 @@ func (tk *Token) UnPack(ctx context.Context, bdata string) error {
 	//parse version
 	b_magic := data[0:4]
 	tk.Magic = binary.LittleEndian.Uint32(b_magic)
-	logger.Debugf(ctx, "magic: %d", tk.Magic)
+	logger.Debug(ctx, "decoded token magic", "magic", tk.Magic)
 	if tk.Magic != TOKEN_HEADER_MAGIC {
 		return tk.UnPackOld(ctx, bdata)
 	}
 
 	b_ver := data[4:8]
 	ver := binary.LittleEndian.Uint32(b_ver)
-	logger.Debugf(ctx, "ver: %d", ver)
+	logger.Debug(ctx, "decoded token version", "version", ver)
 	uidBit := ver>>31 | 0x00
-	logger.Debugf(ctx, "uidBit: %d", uidBit)
+	logger.Debug(ctx, "decoded token user ID width", "bits", uidBit)
 	dlBit := ver >> 30 & 0x01
-	logger.Debugf(ctx, "dlBit: %d", dlBit)
+	logger.Debug(ctx, "decoded token deadline flag", "enabled", dlBit)
 	//parse randB
 	rt := (ver & uint32(0x00FFFF00)) >> 8
 	rt16 := uint16(rt)
 	randB := make([]byte, 2)
 	binary.LittleEndian.PutUint16(randB, rt16)
-	logger.Debugf(ctx, "randB: %v", randB)
+	logger.Debug(ctx, "decoded token random bytes", "random_bytes", randB)
 
 	//mac := data[4:12]
 	mac := data[8:16]
-	logger.Debugf(ctx, "mac: %v", mac)
+	logger.Debug(ctx, "decoded token MAC", "mac", mac)
 
 	//randk
 	aescbc := util.AesCbc{}
@@ -187,65 +187,65 @@ func (tk *Token) UnPack(ctx context.Context, bdata string) error {
 	iv[1] = randB[1]
 	gkey, err := aescbc.AESEncryptCBC(ctx, randB, []byte(tk.Tkey), iv)
 	if err != nil {
-		logger.Warnf(ctx, "err: %v", err)
+		logger.Warn(ctx, "derive token key failed", "err", err)
 		return err
 	}
-	logger.Debugf(ctx, "gkey: %s", gkey)
+	logger.Debug(ctx, "derived token key", "key", gkey)
 
 	randk := []byte{}
 	k1 := []byte(gkey)
 	k2 := []byte(gkey[0:8])
 	randk = append(randk, k1...)
 	randk = append(randk, k2...)
-	logger.Debugf(ctx, "randk: %v", randk)
+	logger.Debug(ctx, "decoded token random key", "random_key", randk)
 
 	//tkBody := data[12:]
 	tkBody := data[16:]
-	logger.Debugf(ctx, "tkBody: %v", tkBody)
+	logger.Debug(ctx, "decoded token body", "body", tkBody)
 	tkSrc, err := aescbc.AESDecryptCBCWithNoBase64(ctx, tkBody, randk, iv)
 	if err != nil {
-		logger.Warnf(ctx, "err: %s", err.Error())
+		logger.Warn(ctx, "decode token body failed", "err", err)
 		return err
 	}
-	logger.Debugf(ctx, "tkSrc: %v", tkSrc)
+	logger.Debug(ctx, "decoded token source", "source", tkSrc)
 	macBuf.Write(b_ver)
 	macBuf.Write(tkSrc)
 	//in_mac, _ := tk.TkMac(ctx, tkSrc, randk, iv)
 	in_mac, _ := tk.TkMac(ctx, macBuf.Bytes(), randk, iv)
-	logger.Debugf(ctx, "mac: %v in_mac: %v", mac, in_mac)
+	logger.Debug(ctx, "compare token MAC", "computed_mac", mac, "input_mac", in_mac)
 
 	int_mac := binary.LittleEndian.Uint64(mac)
 	int_in_mac := binary.LittleEndian.Uint64(in_mac)
 
 	if int_mac == int_in_mac {
-		logger.Debugf(ctx, "mac check succ")
+		logger.Debug(ctx, "token MAC verification succeeded")
 	} else {
-		logger.Warnf(ctx, "mac error")
+		logger.Warn(ctx, "token MAC verification failed")
 		return errors.New("mac error")
 	}
 	//unpack idc
 	start := 0
 	end := 0
-	logger.Debugf(ctx, "bidc: %v", tkSrc[start])
+	logger.Debug(ctx, "decoded token IDC byte", "value", tkSrc[start])
 	tk.Idc = tkSrc[start]
 	start += 1
 	end += 1
-	logger.Debugf(ctx, "idc:  %d", tk.Idc)
+	logger.Debug(ctx, "decoded token IDC", "idc", tk.Idc)
 	//unpack flag_uc
 	tk.FlagUC = string(tkSrc[start])
 	start += 1
 	end += 1
-	logger.Debugf(ctx, "flag_uc: %s", tk.FlagUC)
+	logger.Debug(ctx, "decoded token user-center flag", "flag", tk.FlagUC)
 	//unpack uid
 	if uidBit == 0 {
 		//end = 4
 		start = end
 		end += 4
 		buid := tkSrc[start:end]
-		logger.Debugf(ctx, "buid: %v", buid)
+		logger.Debug(ctx, "decoded token user ID bytes", "bytes", buid)
 		uid32 := binary.LittleEndian.Uint32(buid)
 		tk.Uid = uint64(uid32)
-		logger.Debugf(ctx, "uid: %d", uid32)
+		logger.Debug(ctx, "decoded token user ID", "user_id", uid32, "bits", 32)
 
 	} else if uidBit == 1 {
 		//end = 8
@@ -254,29 +254,29 @@ func (tk *Token) UnPack(ctx context.Context, bdata string) error {
 		buid := tkSrc[0:end]
 		uid64 := binary.LittleEndian.Uint64(buid)
 		tk.Uid = uid64
-		logger.Debugf(ctx, "uid: %d", uid64)
+		logger.Debug(ctx, "decoded token user ID", "user_id", uid64, "bits", 64)
 	}
 	//unpack opuid
 	start = end
 	end += 2
 	b_opuid := tkSrc[start:end]
 	tk.OpUid = binary.LittleEndian.Uint16(b_opuid)
-	logger.Debugf(ctx, "opuid: %d", tk.OpUid)
+	logger.Debug(ctx, "decoded token operator user ID", "operator_user_id", tk.OpUid)
 
 	//unpack expire
 	start = end
 	end += 4
 	b_expire := tkSrc[start:end]
-	logger.Debugf(ctx, "b_expire: %v", b_expire)
+	logger.Debug(ctx, "decoded token expiration bytes", "bytes", b_expire)
 	tk.Expire = binary.LittleEndian.Uint32(b_expire)
-	logger.Debugf(ctx, "expire: %d", tk.Expire)
+	logger.Debug(ctx, "decoded token expiration", "expire_at", tk.Expire)
 
 	//unpack deadline
 	if dlBit == 0 {
 		start = end
 		end += 4
 		b_deadline := tkSrc[start:end]
-		logger.Debugf(ctx, "b_deadline: %v", b_deadline)
+		logger.Debug(ctx, "decoded token deadline bytes", "bytes", b_deadline)
 		deadline32 := binary.LittleEndian.Uint32(b_deadline)
 		tk.Deadline = uint64(deadline32)
 
@@ -284,23 +284,23 @@ func (tk *Token) UnPack(ctx context.Context, bdata string) error {
 		start = end
 		end += 8
 		b_deadline := tkSrc[start:end]
-		logger.Debugf(ctx, "b_deadline: %v", b_deadline)
+		logger.Debug(ctx, "decoded token deadline bytes", "bytes", b_deadline)
 		deadline64 := binary.LittleEndian.Uint64(b_deadline)
 		tk.Deadline = uint64(deadline64)
 
 	}
-	logger.Debugf(ctx, "deadline: %d", tk.Deadline)
+	logger.Debug(ctx, "decoded token deadline", "deadline", tk.Deadline)
 
 	//unpack udid
 	start = end
 	end += 1
 	b_udidlen := uint8(tkSrc[start])
-	logger.Debugf(ctx, "b_udidlen: %d", b_udidlen)
+	logger.Debug(ctx, "decoded token device ID length byte", "value", b_udidlen)
 	start = end
 	budid := tkSrc[start : start+int(b_udidlen)]
-	logger.Debugf(ctx, "budid: %v", budid)
+	logger.Debug(ctx, "decoded token device ID bytes", "bytes", budid)
 	tk.Udid = string(budid)
-	logger.Debugf(ctx, "udid: %s", tk.Udid)
+	logger.Debug(ctx, "decoded token device ID", "device_id", tk.Udid)
 	return nil
 }
 
@@ -322,7 +322,7 @@ func (tk *Token) Pack(ctx context.Context) (string, error) {
 	tkSrc = append(tkSrc, bIdc...)
 	//pack flag_uc
 	uc := []byte(tk.FlagUC)
-	logger.Debugf(ctx, "uc: %v", uc)
+	logger.Debug(ctx, "encoded token user-center flag", "bytes", uc)
 	tkSrc = append(tkSrc, uc...)
 
 	//pack uid
@@ -345,7 +345,7 @@ func (tk *Token) Pack(ctx context.Context) (string, error) {
 	//pack expire
 	b_expire := make([]byte, 4)
 	binary.LittleEndian.PutUint32(b_expire, tk.Expire)
-	logger.Debugf(ctx, "b_expire: %v", b_expire)
+	logger.Debug(ctx, "encoded token expiration", "bytes", b_expire)
 	tkSrc = append(tkSrc, b_expire...)
 
 	//pack deadline
@@ -371,7 +371,7 @@ func (tk *Token) Pack(ctx context.Context) (string, error) {
 
 	//gen mackey
 	randB := tk.generateRandom2Bytes(ctx)
-	logger.Debugf(ctx, "randB: %v len: %d", randB, len(randB))
+	logger.Debug(ctx, "generated token random bytes", "bytes", randB, "length", len(randB))
 	//randB = []byte{0x39, 0x39}
 
 	//pack header
@@ -406,33 +406,33 @@ func (tk *Token) Pack(ctx context.Context) (string, error) {
 	iv[1] = randB[1]
 	gkey, err := aescbc.AESEncryptCBC(ctx, randB, []byte(tk.Tkey), iv)
 	if err != nil {
-		logger.Warnf(ctx, "err: %v", err)
+		logger.Warn(ctx, "derive token key failed", "err", err)
 		return "", err
 	}
-	logger.Debugf(ctx, "gkey: %s", gkey)
+	logger.Debug(ctx, "derived token key", "key", gkey)
 
 	k1 := []byte(gkey)
 	k2 := []byte(gkey[0:8])
 	randk = append(randk, k1...)
 	randk = append(randk, k2...)
 
-	logger.Debugf(ctx, "randk: %v", randk)
-	logger.Debugf(ctx, "tkSrc: %v", tkSrc)
+	logger.Debug(ctx, "generated token random key", "random_key", randk)
+	logger.Debug(ctx, "encoded token source", "source", tkSrc)
 	macBuf.Write(b_ver)
 	macBuf.Write(tkSrc)
 	//mac, _ := tk.TkMac(ctx, tkSrc, randk, iv)
 	mac, _ := tk.TkMac(ctx, macBuf.Bytes(), randk, iv)
-	logger.Debugf(ctx, "mac: %v", mac)
+	logger.Debug(ctx, "generated token MAC", "mac", mac)
 	tkEnc = append(tkEnc, mac...)
 
-	logger.Debugf(ctx, "tkSrc: %v", tkSrc)
+	logger.Debug(ctx, "encoded token source with MAC", "source", tkSrc)
 	tkBody, err := aescbc.AESEncryptCBCWithNoBase64(ctx, tkSrc, randk, iv)
-	logger.Debugf(ctx, "tkBody: %v", tkBody)
+	logger.Debug(ctx, "encrypted token body", "body", tkBody)
 	tkEnc = append(tkEnc, tkBody...)
 	ciphertextBase64 := base64.StdEncoding.EncodeToString(tkEnc)
-	logger.Debugf(ctx, "ciphertextBase64: %s", ciphertextBase64)
+	logger.Debug(ctx, "encoded token ciphertext", "ciphertext", ciphertextBase64)
 	token := tk.PackReplace(ctx, ciphertextBase64)
-	logger.Debugf(ctx, "token: %s", token)
+	logger.Debug(ctx, "packed token", "token", token)
 	return token, nil
 
 }

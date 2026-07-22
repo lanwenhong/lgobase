@@ -51,7 +51,7 @@ func (conn *TcpConn) SetWTimeout(ctx context.Context, wTimeout time.Duration) {
 func (conn *TcpConn) Open(ctx context.Context) error {
 	c, err := net.DialTimeout("tcp", conn.Addr, conn.ConnectTimout)
 	if err != nil {
-		logger.Warnf(ctx, "connect err: %s", err.Error())
+		logger.Warn(ctx, "connect TCP socket failed", "addr", conn.Addr, "timeout", conn.ConnectTimout, "err", err)
 		return err
 	}
 	conn.Conn = c
@@ -60,27 +60,27 @@ func (conn *TcpConn) Open(ctx context.Context) error {
 }
 
 func (conn *TcpConn) Close(ctx context.Context) {
-	logger.Debugf(ctx, "conn close")
+	logger.Debug(ctx, "close TCP connection", "addr", conn.Addr)
 	conn.Opened = false
 	conn.once.Do(func() {
 		if err := conn.Conn.Close(); err != nil {
-			logger.Warnf(ctx, "close err: %s", err.Error())
+			logger.Warn(ctx, "close TCP connection failed", "addr", conn.Addr, "err", err)
 		}
 	})
 }
 
 func (conn *TcpConn) Readn(ctx context.Context, n_byte int) ([]byte, error) {
-	logger.Debugf(ctx, "conn.ReadTimeout: %d", conn.ReadTimeout)
+	logger.Debug(ctx, "read from TCP connection", "addr", conn.Addr, "timeout", conn.ReadTimeout, "requested_bytes", n_byte)
 	if int64(conn.ReadTimeout) > 0 {
 		conn.Conn.SetDeadline(time.Now().Add(conn.ReadTimeout))
 	}
 	b := make([]byte, n_byte)
 	n, err := io.ReadFull(conn.Conn, b)
 	if err != nil {
-		logger.Warnf(ctx, "read err: %s", err.Error())
+		logger.Warn(ctx, "read from TCP connection failed", "addr", conn.Addr, "err", err)
 		conn.Opened = false
 	}
-	logger.Debugf(ctx, "read: %d", n)
+	logger.Debug(ctx, "read from TCP connection completed", "addr", conn.Addr, "bytes", n)
 	return b, err
 
 }
@@ -99,11 +99,11 @@ func (conn *TcpConn) Writen(ctx context.Context, b []byte) error {
 	for {
 		n, err := conn.Conn.Write(b[start:])
 		if err != nil {
-			logger.Warnf(ctx, "write error: %s", err.Error())
+			logger.Warn(ctx, "write to TCP connection failed", "addr", conn.Addr, "written_bytes", start, "err", err)
 			conn.Opened = false
 			return err
 		}
-		logger.Debugf(ctx, "write: %d", n)
+		logger.Debug(ctx, "write to TCP connection completed", "addr", conn.Addr, "bytes", n)
 		start += n
 		if start == len(b) {
 			break
@@ -116,7 +116,7 @@ func (conn *TcpConn) SetOptLinger(ctx context.Context, sec int) error {
 	tcpConn := conn.Conn.(*net.TCPConn)
 	err := tcpConn.SetLinger(sec)
 	if err != nil {
-		logger.Warnf(ctx, "err: %s", err.Error())
+		logger.Warn(ctx, "set TCP linger failed", "addr", conn.Addr, "seconds", sec, "err", err)
 	}
 	return err
 }
