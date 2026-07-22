@@ -65,6 +65,13 @@ func (bs *BaseSvr) SetStat(state int32) {
 	atomic.StoreInt32(&bs.Valid, state)
 }
 
+// CompareAndSwapStat atomically changes the server state only when it still
+// matches old. Selectors use it to ensure concurrent failures enqueue a node
+// for health checking at most once per validity transition.
+func (bs *BaseSvr) CompareAndSwapStat(old, new int32) bool {
+	return atomic.CompareAndSwapInt32(&bs.Valid, old, new)
+}
+
 func (bs *BaseSvr) SetAddr(addr string) {
 	bs.Addr = addr
 }

@@ -51,6 +51,9 @@ type RpcPoolRuleSelector[T any] struct {
 	RulePools map[string]*RpcPoolSelector[T]
 	Kl        *ast.KnowledgeLibrary
 	GrulePool *sync.Pool
+
+	mu     sync.RWMutex
+	closed bool
 }
 
 func NewRpcRulePoolSelector[T any]() *RpcPoolRuleSelector[T] {
@@ -61,6 +64,12 @@ func NewRpcRulePoolSelector[T any]() *RpcPoolRuleSelector[T] {
 
 func (rrps *RpcPoolRuleSelector[T]) AddSvr(ctx context.Context, conf *RpcServerConf,
 	cfunc CreateConn[T], nc NewThriftClient[T], ping PingSvr) error {
+	rrps.mu.RLock()
+	closed := rrps.closed
+	rrps.mu.RUnlock()
+	if closed {
+		return ErrPoolClosed
+	}
 	if conf == nil {
 		return errors.New("server config must not be nil")
 	}
@@ -72,9 +81,6 @@ func (rrps *RpcPoolRuleSelector[T]) AddSvr(ctx context.Context, conf *RpcServerC
 	}
 	if err := rrps.validateRpcServerAddrs(conf.Addr); err != nil {
 		return err
-	}
-	if rrps.RulePools == nil {
-		rrps.RulePools = make(map[string]*RpcPoolSelector[T])
 	}
 	gpConf := &GPoolConfig[T]{
 		Addrs:           conf.Addr,
@@ -89,20 +95,12 @@ func (rrps *RpcPoolRuleSelector[T]) AddSvr(ctx context.Context, conf *RpcServerC
 		Nc:              nc,
 		Ping:            ping,
 	}
-	if gpConf.MaxConns == 0 {
-		gpConf.MaxConns = 200
-	}
-	if gpConf.MaxIdleConns == 0 {
-		gpConf.MaxIdleConns = 100
-	}
-
+	applyRPCPoolConfigDefaults(gpConf)
 	rps := &RpcPoolSelector[T]{}
 	if err := rps.RpcPoolInit(ctx, gpConf); err != nil {
 		return err
 	}
-	rrps.RulePools[conf.Addr] = rps
 	rItem := RuleItem{
-		Name:        fmt.Sprintf("rpc_pool_rule_%d", len(rrps.rlist)),
 		Description: conf.Addr,
 		RuleWhen:    conf.Rule,
 		Salience:    conf.Salience,
@@ -112,36 +110,50 @@ func (rrps *RpcPoolRuleSelector[T]) AddSvr(ctx context.Context, conf *RpcServerC
 		setRet,
 		`Complete()`,
 	}
+
+	rrps.mu.Lock()
+	if rrps.closed {
+		rrps.mu.Unlock()
+		_ = rps.Close(context.Background())
+		return ErrPoolClosed
+	}
+	if rrps.RulePools == nil {
+		rrps.RulePools = make(map[string]*RpcPoolSelector[T])
+	}
+	previous := rrps.RulePools[conf.Addr]
+	rrps.RulePools[conf.Addr] = rps
+	rItem.Name = fmt.Sprintf("rpc_pool_rule_%d", len(rrps.rlist))
 	rrps.rlist = append(rrps.rlist, rItem)
+	rrps.mu.Unlock()
+
+	if previous != nil {
+		if err := previous.Close(ctx); err != nil {
+			logger.Warn(ctx, "close replaced RPC rule pool failed", "addr", conf.Addr, "err", err)
+		}
+	}
 	return nil
 }
 
 func (rrps *RpcPoolRuleSelector[T]) validateRpcServerAddrs(addrs string) error {
-	if strings.TrimSpace(addrs) == "" {
-		return errors.New("server addr must not be empty")
-	}
-	for _, addr := range strings.Split(addrs, ",") {
-		addr = strings.TrimSpace(addr)
-		parts := strings.Split(addr, ":")
-		if len(parts) != 2 || parts[0] == "" {
-			return fmt.Errorf("addr format error: %s", addr)
-		}
-		portTimeout := strings.Split(parts[1], "/")
-		if len(portTimeout) != 2 || portTimeout[0] == "" || portTimeout[1] == "" {
-			return fmt.Errorf("addr format error: %s", addr)
-		}
-	}
-	return nil
+	_, err := parseRPCPoolEndpoints(addrs)
+	return err
 }
 
 func (rrps *RpcPoolRuleSelector[T]) ParseRule(ctx context.Context) error {
-	if len(rrps.rlist) == 0 {
+	rrps.mu.RLock()
+	if rrps.closed {
+		rrps.mu.RUnlock()
+		return ErrPoolClosed
+	}
+	rules := append([]RuleItem(nil), rrps.rlist...)
+	rrps.mu.RUnlock()
+	if len(rules) == 0 {
 		return errors.New("no rule configured")
 	}
 	config := jsoniter.Config{
 		SortMapKeys: true,
 	}
-	jRuleSet, _ := config.Froze().Marshal(rrps.rlist)
+	jRuleSet, _ := config.Froze().Marshal(rules)
 	logger.Debug(ctx, "built RPC selector rule set", "rule_set", json.RawMessage((string(jRuleSet))))
 
 	Rdata, errJ := pkg.ParseJSONRuleset([]byte(jRuleSet))
@@ -157,8 +169,7 @@ func (rrps *RpcPoolRuleSelector[T]) ParseRule(ctx context.Context) error {
 		logger.Warn(ctx, "build rule set failed", "rule", rFlag, "err", err)
 		return err
 	}
-	rrps.Kl = kl
-	rrps.GrulePool = &sync.Pool{
+	grulePool := &sync.Pool{
 		New: func() interface{} {
 			res, err := kl.NewKnowledgeBaseInstance(rFlag, "0.0.1")
 			if err != nil {
@@ -168,11 +179,26 @@ func (rrps *RpcPoolRuleSelector[T]) ParseRule(ctx context.Context) error {
 			return res
 		},
 	}
+	rrps.mu.Lock()
+	if rrps.closed {
+		rrps.mu.Unlock()
+		return ErrPoolClosed
+	}
+	rrps.Kl = kl
+	rrps.GrulePool = grulePool
+	rrps.mu.Unlock()
 	return nil
 }
 
 func (rrps *RpcPoolRuleSelector[T]) SvrSelectFromJson(ctx context.Context, jData string, jDataKey string) (*RpcPoolSelector[T], error) {
-	if rrps.GrulePool == nil {
+	rrps.mu.RLock()
+	if rrps.closed {
+		rrps.mu.RUnlock()
+		return nil, ErrPoolClosed
+	}
+	grulePool := rrps.GrulePool
+	rrps.mu.RUnlock()
+	if grulePool == nil {
 		return nil, errors.New("rule selector is not initialized")
 	}
 	dataContext := ast.NewDataContext()
@@ -184,8 +210,8 @@ func (rrps *RpcPoolRuleSelector[T]) SvrSelectFromJson(ctx context.Context, jData
 		return nil, err
 	}
 
-	kb := rrps.GrulePool.Get().(*ast.KnowledgeBase)
-	defer rrps.GrulePool.Put(kb)
+	kb := grulePool.Get().(*ast.KnowledgeBase)
+	defer grulePool.Put(kb)
 
 	eng := engine.NewGruleEngine()
 	err := eng.Execute(dataContext, kb)
@@ -198,15 +224,22 @@ func (rrps *RpcPoolRuleSelector[T]) SvrSelectFromJson(ctx context.Context, jData
 }
 
 func (cr *RpcPoolRuleSelector[T]) SvrSelectFromDataCtx(ctx context.Context, dataContext ast.IDataContext) (*RpcPoolSelector[T], error) {
-	if cr.GrulePool == nil {
+	cr.mu.RLock()
+	if cr.closed {
+		cr.mu.RUnlock()
+		return nil, ErrPoolClosed
+	}
+	grulePool := cr.GrulePool
+	cr.mu.RUnlock()
+	if grulePool == nil {
 		return nil, errors.New("rule selector is not initialized")
 	}
 	rRet := &RuleRet{}
 	if err := dataContext.Add("R", rRet); err != nil {
 		return nil, err
 	}
-	kb := cr.GrulePool.Get().(*ast.KnowledgeBase)
-	defer cr.GrulePool.Put(kb)
+	kb := grulePool.Get().(*ast.KnowledgeBase)
+	defer grulePool.Put(kb)
 
 	eng := engine.NewGruleEngine()
 	err := eng.Execute(dataContext, kb)
@@ -222,9 +255,54 @@ func (rrps *RpcPoolRuleSelector[T]) rulePoolByRet(rRet *RuleRet) (*RpcPoolSelect
 	if rRet.Svr == "" {
 		return nil, errors.New("no rule matched")
 	}
+	rrps.mu.RLock()
+	defer rrps.mu.RUnlock()
+	if rrps.closed {
+		return nil, ErrPoolClosed
+	}
 	svr, ok := rrps.RulePools[rRet.Svr]
 	if !ok {
 		return nil, fmt.Errorf("rule matched unknown server %q", rRet.Svr)
 	}
 	return svr, nil
+}
+
+// Close prevents further rule selection and closes every selector and endpoint
+// pool owned by this rule selector.
+func (rrps *RpcPoolRuleSelector[T]) Close(ctx context.Context) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	rrps.mu.Lock()
+	if !rrps.closed {
+		rrps.closed = true
+		rrps.GrulePool = nil
+	}
+	pools := make([]*RpcPoolSelector[T], 0, len(rrps.RulePools))
+	for _, pool := range rrps.RulePools {
+		pools = append(pools, pool)
+	}
+	rrps.mu.Unlock()
+
+	errCh := make(chan error, len(pools))
+	var wg sync.WaitGroup
+	for _, pool := range pools {
+		if pool == nil {
+			continue
+		}
+		wg.Add(1)
+		go func(pool *RpcPoolSelector[T]) {
+			defer wg.Done()
+			if err := pool.Close(ctx); err != nil {
+				errCh <- err
+			}
+		}(pool)
+	}
+	wg.Wait()
+	close(errCh)
+	var closeErr error
+	for err := range errCh {
+		closeErr = errors.Join(closeErr, err)
+	}
+	return closeErr
 }
