@@ -46,6 +46,13 @@ type RpcPoolSelector[T any] struct {
 	Gpconf   *GPoolConfig[T]
 }
 
+type rpcPoolCandidateLog struct {
+	Addr    string `json:"addr"`
+	Port    int    `json:"port"`
+	Timeout int    `json:"timeout"`
+	Valid   int32  `json:"valid"`
+}
+
 func NewRpcPoolSelector[T any](ctx context.Context, conf *GPoolConfig[T]) *RpcPoolSelector[T] {
 	if conf.MaxConns == 0 {
 		conf.MaxConns = 200
@@ -61,19 +68,26 @@ func NewRpcPoolSelector[T any](ctx context.Context, conf *GPoolConfig[T]) *RpcPo
 func (rps *RpcPoolSelector[T]) RoundRobin(ctx context.Context) interface{} {
 	//var item []interface{} = make([]interface{}, len(rps.Slist))
 	var item []interface{}
+	candidateLogs := make([]rpcPoolCandidateLog, 0, len(rps.Slist))
 	var j int32 = 0
 	for i := 0; i < len(rps.Slist); i++ {
 		bs := rps.Slist[i].(*RpcSvr[T])
 		if bs.GetValid() == selector.SVR_VALID {
 			//item[i] = rps.Slist[i]
 			item = append(item, rps.Slist[i])
+			candidateLogs = append(candidateLogs, rpcPoolCandidateLog{
+				Addr:    bs.GetAddr(),
+				Port:    bs.GetPort(),
+				Timeout: int(bs.GetTimeOut()),
+				Valid:   bs.GetValid(),
+			})
 			j++
 		}
 	}
 	if j == 0 {
 		return nil
 	}
-	logger.Debug(ctx, "round robin candidates", "candidates", item, "valid_count", j, "candidate_count", len(item))
+	logger.Debug(ctx, "round robin candidates", "candidates", candidateLogs, "valid_count", j, "candidate_count", len(item))
 	atomic_pos := atomic.LoadInt32(&rps.Pos)
 	logger.Debug(ctx, "round robin position", "position", atomic_pos)
 	addr := item[atomic_pos%j]
