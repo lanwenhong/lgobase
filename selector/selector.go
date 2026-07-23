@@ -1,11 +1,13 @@
 package selector
 
 import (
+	"context"
 	"errors"
-	"fmt"
 	"strconv"
 	"strings"
 	"sync/atomic"
+
+	"github.com/lanwenhong/lgobase/logger"
 )
 
 const (
@@ -61,6 +63,13 @@ func (bs *BaseSvr) GetTimeOut() int32 {
 
 func (bs *BaseSvr) SetStat(state int32) {
 	atomic.StoreInt32(&bs.Valid, state)
+}
+
+// CompareAndSwapStat atomically changes the server state only when it still
+// matches old. Selectors use it to ensure concurrent failures enqueue a node
+// for health checking at most once per validity transition.
+func (bs *BaseSvr) CompareAndSwapStat(old, new int32) bool {
+	return atomic.CompareAndSwapInt32(&bs.Valid, old, new)
 }
 
 func (bs *BaseSvr) SetAddr(addr string) {
@@ -122,7 +131,7 @@ func (s *Selector) SparseAddr(pstr string) error {
 func (s *Selector) SparseRedisAddr(pstr []string) error {
 	s.Slist = make([]SvrAddr, len(pstr))
 	for i := 0; i < len(pstr); i++ {
-		fmt.Printf("url: %s\n", pstr[i])
+		logger.Debug(context.Background(), "configure Redis selector node", "url", pstr[i], "index", i)
 		//bs := NewSvr()
 		bs := &BaseSvr{}
 		bs.SetAddr(pstr[i])

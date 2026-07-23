@@ -220,7 +220,7 @@ func (p *ExtProcessor) ReadMetaMap(ctx context.Context, in, out thrift.TProtocol
 		if k == THRIFT_EXT_DEPTH {
 			iv, err := strconv.Atoi(v)
 			if err != nil {
-				logger.Warn(ctx, "thrift_ext", "err", err)
+				logger.Warn(ctx, "parse thrift extension depth failed", "value", v, "err", err)
 			} else {
 				foundDepth = true
 				iv += 1
@@ -239,9 +239,9 @@ func (p *ExtProcessor) ReadMetaMap(ctx context.Context, in, out thrift.TProtocol
 	}
 	if callClientService != "" {
 		ctx = context.WithValue(ctx, THRIFT_EXT_CLIENT_SERVICE, callClientService)
-		logger.Debug(ctx, "thrift_ext", "callCleintService", callClientService)
+		logger.Debug(ctx, "read thrift caller service", "client_service", callClientService)
 	}
-	logger.Debug(ctx, "thrift_ext", "test", "ccc")
+	logger.Debug(ctx, "read thrift extension metadata completed", "depth_found", foundDepth, "client_service", callClientService)
 	return ctx, err
 }
 
@@ -265,8 +265,10 @@ func (p *ExtProcessor) Process(ctx context.Context, in, out thrift.TProtocol) (b
 	//magic
 	//magic := binary.BigEndian.Uint16(preBuf)
 	magic := binary.BigEndian.Uint32(preBuf)
+	protocolName := "standard"
 	//if magic == uint16(THRIFT_EXT_META_MAGIC) {
 	if magic == uint32(THRIFT_EXT_META_MAGIC) {
+		protocolName = "extended"
 		//if magic == THRIFT_EXT_META_MAGIC {
 		logger.Debug(ctx, "select thrift protocol", "protocol", "extended")
 		//ver
@@ -297,7 +299,7 @@ func (p *ExtProcessor) Process(ctx context.Context, in, out thrift.TProtocol) (b
 		ctx = context.WithValue(ctx, "request_id", util.NewRequestID())
 	}
 	//b, t := p.Processor.Process(newCtx, in, out)
-	logger.Debug(ctx, "thrift_ext", "test", "cccccc")
+	logger.Debug(ctx, "dispatch thrift request", "protocol", protocolName)
 	b, t := p.Processor.Process(ctx, in, out)
 	return b, t
 }

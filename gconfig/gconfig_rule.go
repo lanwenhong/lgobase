@@ -47,7 +47,7 @@ func NewGConfRule(svr string) *GConfRule {
 
 func (cr *GConfRule) AddRule(ctx context.Context, g_conf *Gconf) error {
 	ex := g_conf.GlineExtend
-	logger.Debug(ctx, "rule config", "ex", ex)
+	logger.Debug(ctx, "load rule config", "extensions", ex)
 	if _, ok := ex[cr.Sever]; !ok {
 		return errors.New("not found " + cr.Sever)
 	}
@@ -55,8 +55,7 @@ func (cr *GConfRule) AddRule(ctx context.Context, g_conf *Gconf) error {
 	cnt := 0
 	lcre := []GConfRuleEntry{}
 	for k, v := range svrs {
-		logger.Debug(ctx, "rule config", "k", k)
-		logger.Debug(ctx, "rule_config", "v", v)
+		logger.Debug(ctx, "load rule config entry", "server", cr.Sever, "rule", k, "value", v)
 
 		for _, iv := range v {
 			cre := GConfRuleEntry{}
@@ -90,11 +89,11 @@ func (cr *GConfRule) AddRule(ctx context.Context, g_conf *Gconf) error {
 	}
 	jRuleSet, _ := config.Froze().Marshal(lcre)
 	//logger.Debugf(ctx, "rule set: %s", jRuleSet)
-	logger.Debug(ctx, "rule config", "rule_set", json.RawMessage((string(jRuleSet))))
+	logger.Debug(ctx, "built rule set", "server", cr.Sever, "rule_set", json.RawMessage((string(jRuleSet))))
 
 	Rdata, errJ := pkg.ParseJSONRuleset([]byte(jRuleSet))
 	if errJ != nil {
-		logger.Warnf(ctx, "errJ: %s", errJ.Error())
+		logger.Warn(ctx, "parse rule set failed", "server", cr.Sever, "err", errJ)
 		panic(errJ)
 	}
 	kl := ast.NewKnowledgeLibrary()
@@ -102,7 +101,7 @@ func (cr *GConfRule) AddRule(ctx context.Context, g_conf *Gconf) error {
 	rFlag := "gconf_" + cr.Sever
 	err := rb.BuildRuleFromResource(rFlag, "0.0.1", pkg.NewBytesResource([]byte(Rdata)))
 	if err != nil {
-		logger.Warnf(ctx, "err: %s", err.Error())
+		logger.Warn(ctx, "build rule set failed", "server", cr.Sever, "rule", rFlag, "err", err)
 		panic(err)
 	}
 	cr.Kl = kl
@@ -110,7 +109,7 @@ func (cr *GConfRule) AddRule(ctx context.Context, g_conf *Gconf) error {
 		New: func() interface{} {
 			res, err := kl.NewKnowledgeBaseInstance(rFlag, "0.0.1")
 			if err != nil {
-				logger.Debugf(ctx, "err: %s", err.Error())
+				logger.Debug(ctx, "create rule knowledge base failed", "rule", rFlag, "err", err)
 				panic(err)
 			}
 			return res
@@ -131,10 +130,10 @@ func (cr *GConfRule) SvrSelectFromJson(ctx context.Context, jData string, jDataK
 	eng := engine.NewGruleEngine()
 	err := eng.Execute(dataContext, kb)
 	if err != nil {
-		logger.Debugf(ctx, "exec err %s", err.Error())
+		logger.Debug(ctx, "execute rule failed", "server", cr.Sever, "err", err)
 		return nil, err
 	}
-	logger.Debugf(ctx, "ret: %v", rRet)
+	logger.Debug(ctx, "execute rule completed", "server", cr.Sever, "result", rRet)
 	return rRet, nil
 }
 
@@ -147,9 +146,9 @@ func (cr *GConfRule) SvrSelectFromDataCtx(ctx context.Context, dataContext ast.I
 	eng := engine.NewGruleEngine()
 	err := eng.Execute(dataContext, kb)
 	if err != nil {
-		logger.Debugf(ctx, "exec err %s", err.Error())
+		logger.Debug(ctx, "execute rule failed", "server", cr.Sever, "err", err)
 		return nil, err
 	}
-	logger.Debugf(ctx, "ret: %v", rRet)
+	logger.Debug(ctx, "execute rule completed", "server", cr.Sever, "result", rRet)
 	return rRet, nil
 }

@@ -31,6 +31,11 @@ func newRulePoolSelectorForTest(t *testing.T) *RpcPoolRuleSelector[ruleSelectorT
 	}
 
 	selector := NewRpcRulePoolSelector[ruleSelectorTestClient]()
+	t.Cleanup(func() {
+		if err := selector.Close(context.Background()); err != nil {
+			t.Errorf("Close() error = %v", err)
+		}
+	})
 	for i := range cfg.PayServers {
 		conf := cfg.PayServers[i]
 		if err := selector.AddSvr(context.Background(), &conf, createFailedRuleSelectorTestConn, nil, nil); err != nil {
@@ -41,6 +46,76 @@ func newRulePoolSelectorForTest(t *testing.T) *RpcPoolRuleSelector[ruleSelectorT
 		t.Fatal(err)
 	}
 	return selector
+}
+
+func TestRPCPoolRuleSelectorCloseClosesOwnedPools(t *testing.T) {
+	factory := &internalSelectorFactory{}
+	ruleSelector := NewRpcRulePoolSelector[internalTestClient]()
+	conf := &RpcServerConf{
+		Addr:         "node:9000/1000",
+		Rule:         "true",
+		MaxConns:     1,
+		MaxIdleConns: 1,
+	}
+	if err := ruleSelector.AddSvr(context.Background(), conf, factory.create, nil, nil); err != nil {
+		t.Fatalf("AddSvr() error = %v", err)
+	}
+	owned := ruleSelector.RulePools[conf.Addr]
+	if owned == nil {
+		t.Fatal("owned selector is nil")
+	}
+
+	if err := ruleSelector.Close(context.Background()); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+	if selected := owned.RoundRobin(context.Background()); selected != nil {
+		t.Fatalf("owned RoundRobin() after Close = %v, want nil", selected)
+	}
+	if err := ruleSelector.AddSvr(context.Background(), conf, factory.create, nil, nil); !errors.Is(err, ErrPoolClosed) {
+		t.Fatalf("AddSvr() after Close error = %v, want ErrPoolClosed", err)
+	}
+	if err := ruleSelector.Close(context.Background()); err != nil {
+		t.Fatalf("second Close() error = %v", err)
+	}
+	for i, conn := range factory.connections() {
+		if got := conn.closeCalls.Load(); got != 1 {
+			t.Fatalf("connection %d close calls = %d, want 1", i, got)
+		}
+	}
+}
+
+func TestRPCPoolRuleSelectorClosesReplacedPool(t *testing.T) {
+	firstFactory := &internalSelectorFactory{}
+	secondFactory := &internalSelectorFactory{}
+	ruleSelector := NewRpcRulePoolSelector[internalTestClient]()
+	t.Cleanup(func() {
+		if err := ruleSelector.Close(context.Background()); err != nil {
+			t.Errorf("Close() error = %v", err)
+		}
+	})
+	conf := &RpcServerConf{
+		Addr:         "node:9000/1000",
+		Rule:         "true",
+		MaxConns:     1,
+		MaxIdleConns: 1,
+	}
+	if err := ruleSelector.AddSvr(context.Background(), conf, firstFactory.create, nil, nil); err != nil {
+		t.Fatalf("first AddSvr() error = %v", err)
+	}
+	previous := ruleSelector.RulePools[conf.Addr]
+	if err := ruleSelector.AddSvr(context.Background(), conf, secondFactory.create, nil, nil); err != nil {
+		t.Fatalf("second AddSvr() error = %v", err)
+	}
+	if selected := previous.RoundRobin(context.Background()); selected != nil {
+		t.Fatalf("replaced selector RoundRobin() = %v, want nil", selected)
+	}
+	connections := firstFactory.connections()
+	if len(connections) != 1 {
+		t.Fatalf("replaced pool connections = %d, want 1", len(connections))
+	}
+	if got := connections[0].closeCalls.Load(); got != 1 {
+		t.Fatalf("replaced pool close calls = %d, want 1", got)
+	}
 }
 
 func requireRuleSelectedAddr(t *testing.T, pool *RpcPoolSelector[ruleSelectorTestClient], want string) {

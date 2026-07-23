@@ -4,7 +4,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/apache/thrift/lib/go/thrift"
@@ -53,7 +52,7 @@ func main() {
 
 	transport, err := thrift.NewTServerSocketTimeout(":9897", time.Duration(500000*time.Millisecond))
 	if err != nil {
-		fmt.Println(err.Error())
+		logger.Error(context.Background(), "create echo Thrift server socket failed", "addr", ":9897", "err", err)
 		return
 	}
 
@@ -67,8 +66,8 @@ func main() {
 		transportFactory,
 		protocolFactory,
 	)
-	fmt.Println("server start")
+	logger.Info(context.Background(), "start echo Thrift server", "addr", ":9897", "transport", "buffered", "protocol", "binary")
 	if err = server.Serve(); err != nil {
-		fmt.Println(err.Error())
+		logger.Error(context.Background(), "serve echo Thrift server failed", "addr", ":9897", "err", err)
 	}
 }

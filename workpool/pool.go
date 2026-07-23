@@ -48,7 +48,7 @@ func (task *Task) WaitRet(ctx context.Context) (any, error) {
 
 func (wp *WorkPool) AddTask(ctx context.Context, req any, process Process) (*Task, error) {
 	if atomic.LoadInt32(&wp.parallel) == wp.PoolSize {
-		logger.Warnf(ctx, "work pool full")
+		logger.Warn(ctx, "submit work pool task failed", "reason", "pool_full")
 		return nil, errors.New("work pool full")
 	}
 	req_id := ""
@@ -65,15 +65,15 @@ func (wp *WorkPool) AddTask(ctx context.Context, req any, process Process) (*Tas
 		Wait:    make(chan struct{}, 1),
 		process: process,
 	}
-	logger.Debugf(ctx, "add task")
+	logger.Debug(ctx, "submit work pool task", "parallel", atomic.LoadInt32(&wp.parallel))
 	wp.TaskQ.PushBack(ctx, task)
 	select {
 	case wp.Notify <- struct{}{}:
 	default:
-		logger.Debugf(ctx, "work pool busy")
+		logger.Debug(ctx, "work pool is busy", "parallel", atomic.LoadInt32(&wp.parallel))
 	}
 	atomic.AddInt32(&wp.parallel, 1)
-	logger.Debugf(ctx, "after push parallel: %d", atomic.LoadInt32(&wp.parallel))
+	logger.Debug(ctx, "work pool task queued", "parallel", atomic.LoadInt32(&wp.parallel))
 	return task, nil
 }
 
@@ -81,23 +81,23 @@ func (wp *WorkPool) do(ctx context.Context) {
 	for {
 		t, _ := wp.TaskQ.PopFront(ctx)
 		if t == nil {
-			logger.Debugf(ctx, "get nil from queue")
+			logger.Debug(ctx, "work pool queue returned no task")
 			break
 		}
 		starttime := time.Now()
 		atomic.AddInt32(&wp.parallel, -1)
 		task := t.(*Task)
 		ctx = context.WithValue(ctx, "request_id", task.TaskId)
-		logger.Debugf(ctx, "after pop parallel: %d", atomic.LoadInt32(&wp.parallel))
+		logger.Debug(ctx, "work pool task dequeued", "parallel", atomic.LoadInt32(&wp.parallel))
 		var err error
 		task.Ret, err = task.process(ctx, task.Req)
 		if err != nil {
-			logger.Warnf(ctx, "task execute err: %v", err)
+			logger.Warn(ctx, "execute work pool task failed", "err", err)
 		}
-		logger.Debugf(ctx, "task ret: %v", task.Ret)
+		logger.Debug(ctx, "execute work pool task completed", "result", task.Ret)
 		task.Wait <- struct{}{}
 		close(task.Wait)
-		logger.Infof(ctx, "func=process_do|time=%v", time.Since(starttime))
+		logger.Info(ctx, "work pool task processing completed", "cost", time.Since(starttime))
 	}
 }
 
@@ -108,14 +108,14 @@ func (wp *WorkPool) Run(ctx context.Context) {
 		wp.Wg.Add(1)
 		go func(ctx context.Context) {
 			ctx = context.WithValue(ctx, "trace_id", util.NewProcessID())
-			logger.Debugf(ctx, "process run")
+			logger.Debug(ctx, "work pool worker started")
 			defer wp.Wg.Done()
 			for {
 				select {
 				case <-wp.Notify:
 					wp.do(ctx)
 				case <-ctx.Done():
-					logger.Debugf(ctx, "process exit")
+					logger.Debug(ctx, "work pool worker stopped")
 					return
 				}
 			}
@@ -125,7 +125,7 @@ func (wp *WorkPool) Run(ctx context.Context) {
 
 func (wp *WorkPool) Join(ctx context.Context) {
 	wp.Wg.Wait()
-	logger.Debugf(ctx, "wait all process")
+	logger.Debug(ctx, "wait for work pool workers")
 }
 
 func (wp *WorkPool) Kill(ctx context.Context) {

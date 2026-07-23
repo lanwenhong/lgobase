@@ -19,7 +19,7 @@ func TestHttpGet(t *testing.T) {
 	caCert, err := ioutil.ReadFile(caCertPath)
 	if err != nil {
 		//log.Fatalf("读取 CA 证书失败：%v", err)
-		logger.Warnf(ctx, "读取 CA 证书失败：%v", err)
+		logger.Warn(ctx, "read test CA certificate failed", "err", err)
 		t.Fatal(err)
 	}
 
@@ -27,7 +27,7 @@ func TestHttpGet(t *testing.T) {
 	caCertPool := x509.NewCertPool()
 	if !caCertPool.AppendCertsFromPEM(caCert) {
 		//log.Fatalf("解析 CA 证书失败：无效的 PEM 格式")
-		logger.Warnf(ctx, "解析 CA 证书失败：无效的 PEM 格式")
+		logger.Warn(ctx, "parse test CA certificate failed", "reason", "invalid_pem")
 		t.Fatal(err)
 	}
 	TLSClientConfig := &tls.Config{
@@ -41,7 +41,7 @@ func TestHttpGet(t *testing.T) {
 	httpclient.ClientSetTlsConf(client, TLSClientConfig)
 	resp, err := client.R().SetContext(ctx).Get("https://localhost:4443/hello")
 	if err != nil {
-		logger.Warnf(ctx, "err: %s", err.Error())
+		logger.Warn(ctx, "HTTP client test request failed", "err", err)
 		t.Fatal(err)
 	}
 

@@ -32,7 +32,7 @@ func TestQPush(t *testing.T) {
 	wg.Wait()
 
 	c := q.Print(ctx)
-	logger.Debugf(ctx, "%d", c)
+	logger.Debug(ctx, "CAS queue test count", "count", c)
 }
 
 /*func TestPushPop(t *testing.T) {
@@ -53,10 +53,10 @@ func TestQPush(t *testing.T) {
 			for {
 				e := use_list.PopFront(ctx)
 				if e != nil {
-					logger.Debugf(ctx, "e: %v", e)
+					logger.Debug(ctx, "CAS queue test popped item", "item", e)
 					//free_list.PushFront(ctx, e.Value)
 				} else {
-					logger.Debugf(ctx, "=============e: %v", e)
+					logger.Debug(ctx, "CAS queue test found unexpected item", "item", e)
 					break
 				}
 			}
@@ -85,7 +85,7 @@ func Test2Push(t *testing.T) {
 	for {
 		e := use_list.PopFront(ctx)
 		if e != nil {
-			logger.Debugf(ctx, "e: %v", e)
+			logger.Debug(ctx, "CAS queue benchmark popped item", "item", e)
 		} else {
 			break
 		}

@@ -18,7 +18,7 @@ func (tk *Token) UnPackOld(ctx context.Context, bdata string) error {
 	aescbc := util.AesCbc{}
 	decrypted, err := aescbc.AESDecryptCBCSb(ctx, bdata, []byte(tk.Tkey))
 	if err != nil {
-		logger.Warnf(ctx, "aes dec err: %s", err.Error())
+		logger.Warn(ctx, "decrypt legacy token failed", "err", err)
 		return err
 	}
 
@@ -40,7 +40,7 @@ func (tk *Token) UnPackOld(ctx context.Context, bdata string) error {
 	tk.Deadline = uint64(binary.LittleEndian.Uint32(decrypted[13:17]))
 	//logger.Debugf(ctx, "deadline: %d", deadline)
 	udid_len := uint8(decrypted[17])
-	logger.Debugf(ctx, "udid_len: %d", udid_len)
+	logger.Debug(ctx, "decoded legacy token device ID length", "length", udid_len)
 	bUlen := len(decrypted[18:])
 	udid := ""
 	if bUlen >= int(udid_len) {
@@ -51,6 +51,6 @@ func (tk *Token) UnPackOld(ctx context.Context, bdata string) error {
 	//udid := string(decrypted[18:])
 	//logger.Debugf(ctx, "udid:%s", udid)
 	tk.Udid = udid
-	logger.Debugf(ctx, "tk: %v", tk)
+	logger.Debug(ctx, "decoded legacy token", "token", tk)
 	return nil
 }

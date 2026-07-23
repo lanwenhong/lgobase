@@ -34,7 +34,7 @@ func NewPoolWithUrl(timeout int, maxidle_conn int, maxactive_conn int, sl *selec
 			c, err := redis.DialURL(redis_url, redis.DialConnectTimeout(5000*time.Millisecond),
 				redis.DialReadTimeout(time.Duration(timeout)*time.Millisecond), redis.DialWriteTimeout(time.Duration(timeout)*time.Millisecond))
 			if err != nil {
-				fmt.Println(err.Error())
+				logger.Warn(context.Background(), "connect Redis pool node failed", "err", err)
 			}
 			return c, err
 		}
@@ -70,7 +70,7 @@ func NewPool(db int, passwd string, maxidle_conn int, maxactive_conn int, sl *se
 		port := r_addr.GetPort()
 		addr := fmt.Sprintf("%s:%d", ip, port)
 		redis_url := "redis://" + passwd_s + addr + db_s
-		fmt.Printf("redis addr: %s\n", redis_url)
+		logger.Debug(context.Background(), "configure Redis pool node", "addr", addr, "db", db)
 		rp.Plist[i] = new(redis.Pool)
 		rp.Plist[i].MaxIdle = maxidle_conn
 		rp.Plist[i].MaxActive = maxactive_conn
@@ -80,7 +80,7 @@ func NewPool(db int, passwd string, maxidle_conn int, maxactive_conn int, sl *se
 		rp.Plist[i].Dial = func() (redis.Conn, error) {
 			c, err := redis.DialURL(redis_url, redis.DialConnectTimeout(5000*time.Millisecond), redis.DialReadTimeout(timeout*time.Millisecond), redis.DialWriteTimeout(timeout*time.Millisecond))
 			if err != nil {
-				fmt.Println(err.Error())
+				logger.Warn(context.Background(), "connect Redis pool node failed", "addr", addr, "db", db, "err", err)
 			}
 			return c, err
 		}
@@ -98,7 +98,7 @@ func NewPool(db int, passwd string, maxidle_conn int, maxactive_conn int, sl *se
 
 func (pr *RedisPool) RedisPoolRoundRobin(ctx context.Context) *redis.Pool {
 	addr := pr.Sl.RoundRobin().(selector.BaseSvr)
-	logger.Debugf(ctx, "get addr: %s index:%d", addr.GetAddr(), pr.Sl.Pos)
+	logger.Debug(ctx, "selected Redis pool node", "addr", addr.GetAddr(), "index", pr.Sl.Pos)
 	getpool := pr.Plist[pr.Sl.Pos]
 	return getpool
 }
@@ -120,7 +120,7 @@ func (pr *RedisPool) Do(ctx context.Context, commandName string, args ...interfa
 	defer c.Close()
 	reply, err = c.Do(commandName, args...)
 	if pr.PrintLog {
-		logger.Infof(ctx, "server=redis|addr=%s:%d|cmd=%s|args=%v|time=%d", r_addr.GetAddr(), r_addr.GetPort(), commandName, args, time.Now().UnixNano()/1000-smicros)
+		logger.Info(ctx, "Redis command completed", "addr", r_addr.GetAddr(), "port", r_addr.GetPort(), "command", commandName, "args", args, "cost_us", time.Now().UnixNano()/1000-smicros, "err", err)
 	}
 	return reply, err
 }

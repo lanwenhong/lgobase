@@ -20,7 +20,7 @@ func TestFileRotate(t *testing.T) {
 
 	ctx := context.Background()
 	for i := 0; i < 2000; i++ {
-		logger.Debugf(ctx, "aaaaaaaaaaaaaaaaaaaaaaaaaa")
+		logger.Debug(ctx, "file rotation counter test", "iteration", i)
 
 	}
 }

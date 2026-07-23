@@ -70,7 +70,7 @@ func (q *CasQueue) Print(ctx context.Context) int64 {
 	p := (*Item)(q.Head)
 	var i int64
 	for p.next != nil {
-		logger.Debugf(ctx, "%v", *((*interface{})((*Item)(p.next).V)))
+		logger.Debug(ctx, "queue item visited", "value", *((*interface{})((*Item)(p.next).V)))
 		//fmt.Println(*((*interface{})((*Item)(p.next).V)))
 		p = (*Item)(p.next)
 		i++

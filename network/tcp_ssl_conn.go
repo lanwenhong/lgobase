@@ -54,13 +54,13 @@ func (conn *TcpSslConn) IsOpen(ctx context.Context) bool {
 
 func (conn *TcpSslConn) Open(ctx context.Context) error {
 	//c, err := net.DialTimeout("tcp", conn.Addr, conn.ConnectTimout)
-	logger.Debugf(ctx, "Timeout: %d", conn.ConnectTimout)
+	logger.Debug(ctx, "connect TLS socket", "addr", conn.Addr, "timeout", conn.ConnectTimout)
 	dialer := &net.Dialer{
 		Timeout: conn.ConnectTimout, // 连接超时（包括 TCP 握手 + TLS 握手）
 	}
 	c, err := tls.DialWithDialer(dialer, "tcp", conn.Addr, conn.TlsConf)
 	if err != nil {
-		logger.Warnf(ctx, "connect err: %s", err.Error())
+		logger.Warn(ctx, "connect TLS socket failed", "addr", conn.Addr, "timeout", conn.ConnectTimout, "err", err)
 		return err
 	}
 	conn.Conn = c
@@ -71,25 +71,25 @@ func (conn *TcpSslConn) Open(ctx context.Context) error {
 func (conn *TcpSslConn) Close(ctx context.Context) {
 	conn.Opened = false
 	conn.once.Do(func() {
-		logger.Debugf(ctx, "conn close")
+		logger.Debug(ctx, "close TLS connection", "addr", conn.Addr)
 		if err := conn.Conn.Close(); err != nil {
-			logger.Warnf(ctx, "close err: %s", err.Error())
+			logger.Warn(ctx, "close TLS connection failed", "addr", conn.Addr, "err", err)
 		}
 	})
 }
 
 func (conn *TcpSslConn) Readn(ctx context.Context, n_byte int) ([]byte, error) {
-	logger.Debugf(ctx, "conn.ReadTimeout: %d", conn.ReadTimeout)
+	logger.Debug(ctx, "read from TLS connection", "addr", conn.Addr, "timeout", conn.ReadTimeout, "requested_bytes", n_byte)
 	if int64(conn.ReadTimeout) > 0 {
 		conn.Conn.SetDeadline(time.Now().Add(conn.ReadTimeout))
 	}
 	b := make([]byte, n_byte)
 	n, err := io.ReadFull(conn.Conn, b)
 	if err != nil {
-		logger.Warnf(ctx, "read err: %s", err.Error())
+		logger.Warn(ctx, "read from TLS connection failed", "addr", conn.Addr, "err", err)
 		conn.Opened = false
 	}
-	logger.Debugf(ctx, "read: %d", n)
+	logger.Debug(ctx, "read from TLS connection completed", "addr", conn.Addr, "bytes", n)
 	return b, err
 
 }
@@ -108,11 +108,11 @@ func (conn *TcpSslConn) Writen(ctx context.Context, b []byte) error {
 	for {
 		n, err := conn.Conn.Write(b[start:])
 		if err != nil {
-			logger.Warnf(ctx, "write error: %s", err.Error())
+			logger.Warn(ctx, "write to TLS connection failed", "addr", conn.Addr, "written_bytes", start, "err", err)
 			conn.Opened = false
 			return err
 		}
-		logger.Debugf(ctx, "write: %d", n)
+		logger.Debug(ctx, "write to TLS connection completed", "addr", conn.Addr, "bytes", n)
 		start += n
 		if start == len(b) {
 			break
@@ -125,7 +125,7 @@ func (conn *TcpSslConn) SetOptLinger(ctx context.Context, sec int) error {
 	tcpConn := conn.Conn.NetConn().(*net.TCPConn)
 	err := tcpConn.SetLinger(sec)
 	if err != nil {
-		logger.Warnf(ctx, "err: %s", err.Error())
+		logger.Warn(ctx, "set TLS socket linger failed", "addr", conn.Addr, "seconds", sec, "err", err)
 	}
 	return err
 }

@@ -45,9 +45,9 @@ func TestGenerateLoggerFormatSampleFiles(t *testing.T) {
 		DesensitizeField: "password,cardNo",
 	})
 	logger.Debug(ctx, "text debug sample", "uid", 1001, "name", "alice")
-	logger.Infof(ctx, "text info sample uid=%d", 1002)
+	logger.Info(ctx, "text info sample", "uid", 1002)
 	logger.Warn(ctx, "text warn sample", "uid", 1003, "reason", "slow")
-	logger.Errorf(ctx, "text error sample uid=%d err=%s", 1004, "sample error")
+	logger.Error(ctx, "text error sample", "uid", 1004, "err", "sample error")
 	logger.Info(ctx, "text desensitize sample",
 		"password", "secret-password",
 		"cardNo", "6222021234567890123",
@@ -101,7 +101,7 @@ func TestGenerateLoggerStdoutSample(t *testing.T) {
 		DesensitizeField: "password,cardNo",
 	})
 	logger.Debug(ctx, "text stdout debug sample", "uid", 1001, "name", "alice")
-	logger.Infof(ctx, "text stdout info sample uid=%d", 1002)
+	logger.Info(ctx, "text stdout info sample", "uid", 1002)
 	logger.Warn(ctx, "text stdout warn sample", "reason", "slow")
 	logger.Error(ctx, "text stdout error sample", "password", "secret-password", "cardNo", "6222021234567890123")
 

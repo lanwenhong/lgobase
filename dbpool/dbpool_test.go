@@ -272,7 +272,7 @@ func TestQuery2(t *testing.T) {
 	//tdb.WithContext(ctx).Where("name = ?", "wowow").First(&user)
 	start := time.Date(2023, 1, 1, 0, 0, 0, 0, time.Local)
 	end := time.Date(2023, 8, 12, 4, 12, 31, 0, time.Local)
-	logger.Debugf(ctx, "start: %s end: %s", start, end)
+	logger.Debug(ctx, "database test time range", "start", start, "end", end)
 	tdb.WithContext(ctx).Where("createat between ? and ?", start, end).Find(&users)
 
 	t.Log(users)
@@ -316,19 +316,19 @@ func TestGendiByDb(t *testing.T) {
 	}
 	tdb := dbs.OrmPools["test1"]
 	tdb.Raw("select @@server_id").Scan(&s)
-	logger.Debugf(ctx, "serverid: %d", s[0].Svrid)
+	logger.Debug(ctx, "database test server ID", "server_id", s[0].Svrid)
 
 	su := []UuidShort{}
 	tdb.Raw("select uuid_short()").Scan(&su)
-	logger.Debugf(ctx, "su: %d", su[0].UuidShort)
+	logger.Debug(ctx, "database test UUID short", "uuid_short", su[0].UuidShort)
 	seq := su[0].UuidShort % 65535
 
 	tt := time.Now().Unix()
 	msec := tt * 1000
-	logger.Debugf(ctx, "tt: %d", msec)
+	logger.Debug(ctx, "database test timestamp", "milliseconds", msec)
 
 	id := uint64(msec)<<22 + s[0].Svrid<<16 + uint64(seq)
-	logger.Debugf(ctx, "id: %d", id)
+	logger.Debug(ctx, "database test generated ID", "id", id)
 }
 
 func TestQueryMap(t *testing.T) {
@@ -367,7 +367,7 @@ func TestQueryMap(t *testing.T) {
 	tdb := dbs.OrmPools["usercenter"]
 	var ret []map[string]interface{}
 	tdb.WithContext(ctx).Raw("select id, username, FROM_UNIXTIME(ctime, '%Y-%m-%d %H:%i:%s') as ctime from users where id=?", 1).Scan(&ret)
-	logger.Debugf(ctx, "ret:%v", ret)
+	logger.Debug(ctx, "database test query result", "result", ret)
 
 	var re []map[string]interface{}
 	var ilist interface{} = nil
@@ -379,5 +379,5 @@ func TestQueryMap(t *testing.T) {
 	var iid interface{} = nil
 	iid = xid
 	tdb.WithContext(ctx).Table("users").Select("*").Where("id = ?", iid).Find(&re1)
-	logger.Debugf(ctx, "re1: %v", re1)
+	logger.Debug(ctx, "database test query result", "result", re1)
 }

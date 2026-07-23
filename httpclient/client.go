@@ -78,7 +78,7 @@ func NewHttpClient(transport *http.Transport) *resty.Client {
 			client.SetHeader("Client-Service", util.GetEnv("CLIENT_SERVICE", "-"))
 		}
 		//logger.Infof(ctx, "send|mehtod=%s|url=%s|body=%s", req.Method, req.URL, s)
-		logger.Info(ctx, "HttpClient", "func", "send", "method", req.Method, "url", req.URL, "body", s, "srcFile", file+line, "fn", fn)
+		logger.Info(ctx, "send HTTP request", "method", req.Method, "url", req.URL, "body", s, "source", file+line, "function", fn)
 		return nil
 	})
 
@@ -91,8 +91,8 @@ func NewHttpClient(transport *http.Transport) *resty.Client {
 		}
 		file, line, fn := GetCaller(5)
 		//logger.Infof(ctx, "recv|method=%s|url=%s|code=%d|ret=%s|time=%dms", resp.Request.Method, resp.Request.URL, resp.StatusCode(), resp.String(), costTime.Milliseconds())
-		logger.Info(ctx, "HttpClient", "func", "recv", "method", resp.Request.Method, "url", resp.Request.URL,
-			"code", resp.StatusCode(), "ret", ret, "cost", fmt.Sprintf("%dms", costTime.Milliseconds()), "srcFile", file+line, "fn", fn)
+		logger.Info(ctx, "receive HTTP response", "method", resp.Request.Method, "url", resp.Request.URL,
+			"status_code", resp.StatusCode(), "response", ret, "cost", costTime, "source", file+line, "function", fn)
 		return nil
 	})
 	return client
