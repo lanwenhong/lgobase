@@ -23,14 +23,37 @@ var (
 
 type Process func(ctx context.Context, req any) (any, error)
 
+// QueueMode selects the task storage and overload behavior used by WorkPool.
+type QueueMode uint8
+
+const (
+	// QueueModeCAS preserves the historical WorkPool behavior: submissions are
+	// stored in a growable CAS queue and are accepted while memory is available.
+	QueueModeCAS QueueMode = iota
+	// QueueModeChannel uses a bounded channel and returns ErrPoolFull when the
+	// configured queue capacity is exhausted.
+	QueueModeChannel
+)
+
+// Options configures a WorkPool without changing the historical
+// NewWorkPool(int) constructor.
+type Options struct {
+	PoolSize  int
+	QueueMode QueueMode
+	// QueueSize only applies to QueueModeChannel. Zero defaults to PoolSize.
+	QueueSize int
+}
+
 type WorkPool struct {
-	// TaskQ and Notify are retained for source compatibility. Scheduling is
-	// performed by the internal bounded task channel.
-	TaskQ    cas.Queue
-	PoolSize int32
-	Notify   chan struct{}
-	Wg       sync.WaitGroup
-	Cancel   context.CancelFunc
+	// TaskQ and Notify retain their historically exported shape and provide the
+	// storage and wake-up path for QueueModeCAS.
+	TaskQ     cas.Queue
+	PoolSize  int32
+	Notify    chan struct{}
+	Wg        sync.WaitGroup
+	Cancel    context.CancelFunc
+	QueueMode QueueMode
+	QueueSize int32
 
 	parallel int32
 	tasks    chan *Task
@@ -56,19 +79,51 @@ type Task struct {
 	completeOnce sync.Once
 }
 
+// NewWorkPool creates a pool backed by the historical growable CAS queue.
 func NewWorkPool(poolSize int) *WorkPool {
-	if poolSize <= 0 {
+	return NewWorkPoolWithOptions(Options{
+		PoolSize:  poolSize,
+		QueueMode: QueueModeCAS,
+	})
+}
+
+// NewWorkPoolWithOptions creates a pool with an explicit queue strategy.
+// QueueModeChannel is bounded by QueueSize, while QueueModeCAS accepts tasks
+// while memory is available.
+func NewWorkPoolWithOptions(options Options) *WorkPool {
+	if options.PoolSize <= 0 {
 		panic("workpool: pool size must be greater than zero")
+	}
+	if options.QueueMode != QueueModeCAS && options.QueueMode != QueueModeChannel {
+		panic("workpool: unsupported queue mode")
+	}
+
+	queueSize := options.QueueSize
+	if options.QueueMode == QueueModeCAS {
+		if queueSize != 0 {
+			panic("workpool: queue size is not supported in CAS mode")
+		}
+	} else {
+		if queueSize == 0 {
+			queueSize = options.PoolSize
+		}
+		if queueSize < 0 {
+			panic("workpool: queue size must not be negative")
+		}
 	}
 
 	poolCtx, cancel := context.WithCancel(context.Background())
 	wp := &WorkPool{
-		PoolSize: int32(poolSize),
-		TaskQ:    cas.CreateCasQueue(),
-		Notify:   make(chan struct{}, poolSize),
-		tasks:    make(chan *Task, poolSize),
-		ctx:      poolCtx,
-		cancel:   cancel,
+		PoolSize:  int32(options.PoolSize),
+		TaskQ:     cas.CreateCasQueue(),
+		Notify:    make(chan struct{}, options.PoolSize),
+		QueueMode: options.QueueMode,
+		QueueSize: int32(queueSize),
+		ctx:       poolCtx,
+		cancel:    cancel,
+	}
+	if options.QueueMode == QueueModeChannel {
+		wp.tasks = make(chan *Task, queueSize)
 	}
 	// Keep direct calls to the historically exported Cancel field safe and
 	// consistent with Kill.
@@ -142,10 +197,29 @@ func (wp *WorkPool) AddTask(ctx context.Context, req any, process Process) (*Tas
 	// Increment before publishing the task so a worker can never decrement the
 	// queued count before the submitter increments it.
 	queued := atomic.AddInt32(&wp.parallel, 1)
+	if wp.QueueMode == QueueModeCAS {
+		if !wp.TaskQ.PushBack(ctx, task) {
+			atomic.AddInt32(&wp.parallel, -1)
+			wp.mu.Unlock()
+			logger.Warn(ctx, "submit work pool task failed", "reason", "queue_push_failed")
+			return nil, ErrPoolFull
+		}
+		// Notify only wakes sleeping workers; once awake, CAS workers keep
+		// draining the queue. A bounded notification channel therefore does not
+		// bound the number of accepted tasks.
+		select {
+		case wp.Notify <- struct{}{}:
+		default:
+		}
+		wp.mu.Unlock()
+		logger.Debug(ctx, "work pool task queued", "queued", queued, "queue_mode", "cas")
+		return task, nil
+	}
+
 	select {
 	case wp.tasks <- task:
 		wp.mu.Unlock()
-		logger.Debug(ctx, "work pool task queued", "queued", queued)
+		logger.Debug(ctx, "work pool task queued", "queued", queued, "queue_mode", "channel")
 		return task, nil
 	default:
 		atomic.AddInt32(&wp.parallel, -1)
@@ -205,6 +279,20 @@ func (wp *WorkPool) worker(workerCtx context.Context) {
 	defer logger.Debug(workerCtx, "work pool worker stopped")
 
 	for {
+		if wp.QueueMode == QueueModeCAS {
+			task, ok := wp.nextCASTask()
+			if !ok {
+				return
+			}
+			atomic.AddInt32(&wp.parallel, -1)
+			if wp.isStopped() {
+				task.complete(nil, ErrPoolClosed)
+				return
+			}
+			wp.execute(workerCtx, task)
+			continue
+		}
+
 		select {
 		case <-wp.ctx.Done():
 			return
@@ -215,6 +303,26 @@ func (wp *WorkPool) worker(workerCtx context.Context) {
 				return
 			}
 			wp.execute(workerCtx, task)
+		}
+	}
+}
+
+func (wp *WorkPool) nextCASTask() (*Task, bool) {
+	for {
+		value, _ := wp.TaskQ.PopFront(wp.ctx)
+		if value != nil {
+			task, ok := value.(*Task)
+			if !ok {
+				logger.Error(wp.ctx, "work pool CAS queue contains invalid task")
+				continue
+			}
+			return task, true
+		}
+
+		select {
+		case <-wp.ctx.Done():
+			return nil, false
+		case <-wp.Notify:
 		}
 	}
 }
@@ -269,6 +377,23 @@ func (wp *WorkPool) stop(ctx context.Context) {
 			wp.stopRun()
 		}
 		wp.cancel()
+		if wp.QueueMode == QueueModeCAS {
+			for {
+				value, _ := wp.TaskQ.PopFront(ctx)
+				if value == nil {
+					wp.mu.Unlock()
+					logger.Debug(ctx, "work pool stopped")
+					return
+				}
+				task, ok := value.(*Task)
+				if !ok {
+					continue
+				}
+				atomic.AddInt32(&wp.parallel, -1)
+				task.complete(nil, ErrPoolClosed)
+			}
+		}
+
 		for {
 			select {
 			case task := <-wp.tasks:

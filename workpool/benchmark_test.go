@@ -200,7 +200,10 @@ func BenchmarkWorkPoolAddTask(b *testing.B) {
 	})
 	b.Run("RejectedFull", func(b *testing.B) {
 		ctx := benchmarkContext()
-		wp := workpool.NewWorkPool(1)
+		wp := workpool.NewWorkPoolWithOptions(workpool.Options{
+			PoolSize:  1,
+			QueueMode: workpool.QueueModeChannel,
+		})
 		if _, err := wp.AddTask(ctx, nil, benchmarkNoOpProcess); err != nil {
 			b.Fatal(err)
 		}

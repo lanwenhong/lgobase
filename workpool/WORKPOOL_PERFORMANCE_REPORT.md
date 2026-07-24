@@ -2,6 +2,23 @@
 
 测试日期：2026-07-23
 
+## 队列兼容性更新
+
+当前 `WorkPool` 已支持两种初始化策略：
+
+- `NewWorkPool(poolSize)` 保持历史兼容，默认使用可随内存增长的 CAS queue。
+- 有界 channel 通过 `NewWorkPoolWithOptions` 显式选择，`PoolSize` 控制 worker 数，`QueueSize` 独立控制排队容量。
+
+```go
+wp := workpool.NewWorkPoolWithOptions(workpool.Options{
+    PoolSize:  64,
+    QueueMode: workpool.QueueModeChannel,
+    QueueSize: 256,
+})
+```
+
+下方原始性能数据来自有界 channel 实现，保留用于比较调度开销；不能直接当作默认 CAS 模式的性能数据。
+
 ## 结论摘要
 
 1. 当前 `WorkPool` 更适合作为“有界并发与生命周期管理”组件，而不是极小 no-op 任务的最低开销调度器。固定 `request_id`、容量充足时，一次并发提交、执行和等待约为 **1.46 µs/op、599 B/op、11 allocs/op**。
@@ -14,11 +31,11 @@
 
 ## 测试对象
 
-本报告测试当前工作区中的新版 `workpool`：
+本报告原始数据测试有界 channel 模式；当前工作区在此基础上增加了可选 CAS 模式：
 
-- 使用有界 `chan *Task` 调度，不再依赖 CAS Queue。
-- worker 数和默认队列容量都由 `NewWorkPool(poolSize)` 的 `poolSize` 决定。
-- `AddTask` 队列满时立即返回 `ErrPoolFull`。
+- CAS 模式由 `NewWorkPool(poolSize)` 默认选择，队列可随内存增长。
+- Channel 模式由 `NewWorkPoolWithOptions` 显式选择，worker 数和队列容量可独立配置。
+- 只有 Channel 模式会在队列满时返回 `ErrPoolFull`。
 - Task 支持结果、错误、context 等待和多等待者广播。
 - worker 支持 panic 隔离、池关闭传播和幂等生命周期。
 - 提交请求取消不会取消已经接受的异步任务；Pool 关闭会取消运行中任务。

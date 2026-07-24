@@ -96,7 +96,10 @@ func TestConcurrentSubmitRespectsQueueCapacity(t *testing.T) {
 		submitCount = 128
 	)
 
-	wp := workpool.NewWorkPool(poolSize)
+	wp := workpool.NewWorkPoolWithOptions(workpool.Options{
+		PoolSize:  poolSize,
+		QueueMode: workpool.QueueModeChannel,
+	})
 	start := make(chan struct{})
 	acceptedTasks := make(chan *workpool.Task, submitCount)
 	var (
@@ -146,7 +149,10 @@ func TestConcurrentSubmitRespectsQueueCapacity(t *testing.T) {
 func TestRunningPoolRespectsWorkerAndQueueCapacity(t *testing.T) {
 	const poolSize = 4
 
-	wp := workpool.NewWorkPool(poolSize)
+	wp := workpool.NewWorkPoolWithOptions(workpool.Options{
+		PoolSize:  poolSize,
+		QueueMode: workpool.QueueModeChannel,
+	})
 	wp.Run(context.Background())
 	t.Cleanup(func() {
 		wp.Kill(context.Background())
@@ -215,6 +221,158 @@ func TestRunningPoolRespectsWorkerAndQueueCapacity(t *testing.T) {
 	}
 	if got := maxActive.Load(); got > poolSize {
 		t.Fatalf("max active tasks = %d, exceeds pool size %d", got, poolSize)
+	}
+}
+
+func TestNewWorkPoolDefaultsToGrowableCASQueue(t *testing.T) {
+	const taskCount = 256
+
+	wp := workpool.NewWorkPool(1)
+	if wp.QueueMode != workpool.QueueModeCAS {
+		t.Fatalf("queue mode = %v, want CAS", wp.QueueMode)
+	}
+
+	tasks := make([]*workpool.Task, 0, taskCount)
+	for i := 0; i < taskCount; i++ {
+		task, err := wp.AddTask(context.Background(), i, func(_ context.Context, req any) (any, error) {
+			return req, nil
+		})
+		if err != nil {
+			t.Fatalf("AddTask(%d): %v", i, err)
+		}
+		tasks = append(tasks, task)
+	}
+
+	wp.Run(context.Background())
+	t.Cleanup(func() {
+		wp.Kill(context.Background())
+		wp.Join(context.Background())
+	})
+	for i, task := range tasks {
+		ret, err := task.WaitRet(context.Background())
+		if err != nil {
+			t.Fatalf("task %d: %v", i, err)
+		}
+		if ret != i {
+			t.Fatalf("task %d result = %v", i, ret)
+		}
+	}
+}
+
+func TestChannelOptionsAllowIndependentQueueSize(t *testing.T) {
+	wp := workpool.NewWorkPoolWithOptions(workpool.Options{
+		PoolSize:  1,
+		QueueMode: workpool.QueueModeChannel,
+		QueueSize: 3,
+	})
+	if wp.QueueSize != 3 {
+		t.Fatalf("queue size = %d, want 3", wp.QueueSize)
+	}
+	wp.Run(context.Background())
+	t.Cleanup(func() {
+		wp.Kill(context.Background())
+		wp.Join(context.Background())
+	})
+
+	release := make(chan struct{})
+	started := make(chan struct{}, 1)
+	process := func(ctx context.Context, _ any) (any, error) {
+		select {
+		case started <- struct{}{}:
+		default:
+		}
+		select {
+		case <-release:
+		case <-ctx.Done():
+		}
+		return nil, nil
+	}
+
+	running, err := wp.AddTask(context.Background(), nil, process)
+	if err != nil {
+		t.Fatal(err)
+	}
+	<-started
+	queued := make([]*workpool.Task, 0, 3)
+	for i := 0; i < 3; i++ {
+		task, err := wp.AddTask(context.Background(), nil, process)
+		if err != nil {
+			t.Fatalf("queue task %d: %v", i, err)
+		}
+		queued = append(queued, task)
+	}
+	if task, err := wp.AddTask(context.Background(), nil, process); task != nil || !errors.Is(err, workpool.ErrPoolFull) {
+		t.Fatalf("overflow AddTask = (%v, %v), want (nil, %v)", task, err, workpool.ErrPoolFull)
+	}
+
+	close(release)
+	if _, err := running.WaitRet(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	for _, task := range queued {
+		if _, err := task.WaitRet(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestCASQueueConcurrentSubmitExecutesEveryTask(t *testing.T) {
+	const (
+		producerCount    = 16
+		tasksPerProducer = 100
+		taskCount        = producerCount * tasksPerProducer
+	)
+
+	wp := workpool.NewWorkPool(8)
+	wp.Run(context.Background())
+	t.Cleanup(func() {
+		wp.Kill(context.Background())
+		wp.Join(context.Background())
+	})
+
+	seen := make([]atomic.Int32, taskCount)
+	accepted := make(chan *workpool.Task, taskCount)
+	start := make(chan struct{})
+	var producers sync.WaitGroup
+	for producer := 0; producer < producerCount; producer++ {
+		producer := producer
+		producers.Add(1)
+		go func() {
+			defer producers.Done()
+			<-start
+			for offset := 0; offset < tasksPerProducer; offset++ {
+				id := producer*tasksPerProducer + offset
+				task, err := wp.AddTask(context.Background(), id, func(_ context.Context, req any) (any, error) {
+					index := req.(int)
+					seen[index].Add(1)
+					return index, nil
+				})
+				if err != nil {
+					t.Errorf("AddTask(%d): %v", id, err)
+					return
+				}
+				accepted <- task
+			}
+		}()
+	}
+	close(start)
+	producers.Wait()
+	close(accepted)
+
+	completed := 0
+	for task := range accepted {
+		if _, err := task.WaitRet(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		completed++
+	}
+	if completed != taskCount {
+		t.Fatalf("completed = %d, want %d", completed, taskCount)
+	}
+	for id := range seen {
+		if got := seen[id].Load(); got != 1 {
+			t.Fatalf("task %d executions = %d, want 1", id, got)
+		}
 	}
 }
 
@@ -739,4 +897,46 @@ func TestNewWorkPoolRejectsInvalidSize(t *testing.T) {
 		}
 	}()
 	workpool.NewWorkPool(0)
+}
+
+func TestNewWorkPoolWithOptionsRejectsInvalidConfiguration(t *testing.T) {
+	testCases := []struct {
+		name    string
+		options workpool.Options
+	}{
+		{
+			name: "unsupported queue mode",
+			options: workpool.Options{
+				PoolSize:  1,
+				QueueMode: workpool.QueueMode(255),
+			},
+		},
+		{
+			name: "CAS queue size",
+			options: workpool.Options{
+				PoolSize:  1,
+				QueueMode: workpool.QueueModeCAS,
+				QueueSize: 1,
+			},
+		},
+		{
+			name: "negative channel queue size",
+			options: workpool.Options{
+				PoolSize:  1,
+				QueueMode: workpool.QueueModeChannel,
+				QueueSize: -1,
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			defer func() {
+				if recover() == nil {
+					t.Fatal("NewWorkPoolWithOptions did not panic")
+				}
+			}()
+			workpool.NewWorkPoolWithOptions(testCase.options)
+		})
+	}
 }
