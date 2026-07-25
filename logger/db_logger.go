@@ -200,18 +200,18 @@ func (l MyDBlogger) Trace(ctx context.Context, begin time.Time, fc func() (strin
 	}
 
 	elapsed := time.Since(begin)
-	time := fmt.Sprintf("%fms", float64(elapsed.Nanoseconds())/1e6)
+	cost := FormatDurationUS(elapsed)
 	switch {
 	case err != nil && l.LogLevel >= dlog.Error && (!errors.Is(err, dlog.ErrRecordNotFound) || !l.IgnoreRecordNotFoundError):
 		sql, rows := fc()
-		slog.Default().ErrorContext(ctx, "SQLERRLOG", "sql", sql, "cost", time, "rows", rows, "err", err, "source_db", FileWithShortLineNumV2(utils.FileWithLineNum()))
+		slog.Default().ErrorContext(ctx, "SQLERRLOG", "sql", sql, "cost", cost, "rows", rows, "err", err, "source_db", FileWithShortLineNumV2(utils.FileWithLineNum()))
 
 	case elapsed > l.SlowThreshold && l.SlowThreshold != 0 && l.LogLevel >= dlog.Warn:
 		sql, rows := fc()
 		slowLog := fmt.Sprintf("SLOW SQL >= %v", l.SlowThreshold)
-		slog.Default().WarnContext(ctx, "SQLSLOWLOG", "slowlog", slowLog, "rows", rows, "sql", sql, "cost", time, "source_db", FileWithShortLineNumV2(utils.FileWithLineNum()))
+		slog.Default().WarnContext(ctx, "SQLSLOWLOG", "slowlog", slowLog, "rows", rows, "sql", sql, "cost", cost, "source_db", FileWithShortLineNumV2(utils.FileWithLineNum()))
 	case l.LogLevel == dlog.Info:
 		sql, rows := fc()
-		slog.Default().InfoContext(ctx, "SQLLOG", "rows", rows, "sql", sql, "cost", time, "source_db", FileWithShortLineNumV2(utils.FileWithLineNum()))
+		slog.Default().InfoContext(ctx, "SQLLOG", "rows", rows, "sql", sql, "cost", cost, "source_db", FileWithShortLineNumV2(utils.FileWithLineNum()))
 	}
 }

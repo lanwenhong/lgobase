@@ -10,7 +10,9 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"strconv"
 	"sync"
+	"time"
 )
 
 var (
@@ -99,10 +101,25 @@ func NewMyModifyHandler(stdout, logFile, logFileErr *os.File) *MyModifyHandler {
 
 func jsonReplaceAttr(groups []string, attr slog.Attr) slog.Attr {
 	attr = DesensitizeReplaceAttr(groups, attr)
+	attr.Value = durationValueUS(attr.Value)
 	if attr.Key == slog.TimeKey && attr.Value.Kind() == slog.KindTime {
 		attr.Key = "log_time"
 	}
 	return attr
+}
+
+// FormatDurationUS keeps log durations at microsecond precision and includes
+// the unit in the value so JSON and text logs have the same representation.
+func FormatDurationUS(duration time.Duration) string {
+	return strconv.FormatInt(duration.Microseconds(), 10) + "us"
+}
+
+func durationValueUS(value slog.Value) slog.Value {
+	value = value.Resolve()
+	if value.Kind() == slog.KindDuration {
+		return slog.StringValue(FormatDurationUS(value.Duration()))
+	}
+	return value
 }
 
 func newMyModifyHandler(stdout *os.File, logObj *FILE, logFile, logFileErr *os.File) *MyModifyHandler {
@@ -284,7 +301,7 @@ func (h *CustomHandler) GetAttr(r slog.Record, key string) (slog.Value, bool) {
 
 func (h *CustomHandler) appendTextAttr(buf []byte, attr slog.Attr) []byte {
 	attr = DesensitizeReplaceAttr(nil, attr)
-	attr.Value = attr.Value.Resolve()
+	attr.Value = durationValueUS(attr.Value)
 	buf = append(buf, ' ')
 	buf = append(buf, attr.Key...)
 	buf = append(buf, '=')
