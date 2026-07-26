@@ -37,43 +37,59 @@ func (q *CasQueue) PushBack(ctx context.Context, val interface{}) bool {
 		V:    unsafe.Pointer(&val),
 	}
 
-	p := (*Item)(q.Tail)
-	oldp := p
-
-	for p.next != nil {
-		p = (*Item)(p.next)
-	}
-	for !atomic.CompareAndSwapPointer(&p.next, nil, unsafe.Pointer(node)) {
-		for p.next != nil {
-			p = (*Item)(p.next)
+	for {
+		tail := atomic.LoadPointer(&q.Tail)
+		tailItem := (*Item)(tail)
+		next := atomic.LoadPointer(&tailItem.next)
+		if tail != atomic.LoadPointer(&q.Tail) {
+			continue
+		}
+		if next != nil {
+			atomic.CompareAndSwapPointer(&q.Tail, tail, next)
+			continue
+		}
+		if atomic.CompareAndSwapPointer(&tailItem.next, nil, unsafe.Pointer(node)) {
+			atomic.CompareAndSwapPointer(&q.Tail, tail, unsafe.Pointer(node))
+			return true
 		}
 	}
-	atomic.CompareAndSwapPointer(&q.Tail, unsafe.Pointer(oldp), unsafe.Pointer(node))
-	return true
 }
 
 func (q *CasQueue) PopFront(ctx context.Context) (interface{}, bool) {
-	p := (*Item)(q.Head)
-	if p.next == nil {
-		return nil, true
-	}
-	for !atomic.CompareAndSwapPointer(&q.Head, unsafe.Pointer(p), unsafe.Pointer(p.next)) {
-		p = (*Item)(q.Head)
-		if p.next == nil {
-			return nil, true
+	for {
+		head := atomic.LoadPointer(&q.Head)
+		tail := atomic.LoadPointer(&q.Tail)
+		headItem := (*Item)(head)
+		next := atomic.LoadPointer(&headItem.next)
+		if head != atomic.LoadPointer(&q.Head) {
+			continue
+		}
+		if head == tail {
+			if next == nil {
+				return nil, true
+			}
+			atomic.CompareAndSwapPointer(&q.Tail, tail, next)
+			continue
+		}
+
+		value := *((*interface{})((*Item)(next).V))
+		if atomic.CompareAndSwapPointer(&q.Head, head, next) {
+			return value, true
 		}
 	}
-	return *((*interface{})(((*Item)(p.next)).V)), true
 }
 
 func (q *CasQueue) Print(ctx context.Context) int64 {
-	p := (*Item)(q.Head)
+	p := (*Item)(atomic.LoadPointer(&q.Head))
 	var i int64
-	for p.next != nil {
-		logger.Debug(ctx, "queue item visited", "value", *((*interface{})((*Item)(p.next).V)))
+	for {
+		next := atomic.LoadPointer(&p.next)
+		if next == nil {
+			return i
+		}
+		logger.Debug(ctx, "queue item visited", "value", *((*interface{})((*Item)(next).V)))
 		//fmt.Println(*((*interface{})((*Item)(p.next).V)))
-		p = (*Item)(p.next)
+		p = (*Item)(next)
 		i++
 	}
-	return i
 }
