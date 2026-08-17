@@ -49,6 +49,10 @@ func (conn *TcpSslConn) SetWTimeout(ctx context.Context, wTimeout time.Duration)
 }
 
 func (conn *TcpSslConn) IsOpen(ctx context.Context) bool {
+	if !conn.Opened || conn.Conn == nil {
+		return false
+	}
+	conn.Opened = isTCPConnOpen(conn.Conn.NetConn())
 	return conn.Opened
 }
 

@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"runtime"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 
@@ -58,6 +60,230 @@ func newInternalTestPoolWithLimits(maxConns, maxIdleConns, maxWaiters, timeout i
 	pool := &Gpool[internalTestClient]{}
 	pool.GpoolInit2(context.Background(), "test", 0, timeout, conf)
 	return pool
+}
+
+func newInternalRetryTestPool(t *testing.T, maxRetries int) *Gpool[internalTestClient] {
+	t.Helper()
+
+	conf := &GPoolConfig[internalTestClient]{
+		MaxConns:      1,
+		MaxIdleConns:  1,
+		MaxWaiters:    1,
+		RPCMaxRetries: maxRetries,
+		Cfunc: func(context.Context, string, int, int) (Conn[internalTestClient], error) {
+			conn := &internalTestConn{}
+			_ = conn.Open()
+			return conn, nil
+		},
+	}
+
+	pool := &Gpool[internalTestClient]{}
+	pool.GpoolInit2(context.Background(), "test", 0, 1_000, conf)
+	t.Cleanup(func() {
+		if err := pool.Close(context.Background()); err != nil {
+			t.Errorf("Close() error = %v", err)
+		}
+	})
+	return pool
+}
+
+func TestGpoolIsDisconnectedError(t *testing.T) {
+	pool := &Gpool[internalTestClient]{}
+	disconnected := thrift.NewTTransportException(thrift.END_OF_FILE, "connection closed")
+
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{name: "end of file", err: disconnected, want: true},
+		{name: "wrapped not open", err: fmt.Errorf("wrapped: %w", thrift.NewTTransportException(thrift.NOT_OPEN, "not open")), want: true},
+		{name: "connection reset", err: thrift.NewTTransportExceptionFromError(syscall.ECONNRESET), want: true},
+		{name: "plain EOF wrapped by thrift", err: thrift.NewTTransportExceptionFromError(io.EOF), want: true},
+		{name: "timeout", err: thrift.NewTTransportException(thrift.TIMED_OUT, "timed out"), want: false},
+		{name: "unknown transport error", err: thrift.NewTTransportException(thrift.UNKNOWN_TRANSPORT_EXCEPTION, "unknown"), want: false},
+		{name: "protocol error", err: thrift.NewTProtocolExceptionWithType(thrift.INVALID_DATA, errors.New("invalid")), want: false},
+		{name: "application error", err: errors.New("application error"), want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := pool.isDisconnectedError(tt.err); got != tt.want {
+				t.Fatalf("isDisconnectedError() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGpoolThriftCall2RetryCount(t *testing.T) {
+	disconnected := thrift.NewTTransportException(thrift.END_OF_FILE, "connection closed")
+
+	tests := []struct {
+		name       string
+		maxRetries int
+		wantCalls  int
+	}{
+		{name: "zero preserves no retry behavior", maxRetries: 0, wantCalls: 1},
+		{name: "negative preserves no retry behavior", maxRetries: -1, wantCalls: 1},
+		{name: "two retries make three attempts", maxRetries: 2, wantCalls: 3},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pool := newInternalRetryTestPool(t, tt.maxRetries)
+			calls := 0
+			err := pool.ThriftCall2(context.Background(), func(interface{}) (string, error) {
+				calls++
+				return "test", disconnected
+			})
+			if err != disconnected {
+				t.Fatalf("ThriftCall2() error = %v, want %v", err, disconnected)
+			}
+			if calls != tt.wantCalls {
+				t.Fatalf("RPC calls = %d, want %d", calls, tt.wantCalls)
+			}
+			assertInternalPoolState(t, pool, 0, 0)
+		})
+	}
+}
+
+func TestPoolConnDiscardRemovesFailedConnectionImmediately(t *testing.T) {
+	pool := newInternalTestPool(1, 1)
+	ctx := context.Background()
+	conn, err := pool.Get(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	physical := conn.Gc.(*internalTestConn)
+
+	conn.Discard(ctx)
+	assertInternalPoolState(t, pool, 0, 0)
+	if got := physical.closeCalls.Load(); got != 1 {
+		t.Fatalf("physical close calls = %d, want 1", got)
+	}
+
+	// Discard, Close, and repeated Discard calls must not double-close or
+	// reinsert the failed connection into the idle queue.
+	conn.Discard(ctx)
+	conn.Close(ctx)
+	if got := physical.closeCalls.Load(); got != 1 {
+		t.Fatalf("physical close calls after repeated release = %d, want 1", got)
+	}
+	assertInternalPoolState(t, pool, 0, 0)
+
+	replacement, err := pool.Get(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if replacement.Gc == conn.Gc {
+		t.Fatal("Get() returned the discarded connection")
+	}
+	replacement.Close(ctx)
+	if err := pool.Close(ctx); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestGpoolCall2VariantsRetryDisconnectedConnection(t *testing.T) {
+	disconnected := thrift.NewTTransportException(thrift.END_OF_FILE, "connection closed")
+
+	tests := []struct {
+		name string
+		call func(*Gpool[internalTestClient], context.Context, func() (string, error)) error
+	}{
+		{
+			name: "ThriftCall2",
+			call: func(pool *Gpool[internalTestClient], ctx context.Context, process func() (string, error)) error {
+				return pool.ThriftCall2(ctx, func(interface{}) (string, error) { return process() })
+			},
+		},
+		{
+			name: "ThriftWithTimeOutCall2",
+			call: func(pool *Gpool[internalTestClient], ctx context.Context, process func() (string, error)) error {
+				return pool.ThriftWithTimeOutCall2(ctx, time.Second, func(interface{}) (string, error) { return process() })
+			},
+		},
+		{
+			name: "ThriftExtCall2",
+			call: func(pool *Gpool[internalTestClient], ctx context.Context, process func() (string, error)) error {
+				return pool.ThriftExtCall2(ctx, func(context.Context, interface{}) (string, error) { return process() })
+			},
+		},
+		{
+			name: "ThriftWithTimeOutExtCall2",
+			call: func(pool *Gpool[internalTestClient], ctx context.Context, process func() (string, error)) error {
+				return pool.ThriftWithTimeOutExtCall2(ctx, time.Second, func(context.Context, interface{}) (string, error) { return process() })
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pool := newInternalRetryTestPool(t, 1)
+			calls := 0
+			err := tt.call(pool, context.Background(), func() (string, error) {
+				calls++
+				if calls == 1 {
+					return "test", fmt.Errorf("wrapped disconnect: %w", disconnected)
+				}
+				return "test", nil
+			})
+			if err != nil {
+				t.Fatalf("call error = %v", err)
+			}
+			if calls != 2 {
+				t.Fatalf("RPC calls = %d, want 2", calls)
+			}
+			assertInternalPoolState(t, pool, 1, 0)
+		})
+	}
+}
+
+func TestGpoolThriftCall2DoesNotRetryOtherErrors(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+	}{
+		{name: "application error", err: errors.New("application error")},
+		{name: "protocol error", err: thrift.NewTProtocolExceptionWithType(thrift.INVALID_DATA, errors.New("invalid"))},
+		{name: "timeout", err: thrift.NewTTransportException(thrift.TIMED_OUT, "timed out")},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pool := newInternalRetryTestPool(t, 3)
+			calls := 0
+			err := pool.ThriftCall2(context.Background(), func(interface{}) (string, error) {
+				calls++
+				return "test", tt.err
+			})
+			if err != tt.err {
+				t.Fatalf("ThriftCall2() error = %v, want %v", err, tt.err)
+			}
+			if calls != 1 {
+				t.Fatalf("RPC calls = %d, want 1", calls)
+			}
+		})
+	}
+}
+
+func TestGpoolThriftCall2StopsRetryingWhenContextEnds(t *testing.T) {
+	pool := newInternalRetryTestPool(t, 3)
+	ctx, cancel := context.WithCancel(context.Background())
+	disconnected := thrift.NewTTransportException(thrift.END_OF_FILE, "connection closed")
+	calls := 0
+
+	err := pool.ThriftCall2(ctx, func(interface{}) (string, error) {
+		calls++
+		cancel()
+		return "test", disconnected
+	})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("ThriftCall2() error = %v, want context.Canceled", err)
+	}
+	if calls != 1 {
+		t.Fatalf("RPC calls = %d, want 1", calls)
+	}
 }
 
 func assertInternalPoolState(t *testing.T, pool *Gpool[internalTestClient], idle, inUse int) {

@@ -5,6 +5,9 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"io"
+	"net"
+	"syscall"
 	"time"
 
 	"github.com/lanwenhong/lgobase/gpool"
@@ -73,6 +76,7 @@ type GTcpPool[T TcpConnInter] struct {
 	MaxWaiters      int
 	MaxConnLife     int64
 	MaxIdleConnLife int64
+	RPCMaxRetries   int
 	PurgeRate       float64
 	Cfunc           CreateTcpConn[T]
 	Addr            string
@@ -109,6 +113,7 @@ func (gp *GTcpPool[T]) GTcpPoolInitWithContext(ctx context.Context, addr string,
 	gp.MaxWaiters = conf.MaxWaiters
 	gp.MaxConnLife = conf.MaxConnLife
 	gp.MaxIdleConnLife = conf.MaxIdleConnLife
+	gp.RPCMaxRetries = conf.RPCMaxRetries
 	gp.PurgeRate = conf.PurgeRate
 	gp.Cfunc = conf.Cfunc
 	gp.Addr = addr
@@ -177,6 +182,16 @@ func (pc *PoolTcpConn[T]) Close(ctx context.Context) {
 	pc.coreConn.Close(ctx)
 }
 
+// Discard permanently removes a failed connection from the pool rather than
+// returning it to the idle queue.
+func (pc *PoolTcpConn[T]) Discard(ctx context.Context) {
+	if pc == nil || pc.coreConn == nil {
+		return
+	}
+	pc.Opened = false
+	pc.coreConn.Discard(ctx)
+}
+
 func (gp *GTcpPool[T]) GetFreeLen() int {
 	if gp.core == nil {
 		return 0
@@ -207,14 +222,79 @@ func (gp *GTcpPool[T]) Close(ctx context.Context) error {
 	return gp.core.Close(ctx)
 }
 
-func (gp *GTcpPool[T]) Process(ctx context.Context, process func(client interface{}) (string, error)) error {
+// isDisconnectedError reports whether an operation failed because its TCP
+// connection was closed or reset. Timeout errors are deliberately excluded
+// because the remote side may already have processed the request.
+func (gp *GTcpPool[T]) isDisconnectedError(err error) bool {
+	if err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return false
+	}
+
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		return false
+	}
+
+	return errors.Is(err, io.EOF) ||
+		errors.Is(err, io.ErrUnexpectedEOF) ||
+		errors.Is(err, net.ErrClosed) ||
+		errors.Is(err, syscall.ECONNRESET) ||
+		errors.Is(err, syscall.ECONNABORTED) ||
+		errors.Is(err, syscall.EPIPE) ||
+		errors.Is(err, syscall.ENOTCONN)
+}
+
+// processOnce borrows and returns exactly one connection. Keeping the defer in
+// this per-attempt function prevents retries from retaining old pool leases.
+func (gp *GTcpPool[T]) processOnce(ctx context.Context, process func(client interface{}) (string, error)) (string, error) {
 	pc, err := gp.Get(ctx)
 	if err != nil {
 		logger.Warn(ctx, "get TCP pool connection failed", "addr", gp.Addr, "port", gp.Port, "err", err)
-		return err
+		return "", err
 	}
-	defer pc.Close(ctx)
+	returnToPool := true
+	defer func() {
+		if returnToPool {
+			pc.Close(ctx)
+		}
+	}()
 
+	rpcName, err := process(pc.Gc)
+	if err != nil {
+		logger.Warn(ctx, "TCP RPC call failed", "method", rpcName, "addr", gp.Addr, "port", gp.Port, "err", err)
+		returnToPool = false
+		pc.Discard(ctx)
+	}
+	return rpcName, err
+}
+
+func (gp *GTcpPool[T]) processWithRetry(ctx context.Context, process func(client interface{}) (string, error)) (string, error) {
+	maxRetries := gp.RPCMaxRetries
+	if maxRetries < 0 {
+		maxRetries = 0
+	}
+
+	var rpcName string
+	for attempt := 0; ; attempt++ {
+		attemptName, err := gp.processOnce(ctx, process)
+		if attemptName != "" {
+			rpcName = attemptName
+		}
+		if err == nil {
+			return rpcName, nil
+		}
+		if attempt >= maxRetries || !gp.isDisconnectedError(err) {
+			return rpcName, err
+		}
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return rpcName, ctxErr
+		}
+
+		logger.Warn(ctx, "retry disconnected TCP RPC", "method", rpcName, "addr", gp.Addr, "port", gp.Port, "retry", attempt+1, "max_retries", maxRetries, "err", err)
+	}
+}
+
+func (gp *GTcpPool[T]) Process(ctx context.Context, process func(client interface{}) (string, error)) error {
 	var rpcErr error
 	rpcName := ""
 	started := time.Now()
@@ -228,11 +308,6 @@ func (gp *GTcpPool[T]) Process(ctx context.Context, process func(client interfac
 			"err", rpcErr)
 	}()
 
-	rpcName, err = process(pc.Gc)
-	if err != nil {
-		rpcErr = err
-		logger.Warn(ctx, "TCP RPC call failed", "method", rpcName, "addr", gp.Addr, "port", gp.Port, "err", err)
-		pc.Gc.Close(ctx)
-	}
-	return err
+	rpcName, rpcErr = gp.processWithRetry(ctx, process)
+	return rpcErr
 }

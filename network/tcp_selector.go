@@ -31,6 +31,10 @@ type TcpPoolConfig[T TcpConnInter] struct {
 	Ping            TcpPingSvr
 	PingTicker      int64
 	TlsConf         *tls.Config
+	// RPCMaxRetries is the number of additional attempts made after Process
+	// fails because its TCP connection was disconnected. Zero and negative
+	// values preserve the historical behavior and disable retries.
+	RPCMaxRetries int
 }
 
 type TcpRpcSvr[T TcpConnInter] struct {
