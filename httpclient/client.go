@@ -3,11 +3,12 @@ package httpclient
 import (
 	"crypto/tls"
 	"fmt"
-	"github.com/lanwenhong/lgobase/util"
 	"net/http"
 	"runtime"
 	"strconv"
 	"time"
+
+	"github.com/lanwenhong/lgobase/util"
 
 	"github.com/go-resty/resty/v2"
 	"github.com/lanwenhong/lgobase/logger"
@@ -71,14 +72,15 @@ func NewHttpClient(transport *http.Transport) *resty.Client {
 				s = fmt.Sprintf("%v", req.Body)
 			}
 		}
-		file, line, fn := GetCaller(6)
+		//file, line, fn := GetCaller(6)
 		ctx := req.Context()
 		clientService := client.Header.Get("Client-Service")
 		if clientService == "" {
 			client.SetHeader("Client-Service", util.GetEnv("CLIENT_SERVICE", "-"))
 		}
 		//logger.Infof(ctx, "send|mehtod=%s|url=%s|body=%s", req.Method, req.URL, s)
-		logger.Info(ctx, "send HTTP request", "method", req.Method, "url", req.URL, "body", s, "source", file+line, "function", fn)
+		//logger.Info(ctx, "send HTTP request", "method", req.Method, "url", req.URL, "body", s, "source", file+line, "function", fn)
+		logger.Info(ctx, "send HTTP request", "method", req.Method, "url", req.URL, "body", s)
 		return nil
 	})
 
@@ -89,10 +91,11 @@ func NewHttpClient(transport *http.Transport) *resty.Client {
 		if ctx.Value("log_resp") == "false" {
 			ret = "*"
 		}
-		file, line, fn := GetCaller(5)
+		//file, line, fn := GetCaller(5)
 		//logger.Infof(ctx, "recv|method=%s|url=%s|code=%d|ret=%s|time=%dms", resp.Request.Method, resp.Request.URL, resp.StatusCode(), resp.String(), costTime.Milliseconds())
 		logger.Info(ctx, "receive HTTP response", "method", resp.Request.Method, "url", resp.Request.URL,
-			"status_code", resp.StatusCode(), "response", ret, "cost", costTime, "source", file+line, "function", fn)
+			//"status_code", resp.StatusCode(), "response", ret, "cost", costTime, "source", file+line, "function", fn)
+			"status_code", resp.StatusCode(), "response", ret, "cost", costTime)
 		return nil
 	})
 	return client
