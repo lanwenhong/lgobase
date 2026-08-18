@@ -40,6 +40,10 @@ type GPoolConfig[T any] struct {
 	Ping       PingSvr
 	PingTicker int64
 	TlsConf    *tls.Config
+	// RPCMaxRetries is the number of additional attempts made after an RPC
+	// fails because its connection was disconnected. Zero and negative values
+	// preserve the historical behavior and disable retries.
+	RPCMaxRetries int
 }
 
 type RpcSvr[T any] struct {

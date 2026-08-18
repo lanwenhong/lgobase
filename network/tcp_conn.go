@@ -38,6 +38,10 @@ func NewTcpFromConn(c net.Conn) *TcpConn {
 }
 
 func (conn *TcpConn) IsOpen(ctx context.Context) bool {
+	if !conn.Opened {
+		return false
+	}
+	conn.Opened = isTCPConnOpen(conn.Conn)
 	return conn.Opened
 }
 func (conn *TcpConn) SetRTimeout(ctx context.Context, rTimeout time.Duration) {

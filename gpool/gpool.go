@@ -4,11 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"net"
 	"reflect"
 	"runtime"
 	"strconv"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/apache/thrift/lib/go/thrift"
@@ -51,6 +54,7 @@ type Gpool[T any] struct {
 	MaxIdleConns    int
 	MaxConnLife     int64
 	MaxIdleConnLife int64
+	RPCMaxRetries   int
 	// PurgeRate is retained for configuration compatibility. The fixed-capacity
 	// idle ring now enforces MaxIdleConns as a hard limit.
 	PurgeRate  float64
@@ -90,6 +94,7 @@ func (gp *Gpool[T]) GpoolInit(addr string, port int, timeout int,
 	gp.MaxIdleConns = maxidleconns
 	gp.idle = newIdleQueue[T](gp.MaxIdleConns)
 	gp.MaxConnLife = maxconnlife
+	gp.RPCMaxRetries = 0
 
 	gp.Addr = addr
 	gp.Port = port
@@ -117,6 +122,7 @@ func (gp *Gpool[T]) GpoolInit2(ctx context.Context, addr string, port int, timeo
 	gp.idle = newIdleQueue[T](gp.MaxIdleConns)
 	gp.MaxConnLife = gp_conf.MaxConnLife
 	gp.MaxIdleConnLife = gp_conf.MaxIdleConnLife
+	gp.RPCMaxRetries = gp_conf.RPCMaxRetries
 	gp.PurgeRate = gp_conf.PurgeRate
 	gp.Addr = addr
 	gp.Port = port
@@ -378,6 +384,21 @@ func (pc *PoolConn[T]) Close(ctx context.Context) {
 	_ = pc.put(ctx)
 }
 
+// Discard permanently removes a borrowed connection from the pool instead of
+// returning it to the idle queue. It is intended for connections whose RPC or
+// protocol state is no longer safe to reuse and is idempotent with Close.
+func (pc *PoolConn[T]) Discard(ctx context.Context) {
+	if pc == nil || !pc.state.CompareAndSwap(uint32(poolConnBorrowed), uint32(poolConnReturning)) {
+		return
+	}
+
+	gp := pc.gp
+	gp.mutex.Lock()
+	gp.inUse--
+	gp.closeConnectionLocked(ctx, pc)
+	gp.mutex.Unlock()
+}
+
 // Close stops the pool, rejects new Get calls, wakes queued waiters, and waits
 // until idle, borrowed, creating, and closing connections have all been
 // physically closed. If ctx expires, shutdown continues in the background and
@@ -536,96 +557,120 @@ func (gp *Gpool[T]) GetCaller(skip int) (fileName string, line string, funcName 
 	return fileName, ":" + strconv.Itoa(iline), funcName
 }
 
-func (gp *Gpool[T]) ThriftCall2(ctx context.Context, process func(client interface{}) (string, error)) error {
-	var rpc_err error
-	var rpc_name string = ""
-	//file, line, fn := gp.GetCaller(2)
+type rpcCall2Process[T any] func(*PoolConn[T]) (string, error)
 
-	starttime := time.Now()
+// isDisconnectedError reports whether an RPC failed because its transport was
+// disconnected. Timeouts are deliberately excluded: the server may already
+// have processed a timed-out request, so replaying it is not generally safe.
+func (gp *Gpool[T]) isDisconnectedError(err error) bool {
+	var transportErr thrift.TTransportException
+	if !errors.As(err, &transportErr) {
+		return false
+	}
+
+	switch transportErr.TypeId() {
+	case thrift.NOT_OPEN, thrift.END_OF_FILE:
+		return true
+	case thrift.UNKNOWN_TRANSPORT_EXCEPTION:
+		return errors.Is(err, io.EOF) ||
+			errors.Is(err, io.ErrUnexpectedEOF) ||
+			errors.Is(err, net.ErrClosed) ||
+			errors.Is(err, syscall.ECONNRESET) ||
+			errors.Is(err, syscall.EPIPE)
+	default:
+		return false
+	}
+}
+
+// thriftCall2Once borrows and returns exactly one connection. Keeping the
+// defer inside this per-attempt function prevents retries from accumulating
+// borrowed connections and exhausting the pool.
+func (gp *Gpool[T]) thriftCall2Once(ctx context.Context, funcName string, process rpcCall2Process[T]) (string, error) {
+	pc, err := gp.Get(ctx)
+	if err != nil {
+		logger.Warn(ctx, "get pool connection failed", "func", funcName, "addr", gp.Addr, "port", gp.Port, "err", err)
+		return "", err
+	}
+	returnToPool := true
 	defer func() {
-		logger.Info(ctx, "gpool rpc call", "func", "ThriftCall2", "method", rpc_name, "addr", gp.Addr, "port", gp.Port, "timeout_ms", gp.TimeOut, "cost", time.Since(starttime), "err", rpc_err)
+		if returnToPool {
+			pc.Close(ctx)
+		}
 	}()
 
-	pc, err := gp.Get(ctx)
-	if pc != nil {
-		defer pc.Close(ctx)
+	rpcName, err := process(pc)
+	if err == nil {
+		return rpcName, nil
 	}
-	if err != nil {
-		logger.Warn(ctx, "get pool connection failed", "addr", gp.Addr, "port", gp.Port, "err", err)
-		return err
+
+	logger.Warn(ctx, "gpool rpc call failed", "func", funcName, "method", rpcName, "addr", gp.Addr, "port", gp.Port, "err", err)
+	var transportErr thrift.TTransportException
+	if errors.As(err, &transportErr) {
+		logger.Warn(ctx, "thrift transport exception", "type_id", transportErr.TypeId(), "err", err)
+		returnToPool = false
+		pc.Discard(ctx)
+		return rpcName, err
 	}
-	client := pc.Gc.GetThrfitClient()
-	rpc_name, err = process(client)
-	if err != nil {
-		rpc_err = err
-		logger.Warn(ctx, "gpool rpc call failed", "func", "ThriftCall2", "method", rpc_name, "addr", gp.Addr, "port", gp.Port, "err", err)
-		switch err.(type) {
-		case thrift.TTransportException:
-			tte := err.(thrift.TTransportException)
-			e_type_id := tte.TypeId()
-			logger.Warn(ctx, "thrift transport exception", "type_id", e_type_id, "err", err)
-			pc.Gc.Close()
-		case thrift.TProtocolException:
-			tpe := err.(thrift.TProtocolException)
-			e_type_id := tpe.TypeId()
-			logger.Warn(ctx, "thrift protocol exception", "type_id", e_type_id, "err", err)
-			pc.Gc.Close()
-		default:
-			logger.Warn(ctx, "gpool rpc error", "err", err)
+
+	var protocolErr thrift.TProtocolException
+	if errors.As(err, &protocolErr) {
+		logger.Warn(ctx, "thrift protocol exception", "type_id", protocolErr.TypeId(), "err", err)
+		returnToPool = false
+		pc.Discard(ctx)
+		return rpcName, err
+	}
+
+	logger.Warn(ctx, "gpool rpc error", "err", err)
+	return rpcName, err
+}
+
+func (gp *Gpool[T]) thriftCall2WithRetry(ctx context.Context, funcName string, process rpcCall2Process[T]) (string, error) {
+	maxRetries := gp.RPCMaxRetries
+	if maxRetries < 0 {
+		maxRetries = 0
+	}
+
+	var rpcName string
+	for attempt := 0; ; attempt++ {
+		attemptName, err := gp.thriftCall2Once(ctx, funcName, process)
+		if attemptName != "" {
+			rpcName = attemptName
 		}
-		return err
+		if err == nil {
+			return rpcName, nil
+		}
+		if attempt >= maxRetries || !gp.isDisconnectedError(err) {
+			return rpcName, err
+		}
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return rpcName, ctxErr
+		}
+
+		logger.Warn(ctx, "retry disconnected thrift rpc", "func", funcName, "method", rpcName, "addr", gp.Addr, "port", gp.Port, "retry", attempt+1, "max_retries", maxRetries, "err", err)
 	}
-	return nil
+}
+
+func (gp *Gpool[T]) ThriftCall2(ctx context.Context, process func(client interface{}) (string, error)) error {
+	starttime := time.Now()
+	rpcName, rpcErr := gp.thriftCall2WithRetry(ctx, "ThriftCall2", func(pc *PoolConn[T]) (string, error) {
+		return process(pc.Gc.GetThrfitClient())
+	})
+	logger.Info(ctx, "gpool rpc call", "func", "ThriftCall2", "method", rpcName, "addr", gp.Addr, "port", gp.Port, "timeout_ms", gp.TimeOut, "cost", time.Since(starttime), "err", rpcErr)
+	return rpcErr
 }
 
 func (gp *Gpool[T]) ThriftWithTimeOutCall2(ctx context.Context, timeout time.Duration, process func(client interface{}) (string, error)) error {
-	var rpc_err error
-	var rpc_name string = ""
-	//file, line, fn := gp.GetCaller(2)
 	starttime := time.Now()
-	defer func() {
-		logger.Info(ctx, "gpool rpc call", "func", "ThriftWithTimeOutCall2", "method", rpc_name, "addr", gp.Addr, "port", gp.Port, "timeout_ms", gp.TimeOut, "call_timeout", timeout, "cost", time.Since(starttime), "err", rpc_err)
-	}()
-
-	pc, err := gp.Get(ctx)
-	if pc != nil {
-		defer pc.Close(ctx)
-	}
-	if err != nil {
-		logger.Warn(ctx, "get pool connection failed", "addr", gp.Addr, "port", gp.Port, "err", err)
-		return err
-	}
-	pc.Gc.SetTimeOut(ctx, timeout)
-	client := pc.Gc.GetThrfitClient()
-	//rpc_name, err = process(client)
-	_, err = process(client)
-	pc.Gc.SetTimeOut(ctx, time.Duration(gp.TimeOut)*time.Millisecond)
-	if err != nil {
-		rpc_err = err
-		logger.Warn(ctx, "gpool rpc call failed", "func", "ThriftWithTimeOutCall2", "method", rpc_name, "addr", gp.Addr, "port", gp.Port, "err", err)
-		switch err.(type) {
-		case thrift.TTransportException:
-			tte := err.(thrift.TTransportException)
-			e_type_id := tte.TypeId()
-			logger.Warn(ctx, "thrift transport exception", "type_id", e_type_id, "err", err)
-			pc.Gc.Close()
-		case thrift.TProtocolException:
-			tpe := err.(thrift.TProtocolException)
-			e_type_id := tpe.TypeId()
-			logger.Warn(ctx, "thrift protocol exception", "type_id", e_type_id, "err", err)
-			pc.Gc.Close()
-		default:
-			logger.Warn(ctx, "gpool rpc error", "err", err)
-		}
-		return err
-	}
-	return nil
+	rpcName, rpcErr := gp.thriftCall2WithRetry(ctx, "ThriftWithTimeOutCall2", func(pc *PoolConn[T]) (string, error) {
+		pc.Gc.SetTimeOut(ctx, timeout)
+		defer pc.Gc.SetTimeOut(ctx, time.Duration(gp.TimeOut)*time.Millisecond)
+		return process(pc.Gc.GetThrfitClient())
+	})
+	logger.Info(ctx, "gpool rpc call", "func", "ThriftWithTimeOutCall2", "method", rpcName, "addr", gp.Addr, "port", gp.Port, "timeout_ms", gp.TimeOut, "call_timeout", timeout, "cost", time.Since(starttime), "err", rpcErr)
+	return rpcErr
 }
 
 func (gp *Gpool[T]) ThriftExtCall2(ctx context.Context, process func(ctx context.Context, client interface{}) (string, error)) error {
-	var rpc_err error
-	var rpc_name string = ""
-	//file, line, fn := gp.GetCaller(3)
 	if eCtx, ok := ctx.(*ExtContext); ok {
 		clientService := eCtx.GetReqExtData(THRIFT_EXT_CALL_CLIENT_SERVICE)
 		if clientService == "" {
@@ -633,52 +678,16 @@ func (gp *Gpool[T]) ThriftExtCall2(ctx context.Context, process func(ctx context
 			ctx = eCtx
 		}
 	}
+
 	starttime := time.Now()
-	defer func() {
-		//nCtx := ctx.(*ExtContext)
-		//rid := nCtx.GetReqExtData("request_id")
-		logger.Info(ctx, "gpool rpc call", "func", "ThriftExtCall2", "method", rpc_name, "addr", gp.Addr, "port", gp.Port, "timeout_ms", gp.TimeOut, "cost", time.Since(starttime), "err", rpc_err)
-
-	}()
-
-	pc, err := gp.Get(ctx)
-	if pc != nil {
-		defer pc.Close(ctx)
-	}
-	if err != nil {
-		logger.Warn(ctx, "get pool connection failed", "addr", gp.Addr, "port", gp.Port, "err", err)
-		rpc_err = err
-		return err
-	}
-	client := pc.Gc.GetThrfitClient()
-	//rpc_name, err = process(ctx, client)
-	_, err = process(ctx, client)
-	if err != nil {
-		rpc_err = err
-		logger.Warn(ctx, "gpool rpc call failed", "func", "ThriftExtCall2", "method", rpc_name, "addr", gp.Addr, "port", gp.Port, "err", err)
-		switch err.(type) {
-		case thrift.TTransportException:
-			tte := err.(thrift.TTransportException)
-			e_type_id := tte.TypeId()
-			logger.Warn(ctx, "thrift transport exception", "type_id", e_type_id, "err", err)
-			pc.Gc.Close()
-		case thrift.TProtocolException:
-			tpe := err.(thrift.TProtocolException)
-			e_type_id := tpe.TypeId()
-			logger.Warn(ctx, "thrift protocol exception", "type_id", e_type_id, "err", err)
-			pc.Gc.Close()
-		default:
-			logger.Warn(ctx, "gpool rpc error", "err", err)
-		}
-		return err
-	}
-	return nil
+	rpcName, rpcErr := gp.thriftCall2WithRetry(ctx, "ThriftExtCall2", func(pc *PoolConn[T]) (string, error) {
+		return process(ctx, pc.Gc.GetThrfitClient())
+	})
+	logger.Info(ctx, "gpool rpc call", "func", "ThriftExtCall2", "method", rpcName, "addr", gp.Addr, "port", gp.Port, "timeout_ms", gp.TimeOut, "cost", time.Since(starttime), "err", rpcErr)
+	return rpcErr
 }
 
 func (gp *Gpool[T]) ThriftWithTimeOutExtCall2(ctx context.Context, timeout time.Duration, process func(ctx context.Context, client interface{}) (string, error)) error {
-	var rpc_err error
-	var rpc_name string = ""
-	//file, line, fn := gp.GetCaller(3)
 	if eCtx, ok := ctx.(*ExtContext); ok {
 		clientService := eCtx.GetReqExtData(THRIFT_EXT_CALL_CLIENT_SERVICE)
 		if clientService == "" {
@@ -686,46 +695,13 @@ func (gp *Gpool[T]) ThriftWithTimeOutExtCall2(ctx context.Context, timeout time.
 			ctx = eCtx
 		}
 	}
+
 	starttime := time.Now()
-	defer func() {
-		//nCtx := ctx.(*ExtContext)
-		//rid := nCtx.GetReqExtData("request_id")
-		logger.Info(ctx, "gpool rpc call", "func", "ThriftWithTimeOutExtCall2", "method", rpc_name, "addr", gp.Addr, "port", gp.Port, "timeout_ms", gp.TimeOut, "call_timeout", timeout, "cost", time.Since(starttime), "err", rpc_err)
-
-	}()
-
-	pc, err := gp.Get(ctx)
-	if pc != nil {
-		defer pc.Close(ctx)
-	}
-	if err != nil {
-		logger.Warn(ctx, "get pool connection failed", "addr", gp.Addr, "port", gp.Port, "err", err)
-		rpc_err = err
-		return err
-	}
-	pc.Gc.SetTimeOut(ctx, timeout)
-	client := pc.Gc.GetThrfitClient()
-	//rpc_name, err = process(ctx, client)
-	_, err = process(ctx, client)
-	pc.Gc.SetTimeOut(ctx, time.Duration(gp.TimeOut)*time.Millisecond)
-	if err != nil {
-		rpc_err = err
-		logger.Warn(ctx, "gpool rpc call failed", "func", "ThriftWithTimeOutExtCall2", "method", rpc_name, "addr", gp.Addr, "port", gp.Port, "err", err)
-		switch err.(type) {
-		case thrift.TTransportException:
-			tte := err.(thrift.TTransportException)
-			e_type_id := tte.TypeId()
-			logger.Warn(ctx, "thrift transport exception", "type_id", e_type_id, "err", err)
-			pc.Gc.Close()
-		case thrift.TProtocolException:
-			tpe := err.(thrift.TProtocolException)
-			e_type_id := tpe.TypeId()
-			logger.Warn(ctx, "thrift protocol exception", "type_id", e_type_id, "err", err)
-			pc.Gc.Close()
-		default:
-			logger.Warn(ctx, "gpool rpc error", "err", err)
-		}
-		return err
-	}
-	return nil
+	rpcName, rpcErr := gp.thriftCall2WithRetry(ctx, "ThriftWithTimeOutExtCall2", func(pc *PoolConn[T]) (string, error) {
+		pc.Gc.SetTimeOut(ctx, timeout)
+		defer pc.Gc.SetTimeOut(ctx, time.Duration(gp.TimeOut)*time.Millisecond)
+		return process(ctx, pc.Gc.GetThrfitClient())
+	})
+	logger.Info(ctx, "gpool rpc call", "func", "ThriftWithTimeOutExtCall2", "method", rpcName, "addr", gp.Addr, "port", gp.Port, "timeout_ms", gp.TimeOut, "call_timeout", timeout, "cost", time.Since(starttime), "err", rpcErr)
+	return rpcErr
 }
