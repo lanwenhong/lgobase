@@ -7,7 +7,7 @@ import (
 	"io"
 	"strconv"
 	"strings"
-
+	
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/google/uuid"
 	"github.com/lanwenhong/lgobase/logger"
@@ -61,7 +61,7 @@ func NewExtContext(ctx context.Context) *ExtContext {
 		Context: ctx,
 	}
 	nCtx.ReqExtData = make(map[string]string)
-
+	
 	/*if rid, ok := ctx.Value("request_id").(string); ok {
 		nCtx.ReqExtData["request_id"] = rid
 	}*/
@@ -174,7 +174,7 @@ func (p *ExtProcessor) ReadMagic(ctx context.Context, in, out thrift.TProtocol) 
 		}
 	}
 	binary.Write(buf, binary.BigEndian, uint16(magic))
-
+	
 	return magic, buf.Bytes(), true, nil
 }
 
@@ -203,6 +203,7 @@ func (p *ExtProcessor) ReadMetaMap(ctx context.Context, in, out thrift.TProtocol
 	logger.Debug(ctx, "read thrift extension map", "size", size)
 	var foundDepth bool = false
 	var callClientService string = ""
+	ctx = context.WithValue(ctx, THRIFT_EXT_DEPTH, "0")
 	for i := 0; i < size; i++ {
 		k, err := in.ReadString(ctx)
 		if err != nil {
@@ -223,7 +224,6 @@ func (p *ExtProcessor) ReadMetaMap(ctx context.Context, in, out thrift.TProtocol
 				logger.Warn(ctx, "parse thrift extension depth failed", "value", v, "err", err)
 			} else {
 				foundDepth = true
-				iv += 1
 				ctx = context.WithValue(ctx, k, strconv.Itoa(iv))
 			}
 		} else if k == THRIFT_EXT_CALL_CLIENT_SERVICE {
@@ -233,9 +233,6 @@ func (p *ExtProcessor) ReadMetaMap(ctx context.Context, in, out thrift.TProtocol
 			ctx = context.WithValue(ctx, k, v)
 		}
 		//logger.Debug(ctx, "thrift_ext", "k", k, "v", v)
-	}
-	if !foundDepth {
-		ctx = context.WithValue(ctx, THRIFT_EXT_DEPTH, "0")
 	}
 	if callClientService != "" {
 		ctx = context.WithValue(ctx, THRIFT_EXT_CLIENT_SERVICE, callClientService)
@@ -290,7 +287,7 @@ func (p *ExtProcessor) Process(ctx context.Context, in, out thrift.TProtocol) (b
 		/*for k, v := range reqData {
 			ctx = context.WithValue(ctx, k, v)
 		}*/
-
+		
 	} else {
 		logger.Debug(ctx, "select thrift protocol", "protocol", "standard")
 		multiReader := io.MultiReader(bytes.NewReader(preBuf), in.Transport())
