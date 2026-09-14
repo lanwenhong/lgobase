@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"reflect"
 	"time"
 
@@ -115,16 +116,22 @@ func (tc *TConn[T]) NewThClient(nc NewThriftClient[T]) {
 }
 
 func (tc *TConn[T]) Close() error {
+	var err error
 	if tc.Protocol == TH_PRO_FRAMED {
-		err := tc.Tft.Close()
+		err = tc.Tft.Close()
 		tc.isOpen = tc.Tft.IsOpen()
-		return err
 	} else if tc.Protocol == TH_PRO_BUFFER {
-		err := tc.Tbt.Close()
+		err = tc.Tbt.Close()
 		tc.isOpen = tc.Tbt.IsOpen()
-		return err
+	} else {
+		return errors.New("not support")
 	}
-	return errors.New("not support")
+	// Thrift's IsOpen can close a disconnected socket during its health check.
+	// Closing that socket again is successful cleanup, including at pool shutdown.
+	if errors.Is(err, net.ErrClosed) {
+		return nil
+	}
+	return err
 }
 
 func (tc *TConn[T]) IsOpen() bool {

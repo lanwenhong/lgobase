@@ -2,7 +2,9 @@
 
 ## 1. 文档目的
 
-本文档只描述 `gpool` 连接分配、归还、等待、创建和清理路径的优化思路，不代表所有方案都会直接实施。
+本文档记录 `gpool` 连接分配、归还、等待、创建和清理路径的优化思路及已实现行为；标为建议的方案不代表已实施。
+
+2026-09-14 已同步已关闭连接清理、异常连接丢弃逻辑（第 12.6 节）及对应回归结果（第 16.6 节）。
 
 建议按本文的编号逐项评审。每一项审核通过后再单独实现、测试和提交，避免一次改动过大，难以判断性能收益或回归来源。
 
@@ -99,7 +101,7 @@
 - 所有连接借还都竞争同一个 `Gpool.mutex`。
 - 空闲连接已经使用预分配 FIFO 环形队列，正常 Get/Put 不再产生链表节点分配。
 - waiter 慢路径需要创建结果 channel 和 timer。
-- 清理路径在全局锁内调用真实连接的 `Close`。
+- 清理路径已改为锁外同步 `Close`；关闭完成前仍占用容量。
 - 连接有效性和生命周期在每次 Get 时检查。
 
 #### 正确性问题
@@ -110,6 +112,8 @@
 - `PoolConn.Close` 已增加原子状态转换，同一次借用只能成功归还一次。
 - 清理路径已经改为锁外同步 Close，并删除了重复 Close 的后台清理 goroutine。
 - 已增加 `Gpool.Close(ctx)`，统一处理 idle、borrowed、creating、closing 和 waiter。
+- `TConn.Close()` 已将 `net.ErrClosed` 视为成功清理，避免 Thrift 健康检查先关闭 socket 后再次清理产生误报。
+- `Gpool.ThriftCall` 与四个 `Call2` 入口均通过 `Discard(ctx)` 丢弃传输或协议异常对应的连接，支持包装后的异常。
 
 ## 3. 总体设计原则
 
@@ -349,7 +353,9 @@ if !atomic.CompareAndSwapUint32(&pc.state, connBorrowed, connIdle) {
 
 当前实际状态为 `idle/borrowed/returning/closing/closed`。`Close(ctx)` 通过 CAS 将 `borrowed` 转换为 `returning`，失败时静默返回，以保持现有无返回值 API 兼容；随后根据归还结果进入 `idle`、再次直接交接为 `borrowed`，或者进入 `closing/closed`。
 
-该保护基于连接所有权约定：调用方执行 `Close` 后不能继续使用该 `PoolConn`；状态会在连接下一次合法借出时重新变为 `borrowed`。
+异常连接使用 `Discard(ctx)`：同样先将 `borrowed` CAS 为 `returning`，随后执行一次 `inUse--`，经锁外关闭进入 `closing/closed`，不会进入 idle 或交给 waiter。成功 Discard 后，已有的 `defer pc.Close(ctx)` 因状态不再是 `borrowed` 而直接返回。
+
+该保护基于连接所有权约定：调用方执行 `Close` 或 `Discard` 后不能继续使用该 `PoolConn`；正常归还的连接在下一次合法借出时会重新变为 `borrowed`。
 
 ### 7.3 API 行为需要评审
 
@@ -366,6 +372,7 @@ if !atomic.CompareAndSwapUint32(&pc.state, connBorrowed, connIdle) {
 - [x] 同一个连接连续 Close 两次，只能进入空闲池一次。
 - [x] 100 个 goroutine 同时 Close 同一个连接，只能一个成功归还。
 - [x] 重复 Close 后容量与 idle/inUse 计数保持一致。
+- [x] `Close`、`Discard` 与池关闭并发时，连接最终释放且容量计数正确。
 - [x] race detector 通过。
 
 ### 7.5 评审结论
@@ -731,7 +738,7 @@ closing -> closed
 
 - Put 延迟更低。
 - 需要有界队列、关闭池时 drain、错误处理和 worker 退出。
-- 当前实现已经存在重复 Close 和 goroutine 无法退出问题，不建议继续沿用现状。
+- 修改前的后台清理存在重复 Close 和 goroutine 无法退出问题；当前采用锁外同步关闭。
 
 ### 11.4 验收测试
 
@@ -803,6 +810,8 @@ idle 连接由一次后台关闭任务处理，保证 `Close(ctx)` 的 context �
 - [x] 重复调用 Close 安全且幂等。
 - [x] context 到期后关闭继续进行，后续 Close 可以继续等待。
 - [x] 不遗留 purge goroutine。
+- [x] 内置 Thrift 连接已经关闭时，idle 和 borrowed 清理均不会误报关闭失败。
+- [x] 其他真实关闭错误仍通过池关闭结果返回。
 
 ### 12.5 评审结论
 
@@ -810,6 +819,50 @@ idle 连接由一次后台关闭任务处理，保证 `Close(ctx)` 的 context �
 - [ ] 修改后接受
 - [ ] 暂不实施
 - 评审备注：采用温和关闭 borrowed；不增加 borrowed registry，不支持强制中断正在使用的连接。
+
+### 12.6 已关闭连接与异常 RPC 的清理语义（2026-09-14）
+
+#### 问题来源
+
+`v1.10.38` 曾出现以下日志：
+
+```text
+WARN close pool connection failed
+err="use of closed network connection"
+source="gpool.go:210"
+```
+
+两条已确认的触发路径：
+
+1. 空闲连接被对端关闭。`Get` 调用 `TConn.IsOpen()` 时，Apache Thrift v0.22.0 在支持 socket 探测的平台检测到断连，并先关闭本地 socket；池随后再次执行 `Close()`，底层返回 `net.ErrClosed`。
+2. 旧反射接口 `Gpool.ThriftCall` 遇到协议异常后直接执行 `pc.Gc.Close()`，随后 `defer pc.Close(ctx)` 将连接归还到 idle；下一次借用时再次关闭。`v1.10.38` 的 `Call2` 系列也有类似路径，后续已通过 `Discard` 修正。
+
+这条 WARN 本身不能证明 RPC 失败，也不能仅凭一条日志确定当时走了哪条路径。
+
+#### 当前处理规则
+
+下表的 RPC 回收规则适用于 `Gpool.ThriftCall` 和四个 `Call2` 池方法。
+
+| 场景 | 当前行为 |
+| --- | --- |
+| framed/buffered 的底层 Close 返回 `nil` | `TConn.Close()` 返回 `nil` |
+| `errors.Is(err, net.ErrClosed)` 成立，含包装后的错误 | `TConn.Close()` 返回 `nil`，按已完成清理处理 |
+| 其他关闭错误 | 原样返回；池保留 WARN，池关闭期间继续汇总到 `closeErr` |
+| `Gpool.ThriftCall` 获取连接失败 | 直接返回获取错误，不访问空连接 |
+| RPC 返回 Thrift 传输或协议异常 | 使用 `errors.As` 识别，调用 `pc.Discard(ctx)` 丢弃连接，并保留原 RPC 错误 |
+| RPC 成功或返回普通业务错误 | 正常执行 `pc.Close(ctx)` 归还连接，继续遵循容量、waiter 和池关闭规则 |
+
+`net.ErrClosed` 的处理位于内置 [TConn.Close](thriftclient.go)，覆盖空闲连接替换、异常丢弃、重复关闭和整个池关闭。通过 `errors.Is` 判断错误链；仅文本相同的普通错误仍会返回。通用 `Gpool` 对自定义 `Conn.Close()` 返回的错误仍按原有规则记录和处理。
+
+旧 [Gpool.ThriftCall](gpool.go) 的异常回收路径现在与 `ThriftCall2`、`ThriftWithTimeOutCall2`、`ThriftExtCall2`、`ThriftWithTimeOutExtCall2` 一致：
+
+```text
+获取连接成功 -> 执行 RPC
+  传输/协议异常 -> Discard -> inUse-- -> 锁外关闭 -> 释放容量
+  成功/业务错误 -> Close -> 正常归还
+```
+
+关闭期间仍使用原有 `closing` 容量计数，不会在物理关闭返回前释放槽位。旧反射接口仍只执行一次 RPC；此次修改不增加重试，四个 `Call2` 入口继续使用原有 `RPCMaxRetries` 策略。底层已关闭错误的归一化也不改变 RPC 本身的返回错误。
 
 ## 13. 评审项九：连接生命周期检查
 
@@ -844,12 +897,13 @@ Get 时只需要比较 deadline，而不是反复做差值和读取多个配置�
 
 ### 13.3 IsOpen 策略
 
-`IsOpen()` 只能说明本地 transport 状态，通常不能证明远端连接仍可用。
+当前内置 `TConn.IsOpen()` 委托 Thrift transport 检查。Apache Thrift v0.22.0 在支持 socket 探测的平台会检查断连状态，并可能在检查失败时关闭本地 socket，因此它并非纯状态读取。检查通过也不能保证随后的 RPC 一定成功。
 
-可选策略：
+当前策略：
 
-- 保留轻量本地 IsOpen 检查。
-- RPC 失败时标记连接 broken，归还时直接关闭。
+- 从 idle 借出时保留 `IsOpen()` 检查；发现断连后清理旧连接并创建替代连接。
+- `TConn.Close()` 按第 12.6 节处理已关闭错误，兼容健康检查提前关闭 socket 的行为。
+- RPC 返回传输或协议异常时立即 `Discard`；普通业务错误仍正常归还。
 - 不在每次 Get 时主动 ping，避免额外网络往返。
 
 ### 13.4 后台 reaper
@@ -965,6 +1019,8 @@ func (gp *Gpool[T]) Stats() PoolStats
 - 每个连接创建成功。
 - 每个连接正常清理成功。
 
+内置 Thrift 连接清理时，已关闭的 `net.ErrClosed` 不再触发 `close pool connection failed` 或 `close idle connection during pool shutdown failed`。其他关闭错误仍记录 WARN；RPC 自身的异常日志继续保留。该规则属于错误语义处理，不是日志限速或全局屏蔽 WARN。
+
 ### 15.3 高频异常日志限速
 
 当服务端不可用时，连接创建失败和等待超时可能形成日志风暴。建议在 logger 层或 gpool 层增加：
@@ -1017,7 +1073,9 @@ func (gp *Gpool[T]) Stats() PoolStats
 至少覆盖：
 
 ```bash
-go test -race ./gpool -run 'TestGpoolConcurrent'
+go test -race ./gpool \
+  -run '^(TestPoolConnCloseIsIdempotent|TestPoolConnConcurrentReleaseDuringShutdown|TestGpoolWaiterCancellationRacesWithDelivery)$' \
+  -count=1
 ```
 
 并行基准也用于扩大竞态窗口，但 race benchmark 的数值不用于性能比较。
@@ -1112,6 +1170,44 @@ go test -tags=performance ./gpool -run '^$' \
 go test -tags=performance ./gpool \
   -run '^TestGpoolNetworkRPCLatency$' -count=3 -v
 ```
+
+### 16.6 已关闭连接修复回归结果（2026-09-14）
+
+测试环境：Go 1.26.4、darwin/amd64、Apache Thrift v0.22.0。本次验证为功能和竞态回归，前文性能基准数据仍为原测量结果。
+
+新增用例位于 [thriftclient_close_test.go](thriftclient_close_test.go) 和 [close_regression_unix_test.go](close_regression_unix_test.go)，共 10 个顶层测试、33 个叶子场景：
+
+| 覆盖范围 | 场景数 | 核心断言 |
+| --- | ---: | --- |
+| framed/buffered 的 Close 错误语义 | 10 | 成功、已关闭、包装后的已关闭错误均返回 nil；真实错误和仅文本相同的普通错误保留 |
+| framed/buffered 重复关闭 | 2 | 连续关闭返回 nil，连接保持关闭状态 |
+| 池关闭时的错误传播 | 6 | idle/borrowed 两条路径忽略已关闭错误，保留真实关闭错误，重复池关闭结果一致 |
+| Close、Discard 与池关闭并发 | 1 | 最终容量清零，底层物理关闭计数为 1 |
+| 旧 ThriftCall 获取连接失败 | 1 | 返回 ErrPoolClosed，不发生空指针崩溃 |
+| framed/buffered 空闲连接被对端关闭 | 2 | 创建替代连接，原连接不再复用，无重复关闭 WARN |
+| 旧 ThriftCall 传输/协议异常 | 4 | 直接和包装后的异常均立即丢弃连接，保留原 RPC 错误 |
+| 普通业务错误及后续成功调用 | 1 | 连接正常归还并复用 |
+| 四个 Call2 入口的协议异常 | 4 | 异常连接不再入池，下次借用获得新连接，无重复关闭 WARN |
+| 已关闭真实 Thrift 连接的池关闭 | 2 | idle/borrowed 清理成功，无关闭失败 WARN |
+
+断连复现使用本地 Unix socket pair，并经过实际 Thrift socket、framed/buffered transport 和连接池代码；观察对端 EOF 后才触发池检查，不依赖固定 sleep 或外部服务。该组测试由 `!windows && !wasm` 构建条件控制。
+
+验证结果：
+
+- 修复前，新用例捕获原 WARN、异常连接仍留在 idle，以及池关闭返回 `net.ErrClosed`；修复后通过。
+- 从 `gpool` 和 `network` 选择的 78 个顶层回归测试通过 `-race`，计入子测试共 155 个通过结果，覆盖容量、等待队列、选择器和关闭流程。
+- 上表 33 个场景带 `-race` 重复 50 次，1650 次叶子场景执行全部通过。
+- `git diff --check` 和 Go 格式检查通过。
+
+在仓库根目录执行本次新增回归：
+
+```bash
+go test -race ./gpool \
+  -run '^(TestCloseRegression.*|TestTConnCloseErrorSemantics|TestTConnRepeatedClose|TestGpoolShutdownPreservesRealCloseErrors|TestPoolConnConcurrentReleaseDuringShutdown|TestGpoolThriftCallReturnsBorrowError)$' \
+  -count=50 -timeout=120s
+```
+
+上述 78 项为定向选择的相关回归，不代表全仓库测试全部执行。33 个新增场景的断连验证使用本地 socket pair，不包含外部 TCP 服务或生产环境联调。
 
 ## 17. 分阶段提交建议
 

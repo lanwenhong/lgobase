@@ -470,9 +470,10 @@ func (gp *Gpool[T]) closeIdleConnections(connections []*PoolConn[T]) {
 func (gp *Gpool[T]) ThriftCall(ctx context.Context, method string, arguments ...interface{}) (interface{}, error) {
 	var rpc_err error = nil
 	pc, err := gp.Get(ctx)
-	if pc != nil {
-		defer pc.Close(ctx)
+	if err != nil {
+		return nil, err
 	}
+	defer pc.Close(ctx)
 	tconn := pc.Gc.(*TConn[T])
 
 	c := reflect.ValueOf(tconn.Client)
@@ -519,10 +520,10 @@ func (gp *Gpool[T]) ThriftCall(ctx context.Context, method string, arguments ...
 	}
 	if rpc_err != nil {
 		logger.Warn(ctx, "thrift rpc call failed", "method", method, "addr", gp.Addr, "port", gp.Port, "err", rpc_err)
-		switch rpc_err.(type) {
-		case thrift.TTransportException:
-		case thrift.TProtocolException:
-			pc.Gc.Close()
+		var transportErr thrift.TTransportException
+		var protocolErr thrift.TProtocolException
+		if errors.As(rpc_err, &transportErr) || errors.As(rpc_err, &protocolErr) {
+			pc.Discard(ctx)
 		}
 	}
 	if retlen == 1 {
