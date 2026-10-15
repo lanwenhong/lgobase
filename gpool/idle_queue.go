@@ -1,6 +1,6 @@
 package gpool
 
-// idleQueue is a fixed-capacity FIFO ring for idle connections. It is not
+// idleQueue is a fixed-capacity ring for idle connections. It is not
 // thread-safe; Gpool protects every operation with its mutex.
 type idleQueue[T any] struct {
 	items []*PoolConn[T]
@@ -40,6 +40,7 @@ func (q *idleQueue[T]) Push(pc *PoolConn[T]) bool {
 	return true
 }
 
+// Pop removes the oldest idle connection, including when evicting a full ring.
 func (q *idleQueue[T]) Pop() *PoolConn[T] {
 	if q.size == 0 {
 		return nil
@@ -51,6 +52,22 @@ func (q *idleQueue[T]) Pop() *PoolConn[T] {
 	if q.head == len(q.items) {
 		q.head = 0
 	}
+	q.size--
+	return pc
+}
+
+// PopNewest removes the most recently returned idle connection for LIFO reuse.
+func (q *idleQueue[T]) PopNewest() *PoolConn[T] {
+	if q.size == 0 {
+		return nil
+	}
+
+	if q.tail == 0 {
+		q.tail = len(q.items)
+	}
+	q.tail--
+	pc := q.items[q.tail]
+	q.items[q.tail] = nil
 	q.size--
 	return pc
 }

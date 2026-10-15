@@ -195,11 +195,11 @@ func TestRPCPoolSelectorRejectsInvalidConfiguration(t *testing.T) {
 	}
 }
 
-func TestRPCPoolSelectorPreservesGPoolConfigPositionalLayout(t *testing.T) {
+func TestRPCPoolSelectorGPoolConfigPositionalLayoutWithPoolFIFO(t *testing.T) {
 	factory := &internalSelectorFactory{}
 	conf := GPoolConfig[internalTestClient]{
 		"node:9000/1000", 1, 1, 1, 0, 0, 0,
-		factory.create, nil, nil, 0, nil, 0,
+		factory.create, nil, nil, 0, nil, 0, false,
 	}
 	poolSelector, err := NewRpcPoolSelectorWithError(context.Background(), &conf)
 	if err != nil {

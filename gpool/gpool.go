@@ -50,6 +50,7 @@ type PoolConn[T any] struct {
 
 type Gpool[T any] struct {
 	idle            idleQueue[T]
+	poolFIFO        bool
 	MaxConns        int
 	MaxIdleConns    int
 	MaxConnLife     int64
@@ -93,6 +94,7 @@ func (gp *Gpool[T]) GpoolInit(addr string, port int, timeout int,
 	gp.MaxConns = maxconns
 	gp.MaxIdleConns = maxidleconns
 	gp.idle = newIdleQueue[T](gp.MaxIdleConns)
+	gp.poolFIFO = false
 	gp.MaxConnLife = maxconnlife
 	gp.RPCMaxRetries = 0
 
@@ -120,6 +122,7 @@ func (gp *Gpool[T]) GpoolInit2(ctx context.Context, addr string, port int, timeo
 		gp.MaxIdleConns = gp.MaxConns
 	}
 	gp.idle = newIdleQueue[T](gp.MaxIdleConns)
+	gp.poolFIFO = gp_conf.PoolFIFO
 	gp.MaxConnLife = gp_conf.MaxConnLife
 	gp.MaxIdleConnLife = gp_conf.MaxIdleConnLife
 	gp.RPCMaxRetries = gp_conf.RPCMaxRetries
@@ -228,7 +231,12 @@ func (gp *Gpool[T]) closeConnectionLocked(ctx context.Context, pc *PoolConn[T]) 
 
 func (gp *Gpool[T]) getConnFromIdle(ctx context.Context) (*PoolConn[T], error) {
 	var reterr error
-	pc := gp.idle.Pop()
+	var pc *PoolConn[T]
+	if gp.poolFIFO {
+		pc = gp.idle.Pop()
+	} else {
+		pc = gp.idle.PopNewest()
+	}
 	pc.state.Store(uint32(poolConnBorrowed))
 	var isMaxConnLife bool = false
 	var isMaxIdleConnLife bool = false

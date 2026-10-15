@@ -449,17 +449,19 @@ func TestGpoolIdleRingEvictsOldestConnection(t *testing.T) {
 		t.Fatalf("newest idle connection close calls = %d, want 0", got)
 	}
 
-	gotSecond, err := pool.Get(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
 	gotThird, err := pool.Get(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if gotSecond != second || gotThird != third {
-		t.Fatalf("remaining FIFO order = [%p, %p], want [%p, %p]", gotSecond, gotThird, second, third)
+	gotSecond, err := pool.Get(ctx)
+	if err != nil {
+		t.Fatal(err)
 	}
+	if gotSecond != second || gotThird != third {
+		t.Fatalf("remaining LIFO order = [%p, %p], want [%p, %p]", gotThird, gotSecond, third, second)
+	}
+	gotThird.Close(ctx)
+	gotSecond.Close(ctx)
 }
 
 func TestGpoolIdleRingKeepsAllConnectionsWhenIdleEqualsMax(t *testing.T) {

@@ -44,6 +44,10 @@ type GPoolConfig[T any] struct {
 	// fails because its connection was disconnected. Zero and negative values
 	// preserve the historical behavior and disable retries.
 	RPCMaxRetries int
+	// PoolFIFO selects FIFO reuse of idle connections. The default (false) uses
+	// LIFO, preferring the most recently returned connection. This does not
+	// affect the FIFO order of callers waiting for a connection.
+	PoolFIFO bool
 }
 
 type RpcSvr[T any] struct {
