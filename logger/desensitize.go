@@ -3,6 +3,7 @@ package logger
 import (
 	"encoding/json"
 	"encoding/xml"
+	"io"
 	"log/slog"
 	"reflect"
 	"strings"
@@ -22,6 +23,14 @@ const (
 )
 
 type DesensitizeFunc func(any) any
+
+// jsonLogValue embeds JSON in JSON logs and renders readable JSON in text logs.
+// RawMessage alone formats as byte numbers when passed to fmt.Sprint.
+type jsonLogValue struct {
+	json.RawMessage
+}
+
+func (v jsonLogValue) String() string { return string(v.RawMessage) }
 
 type xmlNode struct {
 	XMLName xml.Name
@@ -82,12 +91,7 @@ func (h *DesensitizeHandler) IsXML(s string) bool {
 func (h *DesensitizeHandler) desensitizeString(s string) any {
 	// JSON 字符串自动解析脱敏
 	if h.IsJSON(s) {
-		var obj any
-		if err := json.Unmarshal([]byte(s), &obj); err == nil {
-			masked := h.Desensitize(obj)
-			bs, _ := json.Marshal(masked)
-			return json.RawMessage(bs)
-		}
+		return h.desensitizeJSON(s)
 	}
 
 	// XML 解析脱敏（无正则）
@@ -101,6 +105,65 @@ func (h *DesensitizeHandler) desensitizeString(s string) any {
 	}
 
 	return s
+}
+
+func (h *DesensitizeHandler) desensitizeJSON(s string) any {
+	decoder := json.NewDecoder(strings.NewReader(s))
+	// Keep ID, amount and other numeric tokens exact instead of rounding through
+	// float64. Custom masks for JSON numeric fields receive json.Number.
+	decoder.UseNumber()
+	var obj any
+	if err := decoder.Decode(&obj); err != nil {
+		return s
+	}
+	// Decode must consume exactly one value, just like json.Unmarshal.
+	var extra any
+	if err := decoder.Decode(&extra); err != io.EOF {
+		return s
+	}
+	bs, err := json.Marshal(h.Desensitize(obj))
+	if err != nil {
+		// A custom mask may return an unsupported value. Do not fall back to the
+		// original sensitive JSON, or silently emit null for a failed encoding.
+		return MASKSTR
+	}
+	return jsonLogValue{RawMessage: bs}
+}
+
+// jsonAttrValue recognizes JSON field values when masking is disabled without
+// traversing unrelated maps or structs. Message and metadata attributes bypass
+// this conversion in DesensitizeReplaceAttr.
+func jsonAttrValue(v any) (any, bool) {
+	val := reflect.ValueOf(v)
+	if !val.IsValid() {
+		return nil, false
+	}
+	for val.Kind() == reflect.Ptr {
+		if val.IsNil() {
+			return nil, false
+		}
+		val = val.Elem()
+	}
+	switch value := val.Interface().(type) {
+	case jsonLogValue:
+		return value, true
+	case json.RawMessage:
+		if value == nil {
+			return nil, true
+		}
+		if json.Valid(value) {
+			return jsonLogValue{RawMessage: value}, true
+		}
+		return string(value), true
+	}
+	if val.Kind() == reflect.String {
+		s := val.String()
+		h := NewDesensitizeHandler()
+		if h.IsJSON(s) && json.Valid([]byte(s)) {
+			return jsonLogValue{RawMessage: json.RawMessage(s)}, true
+		}
+	}
+	return nil, false
 }
 
 func (h *DesensitizeHandler) desensitizeStruct(val reflect.Value) any {
@@ -172,6 +235,17 @@ func (h *DesensitizeHandler) Desensitize(v any) any {
 		}
 		val = val.Elem()
 	}
+	switch value := val.Interface().(type) {
+	case json.Number:
+		return value
+	case json.RawMessage:
+		if value == nil {
+			return nil
+		}
+		return h.desensitizeJSON(string(value))
+	case jsonLogValue:
+		return h.desensitizeJSON(string(value.RawMessage))
+	}
 
 	switch val.Kind() {
 	case reflect.String:
@@ -189,19 +263,17 @@ func (h *DesensitizeHandler) Desensitize(v any) any {
 
 func DesensitizeReplaceAttr(groups []string, a slog.Attr) slog.Attr {
 	h := NewDesensitizeHandler()
-	if Gfilelog.Logconf.DesensitizeField == "" {
-		/*v := a.Value.Any()
-		val := reflect.ValueOf(v)
-		if val.Kind() == reflect.String && json.Valid([]byte(val.String())) {
-			a.Value = slog.AnyValue(h.Desensitize(a.Value.Any()))
-		}*/
-		return a
-	}
 	switch a.Key {
 	case slog.TimeKey, slog.LevelKey, slog.MessageKey,
 		slog.SourceKey, IGNORE_CALL_CLIENT_SERVIC, IGNORE_CLIENT_SERVICE,
 		IGNORE_TRACE_DEPTH, IGNORE_SRC_FIle, IGNORE_FN,
 		IGNORE_COST, IGNORE_REQUEST_ID, IGNORE_TRACE_ID:
+		return a
+	}
+	if Gfilelog.Logconf.DesensitizeField == "" {
+		if value, ok := jsonAttrValue(a.Value.Any()); ok {
+			a.Value = slog.AnyValue(value)
+		}
 		return a
 	}
 	if h.sensitiveFieldMap(a.Key) {
