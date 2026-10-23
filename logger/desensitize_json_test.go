@@ -8,8 +8,10 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
 
 func setupJSONDesensitizeTest(t *testing.T, fields string) *DesensitizeHandler {
@@ -213,6 +215,149 @@ func TestJSONFieldPublicLoggerWritesStructuredData(t *testing.T) {
 				}
 			} else if !bytes.Contains(raw, []byte(`data={"id":7516676763448115301,"password":"******"}`)) {
 				t.Fatalf("logger.Info text output = %s", raw)
+			}
+		})
+	}
+}
+
+func assertJSONFieldEqual(t *testing.T, actual json.RawMessage, expected string) {
+	t.Helper()
+	decode := func(data string) any {
+		decoder := json.NewDecoder(strings.NewReader(data))
+		decoder.UseNumber()
+		var value any
+		if err := decoder.Decode(&value); err != nil {
+			t.Fatalf("invalid JSON %s: %v", data, err)
+		}
+		return value
+	}
+	if !reflect.DeepEqual(decode(string(actual)), decode(expected)) {
+		t.Fatalf("JSON field = %s, want %s", actual, expected)
+	}
+}
+
+func TestJSONFieldNestedGoContainers(t *testing.T) {
+	const body = `{"password":"test-secret","id":7516676763448115301}`
+	type child struct{ Data string }
+	input := struct {
+		Data  string
+		Raw   json.RawMessage
+		Child *child
+		Items []any
+		ID    uint64
+	}{body, json.RawMessage(body), &child{body}, []any{child{body}, map[string]any{"Data": body}}, 7516676763448115301}
+	const expected = `{"Data":BODY,"Raw":BODY,"Child":{"Data":BODY},"Items":[{"Data":BODY},{"Data":BODY}],"ID":7516676763448115301}`
+	for _, fields := range []string{"", "password"} {
+		t.Run("mask="+fields, func(t *testing.T) {
+			setupJSONDesensitizeTest(t, fields)
+			wantBody := body
+			if fields != "" {
+				wantBody = strings.ReplaceAll(body, "test-secret", MASKSTR)
+			}
+			want := strings.ReplaceAll(expected, "BODY", wantBody)
+			for _, tc := range []struct {
+				name  string
+				value any
+				want  string
+			}{
+				{"struct", input, want},
+				{"pointer", &input, want},
+				{"map", map[string]any{"request": input}, `{"request":` + want + `}`},
+				{"slice", []any{input}, `[` + want + `]`},
+				{"array", [1]any{input}, `[` + want + `]`},
+			} {
+				t.Run(tc.name, func(t *testing.T) {
+					log := renderJSONAttr(t, slog.Any("data", tc.value))
+					assertJSONFieldEqual(t, log["data"], tc.want)
+					text := string((&CustomHandler{}).appendTextAttr(nil, slog.Any("data", tc.value)))
+					if !strings.Contains(text, `"id":7516676763448115301`) || strings.Contains(text, `\"id\"`) {
+						t.Fatalf("nested text JSON lost structure: %s", text)
+					}
+					if fields != "" && strings.Contains(text, "test-secret") {
+						t.Fatalf("nested text JSON was not masked: %s", text)
+					}
+				})
+			}
+		})
+	}
+	if input.Data != body || input.Child.Data != body {
+		t.Fatal("logging modified the caller's struct")
+	}
+}
+
+type nestedJSONMarshaler struct{}
+
+func (nestedJSONMarshaler) MarshalJSON() ([]byte, error) {
+	return []byte(`{"body":"{\"id\":7516676763448115301}"}`), nil
+}
+
+func TestJSONFieldNestedStructPreservesJSONEncoding(t *testing.T) {
+	setupJSONDesensitizeTest(t, "")
+	input := struct {
+		Body    string              `json:"body"`
+		ID      uint64              `json:"id"`
+		Quoted  int                 `json:"quoted,string"`
+		Skip    string              `json:"-"`
+		Empty   string              `json:"empty,omitempty"`
+		Bytes   []byte              `json:"bytes"`
+		Nil     []string            `json:"nil"`
+		When    time.Time           `json:"when"`
+		Custom  nestedJSONMarshaler `json:"custom"`
+		Invalid string              `json:"invalid"`
+		private string
+	}{
+		Body: `{"id":7516676763448115301}`, ID: 7516676763448115301,
+		Quoted: 123, Skip: "hidden", Bytes: []byte("abc"),
+		When:    time.Date(2026, 10, 23, 0, 0, 0, 0, time.UTC),
+		Invalid: `{"id":1} trailing`, private: "private-value",
+	}
+	log := renderJSONAttr(t, slog.Any("data", &input))
+	assertJSONFieldEqual(t, log["data"], `{"body":{"id":7516676763448115301},"id":7516676763448115301,"quoted":"123","bytes":"YWJj","nil":null,"when":"2026-10-23T00:00:00Z","custom":{"body":{"id":7516676763448115301}},"invalid":"{\"id\":1} trailing"}`)
+}
+
+func TestJSONFieldUnchangedContainersKeepOriginalValue(t *testing.T) {
+	setupJSONDesensitizeTest(t, "")
+	plain := &struct{ Text string }{"ordinary text"}
+	cycle := &struct{ Next any }{}
+	cycle.Next = cycle
+	for _, value := range []any{plain, cycle, errors.New("test error"), []byte(`{"id":123}`)} {
+		attr := DesensitizeReplaceAttr(nil, slog.Any("data", value))
+		if !reflect.DeepEqual(attr.Value.Any(), value) {
+			t.Fatalf("unrelated value %T changed into %T", value, attr.Value.Any())
+		}
+	}
+}
+
+func TestJSONFieldPublicLoggerWritesNestedStruct(t *testing.T) {
+	for _, format := range []int{JSON_FORMAT, TEXT_FORMAT} {
+		t.Run(map[int]string{JSON_FORMAT: "json", TEXT_FORMAT: "text"}[format], func(t *testing.T) {
+			previous, previousDefault := Gfilelog, slog.Default()
+			dir := t.TempDir()
+			log := Newglog(dir, "nested.log", "nested.log.err", &Glogconf{
+				RotateMethod: ROTATE_FILE_DAILY, Loglevel: INFO, Format: format,
+			})
+			t.Cleanup(func() {
+				log.LogObj.logfile.Close()
+				log.LogObj.logfile_err.Close()
+				Gfilelog = previous
+				slog.SetDefault(previousDefault)
+			})
+			request := struct {
+				Body string `json:"body"`
+			}{`{"id":7516676763448115301}`}
+			Info(context.Background(), "request", "data", &request)
+			raw, err := os.ReadFile(filepath.Join(dir, "nested.log"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if format == JSON_FORMAT {
+				var record map[string]json.RawMessage
+				if err := json.Unmarshal(raw, &record); err != nil {
+					t.Fatal(err)
+				}
+				assertJSONFieldEqual(t, record["data"], `{"body":{"id":7516676763448115301}}`)
+			} else if !bytes.Contains(raw, []byte(`data={"body":{"id":7516676763448115301}}`)) {
+				t.Fatalf("logger.Info nested text output = %s", raw)
 			}
 		})
 	}
