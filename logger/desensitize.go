@@ -130,10 +130,12 @@ func (h *DesensitizeHandler) desensitizeJSON(s string) any {
 	return jsonLogValue{RawMessage: bs}
 }
 
-// jsonAttrValue recognizes JSON field values when masking is disabled without
-// traversing unrelated maps or structs. Message and metadata attributes bypass
-// this conversion in DesensitizeReplaceAttr.
+// jsonAttrValue recognizes JSON strings, including strings nested in containers,
+// when masking is disabled. Message and metadata attributes bypass this conversion.
 func jsonAttrValue(v any) (any, bool) {
+	if _, ok := v.(error); ok {
+		return nil, false
+	}
 	val := reflect.ValueOf(v)
 	if !val.IsValid() {
 		return nil, false
@@ -163,7 +165,61 @@ func jsonAttrValue(v any) (any, bool) {
 			return jsonLogValue{RawMessage: json.RawMessage(s)}, true
 		}
 	}
+	switch val.Kind() {
+	case reflect.Struct, reflect.Map, reflect.Slice, reflect.Array:
+		return jsonContainerAttrValue(v)
+	}
 	return nil, false
+}
+
+func jsonContainerAttrValue(v any) (any, bool) {
+	// Normalize the encoded view rather than reflecting structs into maps: this
+	// preserves JSON tags, omitted/private fields, MarshalJSON, times and []byte.
+	// encoding/json also detects cycles instead of recursing indefinitely here.
+	bs, err := json.Marshal(v)
+	if err != nil {
+		return nil, false
+	}
+	decoder := json.NewDecoder(strings.NewReader(string(bs)))
+	decoder.UseNumber()
+	var obj any
+	if err := decoder.Decode(&obj); err != nil {
+		return nil, false
+	}
+	obj, changed := expandJSONFields(obj)
+	if !changed {
+		// Keep the original value and text representation if nothing needs changing.
+		return nil, false
+	}
+	bs, err = json.Marshal(obj)
+	if err != nil {
+		return nil, false
+	}
+	return jsonLogValue{RawMessage: bs}, true
+}
+
+// expandJSONFields only visits decoded JSON trees, never the caller's values.
+func expandJSONFields(v any) (any, bool) {
+	changed := false
+	switch value := v.(type) {
+	case string:
+		return jsonAttrValue(value)
+	case map[string]any:
+		for key, item := range value {
+			if expanded, ok := expandJSONFields(item); ok {
+				value[key] = expanded
+				changed = true
+			}
+		}
+	case []any:
+		for i, item := range value {
+			if expanded, ok := expandJSONFields(item); ok {
+				value[i] = expanded
+				changed = true
+			}
+		}
+	}
+	return v, changed
 }
 
 func (h *DesensitizeHandler) desensitizeStruct(val reflect.Value) any {
